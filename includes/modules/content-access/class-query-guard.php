@@ -4,6 +4,9 @@ namespace Rolewright\Modules\Content_Access;
 defined( 'ABSPATH' ) || exit;
 
 final class Query_Guard {
+	/** @var int */
+	private $head_post = 0;
+
 	public function register(): void {
 		add_action( 'pre_get_posts', array( $this, 'exclude_hidden' ), 99 );
 		add_action( 'pre_get_comments', array( $this, 'exclude_hidden_comments' ), 99 );
@@ -20,6 +23,99 @@ final class Query_Guard {
 		add_filter( 'get_next_post_where', array( $this, 'adjacent_where' ) );
 		add_filter( 'wp_sitemaps_posts_query_args', array( $this, 'sitemap_args' ) );
 		add_filter( 'get_pages', array( $this, 'filter_pages' ) );
+		add_filter( 'oembed_request_post_id', array( $this, 'guard_oembed_id' ), 10, 2 );
+		add_filter( 'oembed_response_data', array( $this, 'guard_oembed_data' ), 10, 2 );
+		add_filter( 'the_title', array( $this, 'guard_the_title' ), 10, 2 );
+		add_filter( 'document_title_parts', array( $this, 'guard_document_title' ) );
+		add_filter( 'wp_title', array( $this, 'guard_wp_title' ), 10, 3 );
+		add_action( 'wp_head', array( $this, 'head_start' ), -10000 );
+		add_action( 'wp_head', array( $this, 'head_end' ), PHP_INT_MAX );
+	}
+
+	private static function denied( int $post_id ): bool {
+		return $post_id > 0 && Access::is_restricted( $post_id ) && Access::is_denied( $post_id );
+	}
+
+	public static function masked_title(): string {
+		return __( 'Restricted content', 'rolewright' );
+	}
+
+	public function guard_oembed_id( $post_id, $url = '' ) {
+		return self::denied( (int) $post_id ) ? 0 : $post_id;
+	}
+
+	public function guard_oembed_data( $data, $post = null ) {
+		$post = get_post( $post );
+		return $post && self::denied( (int) $post->ID ) ? false : $data;
+	}
+
+	public function guard_the_title( $title, $post_id = 0 ) {
+		return self::denied( (int) $post_id ) ? self::masked_title() : $title;
+	}
+
+	/** The denied post the current front-end request is about, or 0. */
+	private static function denied_queried(): int {
+		if ( is_admin() || ! is_singular() ) {
+			return 0;
+		}
+		$id = (int) get_queried_object_id();
+		return self::denied( $id ) ? $id : 0;
+	}
+
+	public function guard_document_title( $parts ) {
+		if ( is_array( $parts ) && self::denied_queried() ) {
+			$parts['title'] = self::masked_title();
+		}
+		return $parts;
+	}
+
+	public function guard_wp_title( $title, $sep = '', $location = '' ) {
+		if ( ! self::denied_queried() ) {
+			return $title;
+		}
+		$sep = trim( (string) $sep );
+		if ( '' === $sep ) {
+			return self::masked_title();
+		}
+		return 'right' === $location ? self::masked_title() . ' ' . $sep . ' ' : ' ' . $sep . ' ' . self::masked_title();
+	}
+
+	public function head_start(): void {
+		$this->head_post = self::denied_queried();
+		if ( $this->head_post ) {
+			ob_start();
+		}
+	}
+
+	public function head_end(): void {
+		if ( ! $this->head_post ) {
+			return;
+		}
+		$post = get_post( $this->head_post );
+		$html = (string) ob_get_clean();
+		$this->head_post = 0;
+		$raw  = $post ? array( (string) $post->post_title, (string) $post->post_excerpt ) : array();
+		echo self::scrub_head( $html, $raw ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+	}
+
+	/**
+	 * Removes what SEO and social plugins print about a denied post: description,
+	 * Open Graph and Twitter card tags, JSON-LD, and any other copy of its title or excerpt.
+	 *
+	 * @param string[] $secrets Raw title and excerpt of the post.
+	 */
+	public static function scrub_head( string $html, array $secrets ): string {
+		$html = (string) preg_replace( '#<meta\s[^>]*(?:property|name)\s*=\s*["\']?(?:og:|twitter:|article:|description)[^>]*>\s*#i', '', $html );
+		$html = (string) preg_replace( '#<script[^>]*application/ld\+json[^>]*>.*?</script>\s*#is', '', $html );
+		foreach ( $secrets as $secret ) {
+			$secret = trim( $secret );
+			if ( '' === $secret ) {
+				continue;
+			}
+			$forms = array_unique( array( $secret, esc_html( $secret ), esc_attr( $secret ), wp_strip_all_tags( $secret ), trim( (string) wp_json_encode( $secret ), '"' ) ) );
+			$html  = str_replace( $forms, self::masked_title(), $html );
+		}
+		return $html;
 	}
 
 	private function applies_to_query(): bool {
@@ -120,8 +216,8 @@ final class Query_Guard {
 	}
 
 	public function guard_title( $title, $post = null ) {
-		if ( $post instanceof \WP_Post && Access::is_restricted( (int) $post->ID ) && Access::is_denied( (int) $post->ID ) ) {
-			return __( 'Restricted content', 'rolewright' );
+		if ( $post instanceof \WP_Post && self::denied( (int) $post->ID ) ) {
+			return self::masked_title();
 		}
 		return $title;
 	}

@@ -10,6 +10,8 @@
 use Rolewright\Modules\Content_Access\Access;
 use Rolewright\Modules\Content_Access\Menu_Visibility;
 use Rolewright\Modules\Content_Access\Post_Editor;
+use Rolewright\Modules\Content_Access\Query_Guard;
+use Rolewright\Modules\Content_Access\Visibility;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
@@ -40,6 +42,11 @@ $msg    = 'Members only notice ' . $sfx;
 
 add_role( $role, 'RW Test Member', array( 'read' => true ) );
 
+$cpt      = 'rw_t_doc';
+$cpt_base = 'rw-docs-' . $sfx;
+register_post_type( $cpt, array( 'public' => true, 'show_in_rest' => true, 'rest_base' => $cpt_base, 'supports' => array( 'title', 'editor' ) ) );
+register_block_type( 'rwtest/secret', array( 'render_callback' => function () { return '<p>SECRETBLOCK</p>'; } ) );
+
 $users = array();
 $mk    = function ( $login, $r ) use ( &$users, $sfx ) {
 	$id = wp_insert_user(
@@ -56,6 +63,7 @@ $mk    = function ( $login, $r ) use ( &$users, $sfx ) {
 $u_right  = $mk( 'right', $role );
 $u_wrong  = $mk( 'wrong', 'subscriber' );
 $u_editor = $mk( 'editor', 'editor' );
+$u_author = $mk( 'author', 'author' );
 $admin_id = (int) get_users( array( 'role' => 'administrator', 'number' => 1, 'fields' => 'ID' ) )[0];
 $actors   = array(
 	'logged-out' => 0,
@@ -95,7 +103,11 @@ $att = wp_insert_attachment(
 );
 $posts[] = $att;
 
+$d_sec = wp_insert_post( array( 'post_type' => $cpt, 'post_title' => 'Doc ' . $secret, 'post_content' => 'Doc body ' . $secret, 'post_status' => 'publish', 'post_author' => $admin_id ) );
+$posts[] = $d_sec;
+
 Access::save_rules( $p_sec, array( $role ), $msg );
+Access::save_rules( $d_sec, array( $role ), $msg );
 
 $rules = Access::rules( $p_sec );
 $rw_ok( array( $role ) === $rules['roles'] && $msg === $rules['message'], 'rules saved and read back' );
@@ -180,6 +192,34 @@ foreach ( $actors as $who => $uid ) {
 	$rw_ok( ( $right ? 200 : 404 ) === $res->get_status(), "REST single status for $who (got " . $res->get_status() . ')' );
 	$rw_ok( $right || false === strpos( wp_json_encode( $res->get_data() ), $secret ), "REST single leaks nothing for $who" );
 
+	foreach ( array( '/WP/V2/POSTS/' . $p_sec, '/Wp/v2/Posts/' . $p_sec, '/wp/v2/' . $cpt_base . '/' . $d_sec, '/WP/V2/' . strtoupper( $cpt_base ) . '/' . $d_sec ) as $route ) {
+		$res = rest_do_request( new WP_REST_Request( 'GET', $route ) );
+		$rw_ok( ( $right ? 200 : 404 ) === $res->get_status() && ( $right || false === strpos( wp_json_encode( $res->get_data() ), $secret ) ), "REST $route status and no leak for $who (got " . $res->get_status() . ')' );
+	}
+	$req = new WP_REST_Request( 'GET', '/wp/v2/search' );
+	$req->set_param( 'search', 'findme' . $sfx );
+	$res  = rest_do_request( $req );
+	$sids = wp_list_pluck( (array) $res->get_data(), 'id' );
+	$rw_ok( $right === in_array( $p_sec, $sids, true ) && ( $right || false === strpos( wp_json_encode( $res->get_data() ), $secret ) ), "REST /wp/v2/search lists protected post only for right role ($who)" );
+	$req = new WP_REST_Request( 'GET', '/wp/v2/search' );
+	$req->set_param( 'search', 'Doc ' . $secret );
+	$req->set_param( 'subtype', $cpt );
+	$res = rest_do_request( $req );
+	$rw_ok( $right || false === strpos( wp_json_encode( $res->get_data() ), $secret ), "REST /wp/v2/search on the custom post type leaks nothing for $who" );
+	$req = new WP_REST_Request( 'GET', '/oembed/1.0/embed' );
+	$req->set_param( 'url', get_permalink( $p_sec ) );
+	$res = rest_do_request( $req );
+	$rw_ok( $right === ( false !== strpos( wp_json_encode( $res->get_data() ), $secret ) ), "REST oEmbed shows the protected title only to right role ($who, got " . $res->get_status() . ')' );
+	$rw_ok( ( $right ? $p_sec : 0 ) === (int) apply_filters( 'oembed_request_post_id', $p_sec, get_permalink( $p_sec ) ) && $right === is_array( get_oembed_response_data( $p_sec, 600 ) ), "oEmbed post id and response data refused for $who" );
+	$rw_ok( $right === ( false !== strpos( get_the_title( $p_sec ), $secret ) ) && $right === ( false !== strpos( apply_filters( 'the_title', 'Secret Title ' . $secret, $p_sec ), $secret ) ), "the_title masked for $who" );
+	$rw_ok( $right === ( false !== strpos( get_the_excerpt( $p_sec ), $secret ) ), "get_the_excerpt masked for $who" );
+	$GLOBALS['wp_the_query'] = $GLOBALS['wp_query'] = new WP_Query(); // phpcs:ignore WordPress.WP.GlobalVariablesOverride
+	$GLOBALS['wp_query']->query( array( 'p' => $p_sec ) );
+	$parts = apply_filters( 'document_title_parts', array( 'title' => 'Secret Title ' . $secret ) );
+	$wpt   = apply_filters( 'wp_title', 'Secret Title ' . $secret, '|', 'right' );
+	$rw_ok( $right === ( false !== strpos( $parts['title'], $secret ) ) && $right === ( false !== strpos( $wpt, $secret ) ), "document title and wp_title masked for $who" );
+	$GLOBALS['wp_the_query'] = $GLOBALS['wp_query'] = new WP_Query(); // phpcs:ignore WordPress.WP.GlobalVariablesOverride
+
 	$res = rest_do_request( new WP_REST_Request( 'GET', '/wp/v2/media/' . $att ) );
 	$rw_ok( ( $right ? 200 : 404 ) === $res->get_status(), "REST attachment of protected post status for $who (got " . $res->get_status() . ')' );
 
@@ -237,6 +277,60 @@ foreach ( $actors as $who => $uid ) {
 	wp_delete_nav_menu( $menu_id );
 	wp_set_current_user( $admin_id );
 }
+
+list( $code, $body ) = $fetch( '/wp-json/oembed/1.0/embed?url=' . rawurlencode( get_permalink( $p_sec ) ), 0 );
+$rw_ok( 404 === $code && false === strpos( $body, $secret ), 'HTTP oEmbed endpoint gives a logged-out visitor 404 and no title (got ' . $code . ')' );
+list( $code, $body ) = $fetch( '/wp-json/oembed/1.0/embed?url=' . rawurlencode( get_permalink( $p_new ) ), 0 );
+$rw_ok( 200 === $code && false !== strpos( $body, 'Public Newer' ), 'HTTP oEmbed still works for a public post (got ' . $code . ')' );
+$head = ! method_exists( Query_Guard::class, 'scrub_head' ) ? 'no scrub ' . $secret : Query_Guard::scrub_head( '<title>x</title><meta property="og:title" content="Secret Title ' . $secret . '" /><meta name="description" content="d" /><meta name="twitter:title" content="t" /><script type="application/ld+json">{"headline":"Secret Title ' . $secret . '"}</script><link rel="x" title="Secret Title ' . $secret . '">', array( 'Secret Title ' . $secret ) );
+$rw_ok( false === strpos( $head, $secret ) && false === strpos( $head, 'og:title' ) && false === strpos( $head, 'ld+json' ) && false !== strpos( $head, '<title>x</title>' ), 'head scrub removes Open Graph, description, JSON-LD and title copies' );
+
+// Block renderer preview and saved visibility attributes.
+$p_edp = wp_insert_post( array( 'post_title' => 'editor own', 'post_status' => 'draft', 'post_author' => $u_editor ) );
+$p_aup = wp_insert_post( array( 'post_title' => 'author own', 'post_status' => 'draft', 'post_author' => $u_author ) );
+$pat   = wp_insert_post( array( 'post_type' => 'wp_block', 'post_title' => 'pattern ' . $sfx, 'post_status' => 'publish', 'post_content' => '<!-- wp:paragraph {"rolewrightMode":"roles","rolewrightRoles":["administrator"]} --><p>PATTERNSECRET</p><!-- /wp:paragraph -->' ) );
+array_push( $posts, $p_edp, $p_aup, $pat );
+$render = function ( $name, $post_id, $attrs ) {
+	$r = new WP_REST_Request( 'GET', '/wp/v2/block-renderer/' . $name );
+	$r->set_query_params( array( 'post_id' => $post_id, 'context' => 'edit', 'attributes' => $attrs ) );
+	$res = rest_do_request( $r );
+	return array( $res->get_status(), wp_json_encode( $res->get_data() ) );
+};
+$hide = array( 'rolewrightMode' => 'roles', 'rolewrightRoles' => array( 'administrator' ) );
+wp_set_current_user( $u_editor );
+list( $code, $json ) = $render( 'rwtest/secret', $p_edp, $hide );
+$rw_ok( 200 === $code && false !== strpos( $json, 'SECRETBLOCK' ), 'editor preview shows the block being edited despite its role rule (got ' . $code . ')' );
+list( $code, $json ) = $render( 'core/block', $p_edp, array( 'ref' => $pat ) );
+$rw_ok( 200 === $code && false === strpos( $json, 'PATTERNSECRET' ), 'editor preview still hides nested blocks the viewer may not see (got ' . $code . ')' );
+$rw_ok( method_exists( Visibility::class, 'preview_active' ) && ! Visibility::preview_active(), 'preview flag cleared when the request ends' );
+wp_set_current_user( $u_author );
+list( $code, $json ) = $render( 'rwtest/secret', $p_edp, $hide );
+$rw_ok( 200 !== $code && false === strpos( $json, 'SECRETBLOCK' ), 'author cannot render hidden block content for a post they cannot edit (got ' . $code . ')' );
+$sticky = do_blocks( '<!-- wp:paragraph {"rolewrightMode":"roles","rolewrightRoles":["administrator"]} --><p>STICKY</p><!-- /wp:paragraph -->' );
+$rw_ok( false === strpos( $sticky, 'STICKY' ), 'block filtering applies again after a block-renderer request' );
+list( $code, $json ) = $render( 'rwtest/secret', $p_aup, $hide );
+$rw_ok( 200 === $code && false !== strpos( $json, 'SECRETBLOCK' ), 'author preview of a block in their own post still works (got ' . $code . ')' );
+
+$hidden_block = '<!-- wp:paragraph {"rolewrightMode":"roles","rolewrightRoles":["administrator"]} --><p>KEEP</p><!-- /wp:paragraph -->';
+wp_set_current_user( $u_editor );
+$sp = wp_insert_post( array( 'post_title' => 'attr save', 'post_status' => 'draft', 'post_content' => $hidden_block ) );
+$posts[] = $sp;
+$rw_ok( false === strpos( get_post( $sp )->post_content, 'rolewrightMode' ) && false !== strpos( get_post( $sp )->post_content, 'KEEP' ), 'visibility attributes stripped when a user without the access capability saves them' );
+$r = new WP_REST_Request( 'POST', '/wp/v2/posts' );
+$r->set_body_params( array( 'title' => 'rest attr', 'status' => 'draft', 'content' => $hidden_block ) );
+$res = rest_do_request( $r );
+$rid = (int) ( $res->get_data()['id'] ?? 0 );
+$posts[] = $rid;
+$rw_ok( $rid && false === strpos( get_post( $rid )->post_content, 'rolewrightMode' ), 'visibility attributes stripped on a REST save by a user without the access capability' );
+wp_set_current_user( $admin_id );
+$kp = wp_insert_post( array( 'post_title' => 'attr keep', 'post_status' => 'draft', 'post_author' => $u_editor, 'post_content' => $hidden_block ) );
+$posts[] = $kp;
+$rw_ok( false !== strpos( get_post( $kp )->post_content, 'rolewrightMode' ), 'a user with the access capability can set visibility attributes' );
+wp_set_current_user( $u_editor );
+wp_update_post( array( 'ID' => $kp, 'post_content' => '<!-- wp:paragraph --><p>new intro</p><!-- /wp:paragraph -->' . str_replace( 'KEEP', 'KEEP edited', $hidden_block ) . '<!-- wp:paragraph {"rolewrightMode":"logged_in"} --><p>ADDED</p><!-- /wp:paragraph -->' ) );
+$kc = get_post( $kp )->post_content;
+$rw_ok( false !== strpos( $kc, '"rolewrightRoles":["administrator"]} --><p>KEEP edited' ) && false === strpos( $kc, '"logged_in"' ) && false !== strpos( $kc, 'ADDED' ), 'existing visibility attributes preserved, new ones stripped, on an edit by a user without the capability' );
+wp_set_current_user( $admin_id );
 
 wp_set_current_user( $u_editor );
 list( $code, $body ) = array( 0, '' );
@@ -307,6 +401,7 @@ foreach ( $users as $uid ) {
 	wp_delete_user( $uid );
 }
 remove_role( $role );
+unregister_block_type( 'rwtest/secret' );
 
 echo "\nPASS: $rw_pass FAIL: $rw_fail\n";
 exit( $rw_fail ? 1 : 0 );

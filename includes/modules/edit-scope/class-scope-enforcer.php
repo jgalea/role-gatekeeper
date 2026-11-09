@@ -16,6 +16,123 @@ final class Scope_Enforcer {
 		add_action( 'admin_bar_menu', array( $this, 'admin_bar' ), 999 );
 		add_filter( 'get_terms_args', array( $this, 'filter_term_lists' ), 10, 2 );
 		add_action( 'set_object_terms', array( $this, 'enforce_assignment' ), 10, 6 );
+		add_filter( 'wp_insert_post_data', array( $this, 'guard_author_change' ), 20, 4 );
+		add_filter( 'wp_count_posts', array( $this, 'count_posts' ), 10, 3 );
+		add_action( 'rest_api_init', array( $this, 'rest_author_hooks' ) );
+	}
+
+	/**
+	 * Whether the user may set $new_author on the post. Applies only when the author
+	 * actually changes: the post must be within the user's scope before the change (if
+	 * it exists) and after it, so a post can't be handed to a blocked author nor taken
+	 * from one.
+	 */
+	public static function author_change_allowed( int $user_id, ?\WP_Post $old, int $new_author, string $new_status = '' ): bool {
+		if ( Evaluator::exempt( $user_id ) || $new_author <= 0 ) {
+			return true;
+		}
+		$current = $old && $old->ID ? (int) $old->post_author : $user_id;
+		if ( $new_author === $current ) {
+			return true;
+		}
+		if ( $old && $old->ID && ! Evaluator::post_allowed( $user_id, $old ) ) {
+			return false;
+		}
+		$after              = $old ? clone $old : new \WP_Post( (object) array( 'ID' => 0, 'post_type' => 'post', 'post_status' => 'draft', 'filter' => 'raw' ) );
+		$after->post_author = (string) $new_author;
+		if ( '' !== $new_status && 'auto-draft' !== $new_status ) {
+			$after->post_status = $new_status;
+		} elseif ( 'auto-draft' === $after->post_status ) {
+			$after->post_status = 'draft';
+		}
+		return Evaluator::post_allowed( $user_id, $after );
+	}
+
+	/**
+	 * Keeps the stored author when the change isn't allowed. Covers every save path
+	 * (classic editor, quick and bulk edit, REST, XML-RPC).
+	 *
+	 * @param array $data Slashed post data.
+	 */
+	public function guard_author_change( $data, $postarr = array(), $unsanitized = array(), $update = false ) {
+		$uid = get_current_user_id();
+		if ( ! $uid || ! is_array( $data ) || ! isset( $data['post_author'] ) || ( isset( $data['post_type'] ) && 'revision' === $data['post_type'] ) ) {
+			return $data;
+		}
+		$old = null;
+		if ( ! empty( $postarr['ID'] ) ) {
+			$found = get_post( (int) $postarr['ID'] );
+			$old   = $found instanceof \WP_Post ? $found : null;
+		}
+		if ( ! $old ) {
+			$old = new \WP_Post(
+				(object) array(
+					'ID'          => 0,
+					'post_type'   => isset( $data['post_type'] ) ? (string) $data['post_type'] : 'post',
+					'post_status' => 'draft',
+					'post_author' => (string) $uid,
+					'filter'      => 'raw',
+				)
+			);
+		}
+		$status = isset( $data['post_status'] ) ? (string) $data['post_status'] : '';
+		if ( ! self::author_change_allowed( $uid, $old, (int) $data['post_author'], $status ) ) {
+			$data['post_author'] = $old->ID ? (int) $old->post_author : $uid;
+		}
+		return $data;
+	}
+
+	public function rest_author_hooks(): void {
+		foreach ( get_post_types( array( 'show_in_rest' => true ) ) as $type ) {
+			add_filter( "rest_pre_insert_{$type}", array( $this, 'rest_author_check' ), 20, 2 );
+		}
+	}
+
+	/** Answers 403 over REST instead of silently keeping the old author. */
+	public function rest_author_check( $prepared, $request ) {
+		$uid = get_current_user_id();
+		if ( ! $uid || ! is_object( $prepared ) || is_wp_error( $prepared ) || ! isset( $prepared->post_author ) ) {
+			return $prepared;
+		}
+		$old    = ! empty( $prepared->ID ) ? get_post( (int) $prepared->ID ) : null;
+		$status = isset( $prepared->post_status ) ? (string) $prepared->post_status : '';
+		if ( ! self::author_change_allowed( $uid, $old instanceof \WP_Post ? $old : null, (int) $prepared->post_author, $status ) ) {
+			return new \WP_Error( 'rolewright_edit_scope_blocked', self::blocked_message(), array( 'status' => 403 ) );
+		}
+		return $prepared;
+	}
+
+	/**
+	 * The status links above the admin list count only the posts the list shows.
+	 *
+	 * @param object $counts
+	 */
+	public function count_posts( $counts, $type, $perm ) {
+		global $pagenow, $wpdb;
+		if ( ! is_object( $counts ) || ! is_admin() || 'edit.php' !== $pagenow || ! Rules::hide_in_lists() ) {
+			return $counts;
+		}
+		$uid = get_current_user_id();
+		$c   = $uid ? Evaluator::list_constraints( $uid ) : array();
+		if ( ! $c ) {
+			return $counts;
+		}
+		$counts = clone $counts;
+		$ids    = isset( $c['post__in'] ) ? $c['post__in'] : $c['post__not_in'];
+		$ids    = array_values( array_filter( array_map( 'intval', $ids ) ) );
+		$by     = array();
+		if ( $ids ) {
+			$marks = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+			$rows  = $wpdb->get_results( $wpdb->prepare( "SELECT post_status, COUNT(*) AS n FROM {$wpdb->posts} WHERE post_type = %s AND ID IN ($marks) GROUP BY post_status", array_merge( array( (string) $type ), $ids ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders
+			foreach ( (array) $rows as $row ) {
+				$by[ $row->post_status ] = (int) $row->n;
+			}
+		}
+		foreach ( array_keys( get_object_vars( $counts ) ) as $status ) {
+			$n                 = isset( $by[ $status ] ) ? $by[ $status ] : 0;
+			$counts->$status = isset( $c['post__in'] ) ? $n : max( 0, (int) $counts->$status - $n );
+		}
+		return $counts;
 	}
 
 	public static function blocked_message(): string {

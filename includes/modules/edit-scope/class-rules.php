@@ -96,6 +96,10 @@ final class Rules {
 		if ( ! $old ) {
 			return new \WP_Error( 'rolewright_no_rule', __( 'That rule does not exist.', 'rolewright' ) );
 		}
+		$check = self::can_touch( $actor, $old );
+		if ( is_wp_error( $check ) ) {
+			return $check;
+		}
 		$rule = self::validate( $actor, $raw );
 		if ( is_wp_error( $rule ) ) {
 			return $rule;
@@ -118,12 +122,46 @@ final class Rules {
 		if ( ! $old ) {
 			return new \WP_Error( 'rolewright_no_rule', __( 'That rule does not exist.', 'rolewright' ) );
 		}
+		$check = self::can_touch( $actor, $old );
+		if ( is_wp_error( $check ) ) {
+			return $check;
+		}
 		$all = self::all();
 		unset( $all[ $id ] );
 		update_option( self::OPTION, $all, false );
 		self::flush();
 		self::fire( $actor, $id, $old, array() );
 		return true;
+	}
+
+	/**
+	 * The stored rule's subject must be within the actor's reach, so a rule on someone
+	 * above the actor can't be loosened or removed by them.
+	 *
+	 * @return true|\WP_Error
+	 */
+	private static function can_touch( int $actor, array $rule ) {
+		$subject = isset( $rule['subject'] ) ? (string) $rule['subject'] : '';
+		if ( isset( $rule['subject_type'] ) && 'user' === $rule['subject_type'] ) {
+			if ( ! Guard::can_act_on_user( $actor, (int) $subject ) ) {
+				return new \WP_Error( 'rolewright_user_above_actor', __( 'You cannot change rules for a user with more access than you.', 'rolewright' ) );
+			}
+		} elseif ( ! self::role_within_reach( $actor, $subject ) ) {
+			return new \WP_Error( 'rolewright_role_above_actor', __( 'You cannot change rules for a role with more access than you.', 'rolewright' ) );
+		}
+		return true;
+	}
+
+	/** A deleted role is within reach; one holding a critical cap the actor lacks is not. */
+	private static function role_within_reach( int $actor, string $role ): bool {
+		if ( Guard::is_super( $actor ) ) {
+			return true;
+		}
+		$obj = get_role( $role );
+		if ( ! $obj ) {
+			return true;
+		}
+		return ! Guard::missing( Guard::critical_subset( (array) $obj->capabilities ), Guard::user_caps( $actor ) );
 	}
 
 	/** @return string[] */
@@ -161,6 +199,9 @@ final class Rules {
 			}
 			if ( $role->has_cap( Caps::MANAGE_ACCESS ) ) {
 				return new \WP_Error( 'rolewright_edit_scope_exempt', __( 'Roles that can manage access rules are exempt from edit scope.', 'rolewright' ) );
+			}
+			if ( ! self::role_within_reach( $actor, $subject ) ) {
+				return new \WP_Error( 'rolewright_role_above_actor', __( 'You cannot change rules for a role with more access than you.', 'rolewright' ) );
 			}
 		} else {
 			$uid  = isset( $raw['subject'] ) ? absint( $raw['subject'] ) : 0;
