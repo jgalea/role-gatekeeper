@@ -1,13 +1,13 @@
 <?php
 /**
- * Run last: wp eval-file wp-content/plugins/rolewright/tests/uninstall-smoke.php
+ * Run last: wp eval-file wp-content/plugins/role-gatekeeper/tests/uninstall-smoke.php
  *
  * Runs uninstall.php in place (never `wp plugin uninstall` on the bind-mounted plugin),
  * checks what it removed, then puts the plugin's caps and module settings back.
  */
 
-use Rolewright\Modules\Safety\Caps;
-use Rolewright\Modules\Safety\Enforcer;
+use Rolegate\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Enforcer;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
@@ -35,7 +35,7 @@ $rw_plugin_caps = function ( array $roles ) {
 	$out = array();
 	foreach ( $roles as $slug => $data ) {
 		foreach ( array_keys( (array) ( $data['capabilities'] ?? array() ) ) as $cap ) {
-			if ( 0 === strpos( (string) $cap, 'rolewright_' ) ) {
+			if ( 0 === strpos( (string) $cap, 'rolegate_' ) ) {
 				$out[] = $slug . ':' . $cap;
 			}
 		}
@@ -43,7 +43,7 @@ $rw_plugin_caps = function ( array $roles ) {
 	return $out;
 };
 $rw_probe_count = function () use ( $wpdb ) {
-	return (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name = %s", 'rolewright_uninstall_probe' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+	return (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name = %s", 'rolegate_uninstall_probe' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 };
 
 $rw_admin = get_users(
@@ -55,12 +55,12 @@ $rw_admin = get_users(
 );
 $rw_admin = (int) $rw_admin[0];
 $rw_keep  = array();
-foreach ( array( 'rolewright_modules', 'rolewright_automation' ) as $rw_opt ) {
+foreach ( array( 'rolegate_modules', 'rolegate_automation' ) as $rw_opt ) {
 	$rw_keep[ $rw_opt ] = get_option( $rw_opt, null );
 }
 
-update_user_meta( $rw_admin, 'rolewright_rescue_token', array( 'hash' => str_repeat( 'a', 64 ), 'expires' => time() + 900 ) );
-update_option( 'rolewright_uninstall_probe', 1, false );
+update_user_meta( $rw_admin, 'rolegate_rescue_token', array( 'hash' => str_repeat( 'a', 64 ), 'expires' => time() + 900 ) );
+update_option( 'rolegate_uninstall_probe', 1, false );
 Enforcer::as_system(
 	function () {
 		get_role( 'editor' )->add_cap( Caps::VIEW_AUDIT );
@@ -85,7 +85,7 @@ if ( is_multisite() ) {
 		)
 	);
 	switch_to_blog( $rw_sub_ok );
-	update_option( 'rolewright_uninstall_probe', 1, false );
+	update_option( 'rolegate_uninstall_probe', 1, false );
 	Enforcer::as_system(
 		function () {
 			get_role( 'administrator' )->add_cap( Caps::MANAGE );
@@ -100,18 +100,18 @@ if ( is_multisite() ) {
 	restore_current_blog();
 }
 
-$rw_ok( 1 === $rw_probe_count() && $rw_plugin_caps( $rw_raw_roles() ) && get_user_meta( $rw_admin, 'rolewright_rescue_token', true ), 'before: options, caps and the rescue token exist (setup)' );
+$rw_ok( 1 === $rw_probe_count() && $rw_plugin_caps( $rw_raw_roles() ) && get_user_meta( $rw_admin, 'rolegate_rescue_token', true ), 'before: options, caps and the rescue token exist (setup)' );
 
 if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
-	define( 'WP_UNINSTALL_PLUGIN', 'rolewright/rolewright.php' );
+	define( 'WP_UNINSTALL_PLUGIN', plugin_basename( ROLEGATE_FILE ) );
 }
-include WP_PLUGIN_DIR . '/rolewright/uninstall.php';
+include ROLEGATE_DIR . 'uninstall.php';
 $rw_ok( true, 'uninstall.php ran to the end without a fatal error' );
 
 wp_cache_delete( $rw_admin, 'user_meta' );
-$rw_ok( 0 === $rw_probe_count(), 'options: rolewright_* options are removed on the current site' );
-$rw_ok( array() === $rw_plugin_caps( $rw_raw_roles() ), 'caps: no role keeps a rolewright_* cap' );
-$rw_ok( ! get_user_meta( $rw_admin, 'rolewright_rescue_token', true ), 'user meta: the rescue token is removed' );
+$rw_ok( 0 === $rw_probe_count(), 'options: rolegate_* options are removed on the current site' );
+$rw_ok( array() === $rw_plugin_caps( $rw_raw_roles() ), 'caps: no role keeps a rolegate_* cap' );
+$rw_ok( ! get_user_meta( $rw_admin, 'rolegate_rescue_token', true ), 'user meta: the rescue token is removed' );
 if ( is_multisite() ) {
 	switch_to_blog( $rw_sub_ok );
 	$rw_ok( 0 === $rw_probe_count() && array() === $rw_plugin_caps( $rw_raw_roles() ), 'multisite: subsite options and caps are removed too' );

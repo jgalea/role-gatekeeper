@@ -1,7 +1,7 @@
 <?php
-namespace Rolewright\Modules\Login_Redirects;
+namespace Rolegate\Modules\Login_Redirects;
 
-use Rolewright\Modules\Site_Access\Redirects;
+use Rolegate\Modules\Site_Access\Redirects;
 
 defined( 'ABSPATH' ) || exit;
 

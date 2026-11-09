@@ -1,15 +1,15 @@
 <?php
-namespace Rolewright\Modules\Roles;
+namespace Rolegate\Modules\Roles;
 
-use Rolewright\Modules\Safety\Caps;
-use Rolewright\Modules\Safety\Enforcer;
-use Rolewright\Modules\Safety\Guard;
+use Rolegate\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Enforcer;
+use Rolegate\Modules\Safety\Guard;
 
 defined( 'ABSPATH' ) || exit;
 
 final class Role_Service {
-	const OPTION_BACKUPS = 'rolewright_roles_backups';
-	const OPTION_EXTRA   = 'rolewright_extra_default_roles';
+	const OPTION_BACKUPS = 'rolegate_roles_backups';
+	const OPTION_EXTRA   = 'rolegate_extra_default_roles';
 	const MAX_BACKUPS    = 5;
 	const CORE_ROLES     = array( 'administrator', 'editor', 'author', 'contributor', 'subscriber' );
 
@@ -18,7 +18,7 @@ final class Role_Service {
 		$name = trim( wp_strip_all_tags( $name ) );
 		$slug = self::slug_from( $name );
 		if ( '' === $name || '' === $slug ) {
-			return new \WP_Error( 'rolewright_invalid_name', __( 'Enter a role name.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_invalid_name', __( 'Enter a role name.', 'role-gatekeeper' ) );
 		}
 		$valid = Guard::valid_new_role_slug( $slug );
 		if ( is_wp_error( $valid ) ) {
@@ -31,7 +31,7 @@ final class Role_Service {
 		}
 		Role_Store::add( $slug, $name, $caps );
 		do_action(
-			'rolewright_changed',
+			'rolegate_changed',
 			'role.created',
 			array(
 				'actor'  => $actor,
@@ -49,9 +49,9 @@ final class Role_Service {
 	/** @return string|\WP_Error slug of the copy */
 	public static function clone_role( int $actor, string $source, string $name ) {
 		if ( ! get_role( $source ) ) {
-			return new \WP_Error( 'rolewright_no_role', __( 'That role does not exist.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_no_role', __( 'That role does not exist.', 'role-gatekeeper' ) );
 		}
-		$veto = apply_filters( 'rolewright_role_change_veto', null, 'clone', $actor, $source );
+		$veto = apply_filters( 'rolegate_role_change_veto', null, 'clone', $actor, $source );
 		if ( $veto instanceof \WP_Error ) {
 			return $veto;
 		}
@@ -62,10 +62,10 @@ final class Role_Service {
 	public static function rename( int $actor, string $role, string $name ) {
 		$name = trim( wp_strip_all_tags( $name ) );
 		if ( '' === $name ) {
-			return new \WP_Error( 'rolewright_invalid_name', __( 'Enter a role name.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_invalid_name', __( 'Enter a role name.', 'role-gatekeeper' ) );
 		}
 		if ( ! get_role( $role ) ) {
-			return new \WP_Error( 'rolewright_no_role', __( 'That role does not exist.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_no_role', __( 'That role does not exist.', 'role-gatekeeper' ) );
 		}
 		$ok = Guard::assert_can_rename_role( $actor, $role );
 		if ( is_wp_error( $ok ) ) {
@@ -74,7 +74,7 @@ final class Role_Service {
 		$before = Role_Store::name( $role );
 		Role_Store::rename( $role, $name );
 		do_action(
-			'rolewright_changed',
+			'rolegate_changed',
 			'role.renamed',
 			array(
 				'actor'  => $actor,
@@ -95,9 +95,9 @@ final class Role_Service {
 		$counts = Role_Store::user_counts();
 		if ( ! empty( $counts[ $role ] ) ) {
 			return new \WP_Error(
-				'rolewright_role_in_use',
+				'rolegate_role_in_use',
 				/* translators: %s: role name */
-				sprintf( __( 'The %s role still has users. Move them to another role first.', 'rolewright' ), Role_Store::name( $role ) )
+				sprintf( __( 'The %s role still has users. Move them to another role first.', 'role-gatekeeper' ), Role_Store::name( $role ) )
 			);
 		}
 		$before = array(
@@ -107,7 +107,7 @@ final class Role_Service {
 		Role_Store::remove( $role );
 		self::forget_extra_default( $role );
 		do_action(
-			'rolewright_changed',
+			'rolegate_changed',
 			'role.deleted',
 			array(
 				'actor'  => $actor,
@@ -155,20 +155,20 @@ final class Role_Service {
 		$extras = array_values( array_diff( array_unique( $extras ), array( $role ) ) );
 		foreach ( array_merge( array( $role ), $extras ) as $r ) {
 			if ( ! get_role( $r ) ) {
-				return new \WP_Error( 'rolewright_no_role', __( 'That role does not exist.', 'rolewright' ) );
+				return new \WP_Error( 'rolegate_no_role', __( 'That role does not exist.', 'role-gatekeeper' ) );
 			}
 			if ( Guard::critical_subset( Role_Store::caps( $r ) ) ) {
 				return new \WP_Error(
-					'rolewright_default_too_powerful',
+					'rolegate_default_too_powerful',
 					/* translators: %s: role name */
-					sprintf( __( 'The %s role holds powerful capabilities and can\'t be given to new registrations.', 'rolewright' ), Role_Store::name( $r ) )
+					sprintf( __( 'The %s role holds powerful capabilities and can\'t be given to new registrations.', 'role-gatekeeper' ), Role_Store::name( $r ) )
 				);
 			}
 			if ( ! Guard::can_assign_role( $actor, $r, 0 ) ) {
 				return new \WP_Error(
-					'rolewright_cannot_assign',
+					'rolegate_cannot_assign',
 					/* translators: %s: role name */
-					sprintf( __( 'You can\'t assign the %s role.', 'rolewright' ), Role_Store::name( $r ) )
+					sprintf( __( 'You can\'t assign the %s role.', 'role-gatekeeper' ), Role_Store::name( $r ) )
 				);
 			}
 		}
@@ -179,7 +179,7 @@ final class Role_Service {
 		update_option( 'default_role', $role );
 		update_option( self::OPTION_EXTRA, $extras, false );
 		do_action(
-			'rolewright_changed',
+			'rolegate_changed',
 			'role.default_set',
 			array(
 				'actor'  => $actor,
@@ -263,11 +263,11 @@ final class Role_Service {
 				}
 			);
 			self::drop_backup( $backup );
-			return new \WP_Error( 'rolewright_lockout', __( 'The reset would lock you out of Rolewright, so the roles were put back as they were.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_lockout', __( 'The reset would lock you out of Role Gatekeeper, so the roles were put back as they were.', 'role-gatekeeper' ) );
 		}
 
 		do_action(
-			'rolewright_changed',
+			'rolegate_changed',
 			'roles.reset',
 			array(
 				'actor'  => $actor,
@@ -327,7 +327,7 @@ final class Role_Service {
 	 */
 	private static function assert_can_reset( int $actor, array $defaults ) {
 		if ( ! $defaults ) {
-			return new \WP_Error( 'rolewright_reset_failed', __( 'The default roles could not be built, so nothing was changed.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_reset_failed', __( 'The default roles could not be built, so nothing was changed.', 'role-gatekeeper' ) );
 		}
 		if ( ! Guard::is_super( $actor ) ) {
 			$needed = array();
@@ -337,9 +337,9 @@ final class Role_Service {
 			$lacking = Guard::missing( array_values( array_unique( $needed ) ), Guard::user_caps( $actor ) );
 			if ( $lacking ) {
 				return new \WP_Error(
-					'rolewright_role_above_actor',
+					'rolegate_role_above_actor',
 					/* translators: %s: comma-separated capability names */
-					sprintf( __( 'Resetting the core roles needs every capability they carry by default, and you don\'t hold these: %s.', 'rolewright' ), implode( ', ', $lacking ) )
+					sprintf( __( 'Resetting the core roles needs every capability they carry by default, and you don\'t hold these: %s.', 'role-gatekeeper' ), implode( ', ', $lacking ) )
 				);
 			}
 		}

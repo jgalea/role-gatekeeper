@@ -1,32 +1,32 @@
 <?php
-namespace Rolewright\Modules\Automation;
+namespace Rolegate\Modules\Automation;
 
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Caps;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * rolewright/v1. Reads need the matching Rolewright capability. Writes additionally need the
+ * rolegate/v1. Reads need the matching Role Gatekeeper capability. Writes additionally need the
  * "allow changes" setting; they run as the signed-in caller through the same Guard checks as
  * the admin screens and never elevate.
  */
 final class Rest_Routes {
-	const NS = 'rolewright/v1';
+	const NS = 'rolegate/v1';
 
 	private const SLUG = '(?P<slug>[A-Za-z0-9_:\-]+)';
 
 	public function register(): void {
 		$read  = function ( string $cap ) {
 			return function () use ( $cap ) {
-				return current_user_can( $cap ) ? true : new \WP_Error( 'rest_forbidden', __( 'Sorry, you are not allowed to do that.', 'rolewright' ), array( 'status' => rest_authorization_required_code() ) );
+				return current_user_can( $cap ) ? true : new \WP_Error( 'rest_forbidden', __( 'Sorry, you are not allowed to do that.', 'role-gatekeeper' ), array( 'status' => rest_authorization_required_code() ) );
 			};
 		};
 		$write = function ( string $cap ) {
 			return function () use ( $cap ) {
 				if ( ! Automation_Module::settings()['rest_writes'] ) {
-					return new \WP_Error( 'rolewright_read_only', __( 'The Rolewright REST API is read-only. Enable changes under Rolewright > Automation.', 'rolewright' ), array( 'status' => 403 ) );
+					return new \WP_Error( 'rolegate_read_only', __( 'The Role Gatekeeper REST API is read-only. Enable changes under Role Gatekeeper > Automation.', 'role-gatekeeper' ), array( 'status' => 403 ) );
 				}
-				return current_user_can( $cap ) ? true : new \WP_Error( 'rest_forbidden', __( 'Sorry, you are not allowed to do that.', 'rolewright' ), array( 'status' => rest_authorization_required_code() ) );
+				return current_user_can( $cap ) ? true : new \WP_Error( 'rest_forbidden', __( 'Sorry, you are not allowed to do that.', 'role-gatekeeper' ), array( 'status' => rest_authorization_required_code() ) );
 			};
 		};
 		$list  = array(
@@ -180,7 +180,7 @@ final class Rest_Routes {
 		$unassign = array_map( 'strval', (array) $request->get_param( 'unassign' ) );
 		foreach ( $assign as $role ) {
 			if ( ! get_role( $role ) ) {
-				return $this->error( new \WP_Error( 'rolewright_no_role', __( 'That role does not exist.', 'rolewright' ) ) );
+				return $this->error( new \WP_Error( 'rolegate_no_role', __( 'That role does not exist.', 'role-gatekeeper' ) ) );
 			}
 			$ask = Gate::confirm_error( (bool) $request['confirm'], $role, array() );
 			if ( $ask ) {
@@ -212,7 +212,7 @@ final class Rest_Routes {
 		if ( is_array( $data ) && isset( $data['status'] ) ) {
 			return $error;
 		}
-		$forbidden = array( 'rolewright_lockout', 'rolewright_protected_role', 'rolewright_cap_not_held', 'rolewright_role_above_actor', 'rolewright_cannot_assign', 'rolewright_user_above_actor' );
+		$forbidden = array( 'rolegate_lockout', 'rolegate_protected_role', 'rolegate_cap_not_held', 'rolegate_role_above_actor', 'rolegate_cannot_assign', 'rolegate_user_above_actor' );
 		$status    = in_array( $error->get_error_code(), $forbidden, true ) ? 403 : 400;
 		$data      = is_array( $data ) ? $data : array();
 		return new \WP_Error( $error->get_error_code(), $error->get_error_message(), array_merge( $data, array( 'status' => $status ) ) );

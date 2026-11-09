@@ -1,5 +1,5 @@
 <?php
-namespace Rolewright\Core;
+namespace Rolegate\Core;
 
 defined( 'ABSPATH' ) || exit;
 

@@ -1,22 +1,22 @@
 <?php
 /**
- * Run: wp eval-file wp-content/plugins/rolewright/tests/edit-scope-smoke.php
+ * Run: wp eval-file wp-content/plugins/role-gatekeeper/tests/edit-scope-smoke.php
  */
 
-use Rolewright\Core\Plugin;
-use Rolewright\Modules\Edit_Scope\Evaluator;
-use Rolewright\Modules\Edit_Scope\Gravity_Forms;
-use Rolewright\Modules\Edit_Scope\Rules;
-use Rolewright\Modules\Edit_Scope\Scope_Enforcer;
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Core\Plugin;
+use Rolegate\Modules\Edit_Scope\Evaluator;
+use Rolegate\Modules\Edit_Scope\Gravity_Forms;
+use Rolegate\Modules\Edit_Scope\Rules;
+use Rolegate\Modules\Edit_Scope\Scope_Enforcer;
+use Rolegate\Modules\Safety\Caps;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
 }
 
-// Multisite: site administrators hold rolewright_* caps only when the network grants it; these checks are about role-based access, so grant it.
+// Multisite: site administrators hold rolegate_* caps only when the network grants it; these checks are about role-based access, so grant it.
 if ( is_multisite() ) {
-	add_filter( 'rolewright_multisite_site_admin_access', '__return_true', 20 );
+	add_filter( 'rolegate_multisite_site_admin_access', '__return_true', 20 );
 }
 
 require_once ABSPATH . 'wp-admin/includes/admin.php';
@@ -86,7 +86,7 @@ $clear();
 
 $events = array();
 add_action(
-	'rolewright_changed',
+	'rolegate_changed',
 	function ( $type, $data ) use ( &$events ) {
 		$events[] = array( $type, $data );
 	},
@@ -234,11 +234,11 @@ $clear();
 
 // Rule validation and safety.
 $admin_role = Rules::add( $admin, array( 'subject_type' => 'role', 'subject' => 'administrator', 'mode' => 'block', 'by' => 'post', 'ids' => array( $p_ed ) ) );
-$ok( is_wp_error( $admin_role ) && 'rolewright_edit_scope_exempt' === $admin_role->get_error_code(), 'rule on a role that manages access is refused' );
+$ok( is_wp_error( $admin_role ) && 'rolegate_edit_scope_exempt' === $admin_role->get_error_code(), 'rule on a role that manages access is refused' );
 $self = Rules::add( $admin, array( 'subject_type' => 'user', 'subject' => $admin, 'mode' => 'block', 'by' => 'post', 'ids' => array( $p_ed ) ) );
 $ok( is_wp_error( $self ), 'rule on yourself is refused' );
 $denied = Rules::add( $ed, array( 'subject_type' => 'role', 'subject' => 'author', 'mode' => 'block', 'by' => 'post', 'ids' => array( $p_ed ) ) );
-$ok( is_wp_error( $denied ) && 'rolewright_forbidden' === $denied->get_error_code(), 'actor without rolewright_manage_access cannot add a rule' );
+$ok( is_wp_error( $denied ) && 'rolegate_forbidden' === $denied->get_error_code(), 'actor without rolegate_manage_access cannot add a rule' );
 $ok( is_wp_error( Rules::add( $admin, array( 'subject_type' => 'role', 'subject' => 'editor', 'mode' => 'block', 'by' => 'post', 'ids' => array( 'abc', '-3' ) ) ) ), 'non-numeric IDs refused' );
 $ok( is_wp_error( Rules::add( $admin, array( 'subject_type' => 'role', 'subject' => 'editor', 'mode' => 'block', 'by' => 'assign', 'taxonomy' => 'nope', 'ids' => array( 1 ) ) ) ), 'unknown taxonomy refused' );
 $ok( is_wp_error( Rules::add( $admin, array( 'subject_type' => 'role', 'subject' => 'editor', 'mode' => 'maybe', 'by' => 'post', 'ids' => array( 1 ) ) ) ), 'bad mode refused' );
@@ -264,16 +264,16 @@ $ok( $can( $ed, 'edit_post', $p_ed2 ), 'deleting the rule restores access' );
 $ok( is_wp_error( Rules::delete( $ed, 'x' ) ), 'delete needs the access capability' );
 
 global $submenu;
-( new Rolewright\Modules\Edit_Scope\Admin_Page() )->register();
+( new Rolegate\Modules\Edit_Scope\Admin_Page() )->register();
 do_action( 'admin_menu' );
 $found = false;
-foreach ( (array) ( $submenu['rolewright'] ?? array() ) as $item ) {
-	if ( 'rolewright-edit-scope' === $item[2] ) {
+foreach ( (array) ( $submenu['role-gatekeeper'] ?? array() ) as $item ) {
+	if ( 'role-gatekeeper-edit-scope' === $item[2] ) {
 		$found = true;
 	}
 }
-$ok( $found, 'submenu page rolewright-edit-scope registered under the Rolewright menu' );
-$ok( class_exists( 'Rolewright\\Modules\\Edit_Scope\\Admin_Page' ) && Rolewright\Modules\Edit_Scope\Admin_Page::SLUG === 'rolewright-edit-scope', 'admin page class and slug constant' );
+$ok( $found, 'submenu page role-gatekeeper-edit-scope registered under the Role Gatekeeper menu' );
+$ok( class_exists( 'Rolegate\\Modules\\Edit_Scope\\Admin_Page' ) && Rolegate\Modules\Edit_Scope\Admin_Page::SLUG === 'role-gatekeeper-edit-scope', 'admin page class and slug constant' );
 
 // Rule subjects above the actor.
 $mgr_role = 'rw_es_mgr_' . $sfx;
@@ -287,15 +287,15 @@ $r_role = Rules::add( $admin, array( 'subject_type' => 'role', 'subject' => $mgr
 $r_low  = Rules::add( $admin, array( 'subject_type' => 'role', 'subject' => 'contributor', 'mode' => 'block', 'by' => 'post', 'ids' => array( $p_ed ) ) );
 $ok( is_array( $r_user ) && is_array( $r_role ) && is_array( $r_low ), 'setup: rules on a user and role above a limited manager' );
 $e = Rules::delete( $lead, $r_user['id'] );
-$ok( is_wp_error( $e ) && 'rolewright_user_above_actor' === $e->get_error_code() && Rules::get( $r_user['id'] ), 'delete refused for a rule on a user above the actor' );
+$ok( is_wp_error( $e ) && 'rolegate_user_above_actor' === $e->get_error_code() && Rules::get( $r_user['id'] ), 'delete refused for a rule on a user above the actor' );
 $e = Rules::update( $lead, $r_user['id'], array( 'subject_type' => 'role', 'subject' => 'contributor', 'mode' => 'block', 'by' => 'post', 'ids' => array( $p_ed ) ) );
 $ok( is_wp_error( $e ) && 'user' === Rules::get( $r_user['id'] )['subject_type'], 'update refused for a rule on a user above the actor' );
 $e = Rules::delete( $lead, $r_role['id'] );
-$ok( is_wp_error( $e ) && 'rolewright_role_above_actor' === $e->get_error_code() && Rules::get( $r_role['id'] ), 'delete refused for a rule on a role above the actor' );
+$ok( is_wp_error( $e ) && 'rolegate_role_above_actor' === $e->get_error_code() && Rules::get( $r_role['id'] ), 'delete refused for a rule on a role above the actor' );
 $e = Rules::update( $lead, $r_role['id'], array( 'subject_type' => 'role', 'subject' => $mgr_role, 'mode' => 'allow', 'by' => 'post', 'ids' => array( $p_ed ) ) );
 $ok( is_wp_error( $e ) && 'block' === Rules::get( $r_role['id'] )['mode'], 'update refused for a rule on a role above the actor' );
 $e = Rules::add( $lead, array( 'subject_type' => 'role', 'subject' => $mgr_role, 'mode' => 'block', 'by' => 'post', 'ids' => array( $p_ed ) ) );
-$ok( is_wp_error( $e ) && 'rolewright_role_above_actor' === $e->get_error_code(), 'add refused for a role above the actor' );
+$ok( is_wp_error( $e ) && 'rolegate_role_above_actor' === $e->get_error_code(), 'add refused for a role above the actor' );
 $ok( is_array( Rules::update( $lead, $r_low['id'], array( 'subject_type' => 'role', 'subject' => 'contributor', 'mode' => 'block', 'by' => 'post', 'ids' => array( $p_ed2 ) ) ) ) && true === Rules::delete( $lead, $r_low['id'] ), 'limited manager can still update and delete rules on lower subjects' );
 $clear();
 

@@ -1,7 +1,7 @@
 <?php
-namespace Rolewright\Modules\Audit;
+namespace Rolegate\Modules\Audit;
 
-use Rolewright\Modules\Safety\Guard;
+use Rolegate\Modules\Safety\Guard;
 
 defined( 'ABSPATH' ) || exit;
 

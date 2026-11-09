@@ -1,5 +1,5 @@
 <?php
-namespace Rolewright\Modules\Portability;
+namespace Rolegate\Modules\Portability;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -7,7 +7,7 @@ defined( 'ABSPATH' ) || exit;
  * Full snapshots of the site's roles taken before each import, newest first.
  */
 final class Backups {
-	const OPTION = 'rolewright_import_backups';
+	const OPTION = 'rolegate_import_backups';
 	const KEEP   = 10;
 
 	public static function store( int $actor, array $roles, string $source ): string {
@@ -23,7 +23,7 @@ final class Backups {
 				'roles'  => $roles,
 			)
 		);
-		$keep = max( 1, (int) apply_filters( 'rolewright_import_backups_keep', self::KEEP ) );
+		$keep = max( 1, (int) apply_filters( 'rolegate_import_backups_keep', self::KEEP ) );
 		update_option( self::OPTION, array_slice( $list, 0, $keep ), false );
 		return $id;
 	}

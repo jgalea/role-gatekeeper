@@ -1,4 +1,4 @@
-=== Rolewright ===
+=== Role Gatekeeper: Access Control, Roles and Capabilities ===
 Contributors: jeangalea
 Tags: roles, capabilities, user roles, permissions, access control
 Requires at least: 6.2
@@ -12,7 +12,7 @@ Roles, capabilities, content access and admin restrictions in one free plugin. E
 
 == Description ==
 
-Rolewright manages who can do what on your WordPress site. It combines role and capability editing, per-user permissions, deny rules, content access, admin restrictions, import and export, multisite tools and an audit log. Nothing is held back for a paid version.
+Role Gatekeeper manages who can do what on your WordPress site. It combines role and capability editing, per-user permissions, deny rules, content access, admin restrictions, import and export, multisite tools and an audit log. Nothing is held back for a paid version.
 
 Features:
 
@@ -29,13 +29,13 @@ Features:
 * Audit log: a record of every role, capability and access change with one-click revert, and a permissions viewer showing who holds a capability.
 * Automation: WP-CLI commands, REST routes and Abilities API integration, read-only until you switch writes on.
 
-Safety is built in. Nobody can grant a role or capability they don't hold themselves, the administrator role is protected, changes that would lock you out are refused, and a rescue link restores access to the Rolewright screens.
+Safety is built in. Nobody can grant a role or capability they don't hold themselves, the administrator role is protected, changes that would lock you out are refused, and a rescue link restores access to the Role Gatekeeper screens.
 
 == Installation ==
 
-1. Upload the plugin to `/wp-content/plugins/rolewright` or install it from the Plugins screen.
+1. Upload the plugin to `/wp-content/plugins/role-gatekeeper` or install it from the Plugins screen.
 2. Activate it.
-3. Open Rolewright in the admin menu and switch on the modules you want.
+3. Open Role Gatekeeper in the admin menu and switch on the modules you want.
 
 == Frequently Asked Questions ==
 
@@ -45,11 +45,11 @@ No. Every feature is in this plugin.
 
 = What happens if I lock myself out? =
 
-Use the "Locked out of Rolewright?" link on the login screen. It emails a one-time link to the administrator's address that restores the Rolewright capabilities. You can also add `define( 'ROLEWRIGHT_DISABLE_SITE_ACCESS', true );` to wp-config.php to switch off private-site and admin-access rules.
+Use the "Locked out of Role Gatekeeper?" link on the login screen. It emails a one-time link to the administrator's address that restores the Role Gatekeeper capabilities. You can also add `define( 'ROLEGATE_DISABLE_SITE_ACCESS', true );` to wp-config.php to switch off private-site and admin-access rules.
 
 = Delegating access =
 
-Switching modules on or off and changing the automation settings needs an administrator who holds every administrator capability. Treat `rolewright_manage_caps` and `rolewright_import` as administrator-level: a holder can hand out any non-critical capability, or create and overwrite roles from a file.
+Switching modules on or off and changing the automation settings needs an administrator who holds every administrator capability. Treat `rolegate_manage_caps` and `rolegate_import` as administrator-level: a holder can hand out any non-critical capability, or create and overwrite roles from a file.
 
 == Changelog ==
 

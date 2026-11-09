@@ -2,40 +2,40 @@
 
 Always on. It owns the plugin's capabilities, the escalation and lockout rules, the WordPress-level hooks that enforce them, and the rescue link. Other modules call `Guard` before writing anything and still check their own permission cap and nonce.
 
-All classes live in `Rolewright\Modules\Safety`.
+All classes live in `Rolegate\Modules\Safety`.
 
 ## Caps
 
-The plugin's own capabilities, granted only to the `administrator` role (on `rolewright_activate` and again on `init` if any are missing). Super admins pass through `is_super_admin()`. On multisite, `network_restricted()` caps are reserved for super admins unless `rolewright_multisite_site_admin_access` returns true.
+The plugin's own capabilities, granted only to the `administrator` role (on `rolegate_activate` and again on `init` if any are missing). Super admins pass through `is_super_admin()`. On multisite, `network_restricted()` caps are reserved for super admins unless `rolegate_multisite_site_admin_access` returns true.
 
 | Constant | Cap |
 |---|---|
-| `Caps::MANAGE` | `rolewright_manage` (menu access, same as `Settings::CAP`) |
-| `Caps::MANAGE_ROLES` | `rolewright_manage_roles` |
-| `Caps::MANAGE_CAPS` | `rolewright_manage_caps` |
-| `Caps::MANAGE_USERS` | `rolewright_manage_users` |
-| `Caps::MANAGE_ACCESS` | `rolewright_manage_access` |
-| `Caps::IMPORT` | `rolewright_import` |
-| `Caps::VIEW_AUDIT` | `rolewright_view_audit` |
+| `Caps::MANAGE` | `rolegate_manage` (menu access, same as `Settings::CAP`) |
+| `Caps::MANAGE_ROLES` | `rolegate_manage_roles` |
+| `Caps::MANAGE_CAPS` | `rolegate_manage_caps` |
+| `Caps::MANAGE_USERS` | `rolegate_manage_users` |
+| `Caps::MANAGE_ACCESS` | `rolegate_manage_access` |
+| `Caps::IMPORT` | `rolegate_import` |
+| `Caps::VIEW_AUDIT` | `rolegate_view_audit` |
 
 - `Caps::all(): string[]` every cap above.
-- `Caps::network_restricted(): string[]` the caps site admins lose on multisite (all `rolewright_manage_*` plus `rolewright_import`).
+- `Caps::network_restricted(): string[]` the caps site admins lose on multisite (all `rolegate_manage_*` plus `rolegate_import`).
 - `Caps::grant_to_administrator(): string[]` adds missing caps to the administrator role, returns what it added.
 
 ## Guard
 
-"Holds" means granted by the user's roles or per-user caps (`WP_User::$allcaps`), passed through `rolewright_guard_user_caps` so a deny module can subtract. `DISALLOW_FILE_MODS` and similar constants are ignored. Cap arguments accept a list (`['read']`) or a map (`['read' => true]`, `false` meaning an explicit deny).
+"Holds" means granted by the user's roles or per-user caps (`WP_User::$allcaps`), passed through `rolegate_guard_user_caps` so a deny module can subtract. `DISALLOW_FILE_MODS` and similar constants are ignored. Cap arguments accept a list (`['read']`) or a map (`['read' => true]`, `false` meaning an explicit deny).
 
 ### Questions
 
-- `critical_caps(): string[]` caps that can take over a site. Filter: `rolewright_critical_caps`. Every `rolewright_*` cap is always included.
-- `is_critical_cap( string $cap ): bool` also true for any `manage_network*` or `rolewright_*` name.
-- `is_protected_role( string $role ): bool` administrator (no delete, rename, or loss of critical/rolewright caps) and the site's default role (no delete). Filter: `rolewright_protected_roles`.
+- `critical_caps(): string[]` caps that can take over a site. Filter: `rolegate_critical_caps`. Every `rolegate_*` cap is always included.
+- `is_critical_cap( string $cap ): bool` also true for any `manage_network*` or `rolegate_*` name.
+- `is_protected_role( string $role ): bool` administrator (no delete, rename, or loss of critical/rolegate caps) and the site's default role (no delete). Filter: `rolegate_protected_roles`.
 - `protected_roles(): string[]`
 - `can_act_on_user( int $actor_id, int $target_id ): bool` false when the target holds any critical cap the actor lacks, or is a super admin and the actor isn't.
 - `can_assign_role( int $actor_id, string $role, int $target_id ): bool` the actor holds every critical cap of the role; for themselves, every cap of the role; and can act on the target. `$target_id = 0` means a user not yet created. Super admin always passes.
-- `can_grant_cap( int $actor_id, string $cap ): bool` critical caps need the actor to hold them; other caps need the actor to hold them or hold `rolewright_manage_caps`.
-- `would_lock_out( int $actor_id, array $proposed_role_caps_by_role ): bool` true when the change leaves the actor without `read`, without `rolewright_manage`, or leaves no role with `rolewright_manage_roles`. Pass `role => full new cap set`, or `role => null` for a deletion. Unlisted roles keep their caps.
+- `can_grant_cap( int $actor_id, string $cap ): bool` critical caps need the actor to hold them; other caps need the actor to hold them or hold `rolegate_manage_caps`.
+- `would_lock_out( int $actor_id, array $proposed_role_caps_by_role ): bool` true when the change leaves the actor without `read`, without `rolegate_manage`, or leaves no role with `rolegate_manage_roles`. Pass `role => full new cap set`, or `role => null` for a deletion. Unlisted roles keep their caps.
 - `lockout_reasons_for( int $actor_id, array $proposed_role_caps_by_role ): string[]` same, returning `read`, `manage`, `no_manager_role`.
 - `sanitize_cap_name( string $cap ): string|false` trims and lowercases, then accepts `[a-z0-9_:-]`, up to 191 chars, not numeric-only, not an existing role name.
 - `cap_exists( string $cap ): bool` some role already lists the cap.
@@ -47,8 +47,8 @@ The plugin's own capabilities, granted only to the `administrator` role (on `rol
 
 Each returns `true` or a `WP_Error` with a message ready to show.
 
-- `assert_can_modify_role( int $actor_id, string $role, array $new_caps )` `$new_caps` is the role's full new cap set. Checks new cap names, the administrator's protected caps, that the role holds no critical cap the actor lacks, that every newly granted cap passes `can_grant_cap`, and self-lockout. Codes: `rolewright_invalid_cap`, `rolewright_protected_role`, `rolewright_role_above_actor`, `rolewright_cap_not_held`, `rolewright_lockout` (data `reasons`).
-- `assert_can_delete_role( int $actor_id, string $role )` codes: `rolewright_protected_role`, `rolewright_no_role`, `rolewright_role_above_actor`, `rolewright_lockout`.
+- `assert_can_modify_role( int $actor_id, string $role, array $new_caps )` `$new_caps` is the role's full new cap set. Checks new cap names, the administrator's protected caps, that the role holds no critical cap the actor lacks, that every newly granted cap passes `can_grant_cap`, and self-lockout. Codes: `rolegate_invalid_cap`, `rolegate_protected_role`, `rolegate_role_above_actor`, `rolegate_cap_not_held`, `rolegate_lockout` (data `reasons`).
+- `assert_can_delete_role( int $actor_id, string $role )` codes: `rolegate_protected_role`, `rolegate_no_role`, `rolegate_role_above_actor`, `rolegate_lockout`.
 - `assert_can_rename_role( int $actor_id, string $role )`
 
 ### Pure helpers
@@ -61,7 +61,7 @@ No WordPress state, safe to unit test.
 - `caps_from_roles( array $role_names, array $roles_caps, array $user_caps = [] ): array<string,bool>`
 - `lockout_reasons( array $actor_roles, array $actor_user_caps, array $roles_after ): string[]`
 
-`can_*` filters (`rolewright_can_assign_role`, `rolewright_can_grant_cap`, `rolewright_can_act_on_user`) run only after the built-in checks pass, so they can refuse but never allow.
+`can_*` filters (`rolegate_can_assign_role`, `rolegate_can_grant_cap`, `rolegate_can_act_on_user`) run only after the built-in checks pass, so they can refuse but never allow.
 
 ## Enforcer
 
@@ -78,17 +78,17 @@ What it hooks:
 - `update_user_metadata` / `add_user_metadata` on `{prefix}capabilities` refuses any write in a logged-in request that gives a user a critical cap the actor lacks, or changes a user above the actor. `user_register` strips roles from a new user created above the actor.
 - `pre_update_option` on `{prefix}user_roles` refuses a role gaining a critical cap the actor lacks, and refuses any change that removes the administrator role or its critical caps, logged in or not.
 
-Both backstops can be switched off with `rolewright_storage_backstop` (`$enabled, 'user'|'roles', $object_id`). Every refusal fires `rolewright_escalation_blocked` (`$kind, $actor_id, $target, $detail`), for the audit module.
+Both backstops can be switched off with `rolegate_storage_backstop` (`$enabled, 'user'|'roles', $object_id`). Every refusal fires `rolegate_escalation_blocked` (`$kind, $actor_id, $target, $detail`), for the audit module.
 
 ## Rescue
 
-A "Locked out of Rolewright?" link under the login form. An administrator or super admin enters their email; whatever they type, the page shows the same response. A matching account gets a one-time link (32 random bytes, stored as SHA-256, 15 minutes, 3 requests per hour per IP and per account). Confirming it puts the `rolewright_*` caps back on the administrator role and redirects to the Rolewright page; it does not log anyone in.
+A "Locked out of Role Gatekeeper?" link under the login form. An administrator or super admin enters their email; whatever they type, the page shows the same response. A matching account gets a one-time link (32 random bytes, stored as SHA-256, 15 minutes, 3 requests per hour per IP and per account). Confirming it puts the `rolegate_*` caps back on the administrator role and redirects to the Role Gatekeeper page; it does not log anyone in.
 
 - `Rescue::request( string $email, string $ip ): bool` true only when a mail went out.
 - `Rescue::consume( int $uid, string $token, string $ip ): true|WP_Error`
 - `Rescue::is_eligible( WP_User $user ): bool`
-- Action `rolewright_rescue_used` (`$uid`). Filter `rolewright_rescue_client_ip` (defaults to `REMOTE_ADDR`).
+- Action `rolegate_rescue_used` (`$uid`). Filter `rolegate_rescue_client_ip` (defaults to `REMOTE_ADDR`).
 
 ## Tests
 
-`wp eval-file wp-content/plugins/rolewright/tests/safety-smoke.php` prints PASS/FAIL lines and exits 1 on any failure.
+`wp eval-file wp-content/plugins/role-gatekeeper/tests/safety-smoke.php` prints PASS/FAIL lines and exits 1 on any failure.

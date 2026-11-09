@@ -1,8 +1,8 @@
 <?php
-namespace Rolewright\Modules\Capabilities;
+namespace Rolegate\Modules\Capabilities;
 
-use Rolewright\Modules\Roles\Role_Store;
-use Rolewright\Modules\Safety\Guard;
+use Rolegate\Modules\Roles\Role_Store;
+use Rolegate\Modules\Safety\Guard;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -18,7 +18,7 @@ final class Cap_Service {
 	 */
 	public static function update_role( int $actor, string $role, array $granted, ?int $level = null, array $new_custom = array(), bool $confirm_self = false ) {
 		if ( ! get_role( $role ) ) {
-			return new \WP_Error( 'rolewright_no_role', __( 'That role does not exist.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_no_role', __( 'That role does not exist.', 'role-gatekeeper' ) );
 		}
 
 		$custom = array();
@@ -26,9 +26,9 @@ final class Cap_Service {
 			$clean = Guard::sanitize_cap_name( (string) $raw );
 			if ( false === $clean ) {
 				return new \WP_Error(
-					'rolewright_invalid_cap',
+					'rolegate_invalid_cap',
 					/* translators: %s: capability name */
-					sprintf( __( '"%s" is not a valid capability name. Use lowercase letters, numbers, underscores, hyphens or colons, and avoid role names.', 'rolewright' ), $raw )
+					sprintf( __( '"%s" is not a valid capability name. Use lowercase letters, numbers, underscores, hyphens or colons, and avoid role names.', 'role-gatekeeper' ), $raw )
 				);
 			}
 			$custom[] = $clean;
@@ -61,8 +61,8 @@ final class Cap_Service {
 		$user = get_userdata( $actor );
 		if ( $removed && ! $confirm_self && $user && in_array( $role, (array) $user->roles, true ) ) {
 			return new \WP_Error(
-				'rolewright_confirm',
-				__( 'This removes capabilities from a role you hold yourself. Confirm to continue.', 'rolewright' ),
+				'rolegate_confirm',
+				__( 'This removes capabilities from a role you hold yourself. Confirm to continue.', 'role-gatekeeper' ),
 				array( 'removed' => $removed )
 			);
 		}
@@ -98,10 +98,10 @@ final class Cap_Service {
 	public static function delete_custom_cap( int $actor, string $cap ) {
 		$stored = Cap_Catalog::custom_caps();
 		if ( 'custom' !== Cap_Catalog::group_of( $cap, Cap_Catalog::post_type_caps() ) && ! in_array( $cap, $stored, true ) ) {
-			return new \WP_Error( 'rolewright_not_custom', __( 'Only custom capabilities can be deleted.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_not_custom', __( 'Only custom capabilities can be deleted.', 'role-gatekeeper' ) );
 		}
 		if ( Guard::is_critical_cap( $cap ) ) {
-			return new \WP_Error( 'rolewright_protected_cap', __( 'This capability is protected and can\'t be deleted.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_protected_cap', __( 'This capability is protected and can\'t be deleted.', 'role-gatekeeper' ) );
 		}
 
 		$plan = array();
@@ -163,7 +163,7 @@ final class Cap_Service {
 		update_option( Cap_Sets::OPTION_SETS, $sets, false );
 		update_option( Cap_Sets::OPTION_CPT, $cpts, false );
 		do_action(
-			'rolewright_changed',
+			'rolegate_changed',
 			'caps.options_updated',
 			array(
 				'actor'  => $actor,
@@ -214,7 +214,7 @@ final class Cap_Service {
 
 	private static function fire( int $actor, string $role, array $before, array $after ): void {
 		do_action(
-			'rolewright_changed',
+			'rolegate_changed',
 			'caps.updated',
 			array(
 				'actor'  => $actor,

@@ -1,7 +1,7 @@
 <?php
-namespace Rolewright\Modules\Deny_Hierarchy;
+namespace Rolegate\Modules\Deny_Hierarchy;
 
-use Rolewright\Core\Module;
+use Rolegate\Core\Module;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -14,11 +14,11 @@ final class Deny_Hierarchy_Module extends Module {
 	}
 
 	public function title(): string {
-		return __( 'Deny capabilities and role hierarchy', 'rolewright' );
+		return __( 'Deny capabilities and role hierarchy', 'role-gatekeeper' );
 	}
 
 	public function description(): string {
-		return __( 'Deny capabilities per role (a deny beats any grant), rank roles so users can only manage roles below their own, hide higher roles from lower managers, and view any user\'s effective capabilities.', 'rolewright' );
+		return __( 'Deny capabilities per role (a deny beats any grant), rank roles so users can only manage roles below their own, hide higher roles from lower managers, and view any user\'s effective capabilities.', 'role-gatekeeper' );
 	}
 
 	public function default_enabled(): bool {
@@ -30,13 +30,13 @@ final class Deny_Hierarchy_Module extends Module {
 			return;
 		}
 		self::$registered = true;
-		add_filter( 'rolewright_module_restricts_user', array( __CLASS__, 'restricts_user' ), 10, 3 );
+		add_filter( 'rolegate_module_restricts_user', array( __CLASS__, 'restricts_user' ), 10, 3 );
 
 		Denials::register();
 		Hierarchy::register();
-		add_filter( 'rolewright_portability_sections', array( Portability_Section::class, 'register' ) );
+		add_filter( 'rolegate_portability_sections', array( Portability_Section::class, 'register' ) );
 		add_filter(
-			'rolewright_role_change_veto',
+			'rolegate_role_change_veto',
 			function ( $veto, $op, $actor, $role, $new_caps = null ) {
 				if ( $veto instanceof \WP_Error ) {
 					return $veto;

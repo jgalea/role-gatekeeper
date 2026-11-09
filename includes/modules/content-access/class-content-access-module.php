@@ -1,7 +1,7 @@
 <?php
-namespace Rolewright\Modules\Content_Access;
+namespace Rolegate\Modules\Content_Access;
 
-use Rolewright\Core\Module;
+use Rolegate\Core\Module;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -11,15 +11,15 @@ final class Content_Access_Module extends Module {
 	}
 
 	public function title(): string {
-		return __( 'Content access', 'rolewright' );
+		return __( 'Content access', 'role-gatekeeper' );
 	}
 
 	public function description(): string {
-		return __( 'Restrict posts, blocks, widgets, menu items and shortcode content to selected roles.', 'rolewright' );
+		return __( 'Restrict posts, blocks, widgets, menu items and shortcode content to selected roles.', 'role-gatekeeper' );
 	}
 
 	public function init(): void {
-		add_filter( 'rolewright_module_restricts_user', array( __CLASS__, 'restricts_user' ), 10, 3 );
+		add_filter( 'rolegate_module_restricts_user', array( __CLASS__, 'restricts_user' ), 10, 3 );
 		Access::register();
 		( new Post_Editor() )->register();
 		( new Query_Guard() )->register();

@@ -1,11 +1,11 @@
 <?php
-namespace Rolewright\Modules\User_Roles;
+namespace Rolegate\Modules\User_Roles;
 
 defined( 'ABSPATH' ) || exit;
 
 final class Users_List {
-	const ADD    = 'rolewright_add:';
-	const REMOVE = 'rolewright_remove:';
+	const ADD    = 'rolegate_add:';
+	const REMOVE = 'rolegate_remove:';
 
 	public function register(): void {
 		add_filter( 'manage_users_columns', array( $this, 'columns' ) );
@@ -25,13 +25,13 @@ final class Users_List {
 		$out = array();
 		foreach ( (array) $columns as $key => $label ) {
 			if ( 'role' === $key ) {
-				$out['rolewright_roles'] = __( 'Roles', 'rolewright' );
+				$out['rolegate_roles'] = __( 'Roles', 'role-gatekeeper' );
 			} else {
 				$out[ $key ] = $label;
 			}
 		}
-		if ( ! isset( $out['rolewright_roles'] ) ) {
-			$out['rolewright_roles'] = __( 'Roles', 'rolewright' );
+		if ( ! isset( $out['rolegate_roles'] ) ) {
+			$out['rolegate_roles'] = __( 'Roles', 'role-gatekeeper' );
 		}
 		return $out;
 	}
@@ -43,7 +43,7 @@ final class Users_List {
 	 * @return string
 	 */
 	public function column( $output, $column, $user_id ) {
-		if ( 'rolewright_roles' !== $column ) {
+		if ( 'rolegate_roles' !== $column ) {
 			return $output;
 		}
 		$names = wp_roles()->role_names;
@@ -56,14 +56,14 @@ final class Users_List {
 			);
 		}
 		if ( ! $parts ) {
-			return '<a href="' . esc_url( Users::no_role_url() ) . '">' . esc_html__( 'No role', 'rolewright' ) . '</a>';
+			return '<a href="' . esc_url( Users::no_role_url() ) . '">' . esc_html__( 'No role', 'role-gatekeeper' ) . '</a>';
 		}
 		return implode( ', ', $parts );
 	}
 
 	private static function filtering(): bool {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only list filter.
-		return ! empty( $_GET['rolewright_no_role'] );
+		return ! empty( $_GET['rolegate_no_role'] );
 	}
 
 	/**
@@ -79,11 +79,11 @@ final class Users_List {
 		if ( $current && isset( $views['all'] ) ) {
 			$views['all'] = str_replace( ' class="current" aria-current="page"', '', $views['all'] );
 		}
-		$views['rolewright_none'] = sprintf(
+		$views['rolegate_none'] = sprintf(
 			'<a href="%s"%s>%s <span class="count">(%s)</span></a>',
 			esc_url( Users::no_role_url() ),
 			$current ? ' class="current" aria-current="page"' : '',
-			esc_html__( 'No role', 'rolewright' ),
+			esc_html__( 'No role', 'role-gatekeeper' ),
 			esc_html( number_format_i18n( $count ) )
 		);
 		return $views;
@@ -113,11 +113,11 @@ final class Users_List {
 		}
 		foreach ( get_editable_roles() as $slug => $role ) {
 			/* translators: %s: role name */
-			$actions[ self::ADD . $slug ] = sprintf( __( 'Add role: %s', 'rolewright' ), translate_user_role( $role['name'] ) );
+			$actions[ self::ADD . $slug ] = sprintf( __( 'Add role: %s', 'role-gatekeeper' ), translate_user_role( $role['name'] ) );
 		}
 		foreach ( get_editable_roles() as $slug => $role ) {
 			/* translators: %s: role name */
-			$actions[ self::REMOVE . $slug ] = sprintf( __( 'Remove role: %s', 'rolewright' ), translate_user_role( $role['name'] ) );
+			$actions[ self::REMOVE . $slug ] = sprintf( __( 'Remove role: %s', 'role-gatekeeper' ), translate_user_role( $role['name'] ) );
 		}
 		return $actions;
 	}
@@ -137,7 +137,7 @@ final class Users_List {
 		check_admin_referer( 'bulk-users' );
 		$actor = get_current_user_id();
 		if ( ! current_user_can( 'promote_users' ) ) {
-			wp_die( esc_html__( 'You do not have permission to do that.', 'rolewright' ), '', array( 'response' => 403 ) );
+			wp_die( esc_html__( 'You do not have permission to do that.', 'role-gatekeeper' ), '', array( 'response' => 403 ) );
 		}
 		$role = substr( (string) $action, strlen( $adding ? self::ADD : self::REMOVE ) );
 		$done = 0;
@@ -152,27 +152,27 @@ final class Users_List {
 		}
 		return add_query_arg(
 			array(
-				'rolewright_done' => $done,
-				'rolewright_skip' => $skip,
+				'rolegate_done' => $done,
+				'rolegate_skip' => $skip,
 			),
-			remove_query_arg( array( 'rolewright_done', 'rolewright_skip' ), $sendback ? $sendback : admin_url( 'users.php' ) )
+			remove_query_arg( array( 'rolegate_done', 'rolegate_skip' ), $sendback ? $sendback : admin_url( 'users.php' ) )
 		);
 	}
 
 	public function notice(): void {
 		global $pagenow;
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only result counters.
-		if ( 'users.php' !== $pagenow || ! isset( $_GET['rolewright_done'], $_GET['rolewright_skip'] ) ) {
+		if ( 'users.php' !== $pagenow || ! isset( $_GET['rolegate_done'], $_GET['rolegate_skip'] ) ) {
 			return;
 		}
-		$done = (int) $_GET['rolewright_done'];
-		$skip = (int) $_GET['rolewright_skip'];
+		$done = (int) $_GET['rolegate_done'];
+		$skip = (int) $_GET['rolegate_skip'];
 		// phpcs:enable
 		/* translators: %s: number of users */
-		$text = sprintf( _n( 'Roles changed for %s user.', 'Roles changed for %s users.', $done, 'rolewright' ), number_format_i18n( $done ) );
+		$text = sprintf( _n( 'Roles changed for %s user.', 'Roles changed for %s users.', $done, 'role-gatekeeper' ), number_format_i18n( $done ) );
 		if ( $skip ) {
 			/* translators: %s: number of users */
-			$text .= ' ' . sprintf( _n( '%s user was skipped: your own account, a user above you, or a role you can\'t assign.', '%s users were skipped: your own account, users above you, or a role you can\'t assign.', $skip, 'rolewright' ), number_format_i18n( $skip ) );
+			$text .= ' ' . sprintf( _n( '%s user was skipped: your own account, a user above you, or a role you can\'t assign.', '%s users were skipped: your own account, users above you, or a role you can\'t assign.', $skip, 'role-gatekeeper' ), number_format_i18n( $skip ) );
 		}
 		printf( '<div class="notice notice-%s is-dismissible"><p>%s</p></div>', $skip && ! $done ? 'warning' : 'success', esc_html( $text ) );
 	}

@@ -1,5 +1,5 @@
 <?php
-namespace Rolewright\Modules\Safety;
+namespace Rolegate\Modules\Safety;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -8,7 +8,7 @@ defined( 'ABSPATH' ) || exit;
  * effects; they read the current roles and users and answer a question.
  *
  * "Holding" a cap means the user's roles or per-user caps grant it (WP_User::$allcaps),
- * passed through the `rolewright_guard_user_caps` filter so deny rules can subtract.
+ * passed through the `rolegate_guard_user_caps` filter so deny rules can subtract.
  * Constants such as DISALLOW_FILE_MODS are deliberately ignored here.
  */
 final class Guard {
@@ -64,20 +64,20 @@ final class Guard {
 	private static $reserved_role_slugs = array( 'shop_manager', 'customer', 'wpseo_manager', 'wpseo_editor', 'bbp_keymaster', 'bbp_moderator', 'bbp_participant', 'bbp_spectator', 'bbp_blocked' );
 
 	/**
-	 * Caps whose holder can take over the site. Always includes every rolewright_* cap.
-	 * Any cap starting with manage_network or rolewright_ is treated as critical even
+	 * Caps whose holder can take over the site. Always includes every rolegate_* cap.
+	 * Any cap starting with manage_network or rolegate_ is treated as critical even
 	 * when not listed (see is_critical_cap()).
 	 *
 	 * @return string[]
 	 */
 	public static function critical_caps(): array {
-		$caps = apply_filters( 'rolewright_critical_caps', self::$base_critical );
+		$caps = apply_filters( 'rolegate_critical_caps', self::$base_critical );
 		$caps = is_array( $caps ) ? array_map( 'strval', $caps ) : self::$base_critical;
 		return array_values( array_unique( array_merge( $caps, Caps::all() ) ) );
 	}
 
 	public static function is_critical_cap( string $cap ): bool {
-		if ( 0 === strpos( $cap, 'rolewright_' ) || self::is_network_cap( $cap ) ) {
+		if ( 0 === strpos( $cap, 'rolegate_' ) || self::is_network_cap( $cap ) ) {
 			return true;
 		}
 		return in_array( $cap, self::critical_caps(), true );
@@ -97,7 +97,7 @@ final class Guard {
 	 * @return string[]
 	 */
 	public static function reserved_role_slugs(): array {
-		$slugs = apply_filters( 'rolewright_reserved_role_slugs', self::$reserved_role_slugs );
+		$slugs = apply_filters( 'rolegate_reserved_role_slugs', self::$reserved_role_slugs );
 		return is_array( $slugs ) ? array_values( array_unique( array_merge( self::$reserved_role_slugs, array_map( 'strval', $slugs ) ) ) ) : self::$reserved_role_slugs;
 	}
 
@@ -118,19 +118,19 @@ final class Guard {
 	 */
 	public static function valid_new_role_slug( string $slug ) {
 		if ( '' === $slug || strtolower( trim( $slug ) ) !== $slug || ! preg_match( '/^[a-z0-9_:\-]+$/', $slug ) || ctype_digit( $slug ) || strlen( $slug ) > self::CAP_MAX_LENGTH ) {
-			return new \WP_Error( 'rolewright_invalid_name', __( 'Role slugs use lowercase letters, numbers, underscores, hyphens and colons.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_invalid_name', __( 'Role slugs use lowercase letters, numbers, underscores, hyphens and colons.', 'role-gatekeeper' ) );
 		}
 		if ( wp_roles()->is_role( $slug ) ) {
-			return new \WP_Error( 'rolewright_role_exists', __( 'A role with that name already exists.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_role_exists', __( 'A role with that name already exists.', 'role-gatekeeper' ) );
 		}
 		if ( self::is_network_cap( $slug ) || self::is_critical_cap( $slug ) || in_array( $slug, self::$base_critical, true ) ) {
-			return new \WP_Error( 'rolewright_reserved_slug', __( 'That name is reserved for a capability and can\'t be used as a role.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_reserved_slug', __( 'That name is reserved for a capability and can\'t be used as a role.', 'role-gatekeeper' ) );
 		}
 		if ( self::cap_exists( $slug ) ) {
-			return new \WP_Error( 'rolewright_role_exists', __( 'A role or capability with that name already exists.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_role_exists', __( 'A role or capability with that name already exists.', 'role-gatekeeper' ) );
 		}
 		if ( self::slug_held_as_user_cap( $slug ) ) {
-			return new \WP_Error( 'rolewright_slug_held_as_cap', __( 'Some users hold a capability with that name. Remove it from them or pick another name.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_slug_held_as_cap', __( 'Some users hold a capability with that name. Remove it from them or pick another name.', 'role-gatekeeper' ) );
 		}
 		return true;
 	}
@@ -307,7 +307,7 @@ final class Guard {
 				}
 			}
 		}
-		$caps = apply_filters( 'rolewright_guard_user_caps', $caps, $user );
+		$caps = apply_filters( 'rolegate_guard_user_caps', $caps, $user );
 		return is_array( $caps ) ? $caps : array();
 	}
 
@@ -348,7 +348,7 @@ final class Guard {
 	/**
 	 * Whether the user may change plugin-wide settings (modules on or off, automation
 	 * writes): a super admin, or a user who holds every critical cap any role on the site
-	 * carries and may manage roles. Holding rolewright_manage alone is not enough.
+	 * carries and may manage roles. Holding rolegate_manage alone is not enough.
 	 */
 	public static function is_site_authority( int $user_id ): bool {
 		if ( $user_id <= 0 ) {
@@ -378,7 +378,7 @@ final class Guard {
 
 	/** @return string[] */
 	public static function protected_roles(): array {
-		$roles   = apply_filters( 'rolewright_protected_roles', array( 'administrator', (string) get_option( 'default_role', 'subscriber' ) ) );
+		$roles   = apply_filters( 'rolegate_protected_roles', array( 'administrator', (string) get_option( 'default_role', 'subscriber' ) ) );
 		$roles   = is_array( $roles ) ? array_map( 'strval', $roles ) : array();
 		$roles[] = 'administrator';
 		return array_values( array_unique( $roles ) );
@@ -399,7 +399,7 @@ final class Guard {
 		if ( self::missing( self::user_critical_caps( $target_id ), self::user_critical_caps( $actor_id ) ) ) {
 			return false;
 		}
-		return (bool) apply_filters( 'rolewright_can_act_on_user', true, $actor_id, $target_id );
+		return (bool) apply_filters( 'rolegate_can_act_on_user', true, $actor_id, $target_id );
 	}
 
 	/**
@@ -431,12 +431,12 @@ final class Guard {
 		} elseif ( $target_id > 0 && ! self::can_act_on_user( $actor_id, $target_id ) ) {
 			return false;
 		}
-		return (bool) apply_filters( 'rolewright_can_assign_role', true, $actor_id, $role, $target_id );
+		return (bool) apply_filters( 'rolegate_can_assign_role', true, $actor_id, $role, $target_id );
 	}
 
 	/**
 	 * Whether the actor may hand $cap to a role or user. Critical caps need the actor to
-	 * hold them. Other caps need the actor to hold them or hold rolewright_manage_caps
+	 * hold them. Other caps need the actor to hold them or hold rolegate_manage_caps
 	 * (so new custom caps can be created and handed out).
 	 */
 	public static function can_grant_cap( int $actor_id, string $cap ): bool {
@@ -453,12 +453,12 @@ final class Guard {
 		if ( empty( $held[ $cap ] ) && empty( $held[ Caps::MANAGE_CAPS ] ) ) {
 			return false;
 		}
-		return (bool) apply_filters( 'rolewright_can_grant_cap', true, $actor_id, $cap );
+		return (bool) apply_filters( 'rolegate_can_grant_cap', true, $actor_id, $cap );
 	}
 
 	/**
 	 * True when applying the change would leave the actor without read, without
-	 * rolewright_manage, or leave no role on the site holding rolewright_manage_roles.
+	 * rolegate_manage, or leave no role on the site holding rolegate_manage_roles.
 	 *
 	 * @param array<string,array|null> $proposed_role_caps_by_role role => full new cap
 	 *        set (list or map); null means the role is deleted. Roles not listed keep
@@ -534,7 +534,7 @@ final class Guard {
 		if ( in_array( $cap, $meta, true ) ) {
 			return true;
 		}
-		$catalog = '\\Rolewright\\Modules\\Capabilities\\Cap_Catalog';
+		$catalog = '\\Rolegate\\Modules\\Capabilities\\Cap_Catalog';
 		return class_exists( $catalog ) && in_array( $cap, $catalog::universe(), true );
 	}
 
@@ -542,14 +542,14 @@ final class Guard {
 	 * Every check a module must pass before replacing a role's cap set: cap names, the
 	 * administrator's protected caps, the actor's level relative to the role, caps the
 	 * actor may grant, and self-lockout. Callers still check their own permission cap
-	 * (for example rolewright_manage_roles) and nonce.
+	 * (for example rolegate_manage_roles) and nonce.
 	 *
 	 * @param string $role     Role name. A role that does not exist yet is treated as empty.
 	 * @param array  $new_caps Full new cap set, list or map (false = explicit deny).
 	 * @return true|\WP_Error
 	 */
 	public static function assert_can_modify_role( int $actor_id, string $role, array $new_caps ) {
-		$veto = apply_filters( 'rolewright_role_change_veto', null, 'modify', $actor_id, $role, $new_caps );
+		$veto = apply_filters( 'rolegate_role_change_veto', null, 'modify', $actor_id, $role, $new_caps );
 		if ( $veto instanceof \WP_Error ) {
 			return $veto;
 		}
@@ -566,9 +566,9 @@ final class Guard {
 		}
 		if ( $invalid ) {
 			return new \WP_Error(
-				'rolewright_invalid_cap',
+				'rolegate_invalid_cap',
 				/* translators: %s: comma-separated capability names */
-				sprintf( __( 'These capability names are not valid: %s. Use lowercase letters, numbers, underscores, hyphens or colons, and avoid role names.', 'rolewright' ), implode( ', ', $invalid ) )
+				sprintf( __( 'These capability names are not valid: %s. Use lowercase letters, numbers, underscores, hyphens or colons, and avoid role names.', 'role-gatekeeper' ), implode( ', ', $invalid ) )
 			);
 		}
 
@@ -586,9 +586,9 @@ final class Guard {
 			}
 			if ( $lost ) {
 				return new \WP_Error(
-					'rolewright_protected_role',
+					'rolegate_protected_role',
 					/* translators: %s: comma-separated capability names */
-					sprintf( __( 'The Administrator role must keep these capabilities: %s.', 'rolewright' ), implode( ', ', $lost ) )
+					sprintf( __( 'The Administrator role must keep these capabilities: %s.', 'role-gatekeeper' ), implode( ', ', $lost ) )
 				);
 			}
 		}
@@ -597,9 +597,9 @@ final class Guard {
 			$above = self::missing( self::critical_subset( $current ), self::user_caps( $actor_id ) );
 			if ( $above ) {
 				return new \WP_Error(
-					'rolewright_role_above_actor',
+					'rolegate_role_above_actor',
 					/* translators: %s: comma-separated capability names */
-					sprintf( __( 'You can\'t change this role because it holds capabilities you don\'t have: %s.', 'rolewright' ), implode( ', ', $above ) )
+					sprintf( __( 'You can\'t change this role because it holds capabilities you don\'t have: %s.', 'role-gatekeeper' ), implode( ', ', $above ) )
 				);
 			}
 		}
@@ -612,9 +612,9 @@ final class Guard {
 		}
 		if ( $not_allowed ) {
 			return new \WP_Error(
-				'rolewright_cap_not_held',
+				'rolegate_cap_not_held',
 				/* translators: %s: comma-separated capability names */
-				sprintf( __( 'You can\'t grant capabilities you don\'t hold yourself: %s.', 'rolewright' ), implode( ', ', $not_allowed ) )
+				sprintf( __( 'You can\'t grant capabilities you don\'t hold yourself: %s.', 'role-gatekeeper' ), implode( ', ', $not_allowed ) )
 			);
 		}
 
@@ -622,9 +622,9 @@ final class Guard {
 			$added = array_diff( self::critical_subset( $new ), self::critical_subset( $current ) );
 			if ( $added ) {
 				return new \WP_Error(
-					'rolewright_default_too_powerful',
+					'rolegate_default_too_powerful',
 					/* translators: %s: comma-separated capability names */
-					sprintf( __( 'New registrations get this role, so it can\'t hold these capabilities: %s.', 'rolewright' ), implode( ', ', $added ) )
+					sprintf( __( 'New registrations get this role, so it can\'t hold these capabilities: %s.', 'role-gatekeeper' ), implode( ', ', $added ) )
 				);
 			}
 		}
@@ -643,7 +643,7 @@ final class Guard {
 	 * @return string[]
 	 */
 	public static function registration_roles(): array {
-		$extra = get_option( 'rolewright_extra_default_roles', array() );
+		$extra = get_option( 'rolegate_extra_default_roles', array() );
 		$extra = is_array( $extra ) ? array_map( 'strval', $extra ) : array();
 		return array_values( array_unique( array_filter( array_merge( array( (string) get_option( 'default_role', 'subscriber' ) ), $extra ) ) ) );
 	}
@@ -652,29 +652,29 @@ final class Guard {
 	 * @return true|\WP_Error
 	 */
 	public static function assert_can_delete_role( int $actor_id, string $role ) {
-		$veto = apply_filters( 'rolewright_role_change_veto', null, 'delete', $actor_id, $role );
+		$veto = apply_filters( 'rolegate_role_change_veto', null, 'delete', $actor_id, $role );
 		if ( $veto instanceof \WP_Error ) {
 			return $veto;
 		}
 
 		if ( self::is_protected_role( $role ) ) {
 			return new \WP_Error(
-				'rolewright_protected_role',
+				'rolegate_protected_role',
 				/* translators: %s: role name */
-				sprintf( __( 'The %s role is protected and can\'t be deleted.', 'rolewright' ), $role )
+				sprintf( __( 'The %s role is protected and can\'t be deleted.', 'role-gatekeeper' ), $role )
 			);
 		}
 		$obj = get_role( $role );
 		if ( ! $obj ) {
-			return new \WP_Error( 'rolewright_no_role', __( 'That role does not exist.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_no_role', __( 'That role does not exist.', 'role-gatekeeper' ) );
 		}
 		if ( ! self::is_super( $actor_id ) ) {
 			$above = self::missing( self::critical_subset( (array) $obj->capabilities ), self::user_caps( $actor_id ) );
 			if ( $above ) {
 				return new \WP_Error(
-					'rolewright_role_above_actor',
+					'rolegate_role_above_actor',
 					/* translators: %s: comma-separated capability names */
-					sprintf( __( 'You can\'t delete this role because it holds capabilities you don\'t have: %s.', 'rolewright' ), implode( ', ', $above ) )
+					sprintf( __( 'You can\'t delete this role because it holds capabilities you don\'t have: %s.', 'role-gatekeeper' ), implode( ', ', $above ) )
 				);
 			}
 		}
@@ -686,17 +686,17 @@ final class Guard {
 	 * @return true|\WP_Error
 	 */
 	public static function assert_can_rename_role( int $actor_id, string $role ) {
-		$veto = apply_filters( 'rolewright_role_change_veto', null, 'rename', $actor_id, $role );
+		$veto = apply_filters( 'rolegate_role_change_veto', null, 'rename', $actor_id, $role );
 		if ( $veto instanceof \WP_Error ) {
 			return $veto;
 		}
 
 		if ( 'administrator' === $role ) {
-			return new \WP_Error( 'rolewright_protected_role', __( 'The Administrator role can\'t be renamed.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_protected_role', __( 'The Administrator role can\'t be renamed.', 'role-gatekeeper' ) );
 		}
 		$obj = get_role( $role );
 		if ( $obj && ! self::is_super( $actor_id ) && self::missing( self::critical_subset( (array) $obj->capabilities ), self::user_caps( $actor_id ) ) ) {
-			return new \WP_Error( 'rolewright_role_above_actor', __( 'You can\'t rename a role that holds capabilities you don\'t have.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_role_above_actor', __( 'You can\'t rename a role that holds capabilities you don\'t have.', 'role-gatekeeper' ) );
 		}
 		return true;
 	}
@@ -706,18 +706,18 @@ final class Guard {
 	 */
 	private static function lockout_error( array $reasons ): \WP_Error {
 		$text  = array(
-			'read'            => __( 'you would lose the read capability', 'rolewright' ),
-			'manage'          => __( 'you would lose access to Rolewright (rolewright_manage)', 'rolewright' ),
-			'no_manager_role' => __( 'no role would be left that can manage roles (rolewright_manage_roles)', 'rolewright' ),
+			'read'            => __( 'you would lose the read capability', 'role-gatekeeper' ),
+			'manage'          => __( 'you would lose access to Role Gatekeeper (rolegate_manage)', 'role-gatekeeper' ),
+			'no_manager_role' => __( 'no role would be left that can manage roles (rolegate_manage_roles)', 'role-gatekeeper' ),
 		);
 		$parts = array();
 		foreach ( $reasons as $r ) {
 			$parts[] = isset( $text[ $r ] ) ? $text[ $r ] : $r;
 		}
 		return new \WP_Error(
-			'rolewright_lockout',
+			'rolegate_lockout',
 			/* translators: %s: list of reasons */
-			sprintf( __( 'This change would lock you out: %s.', 'rolewright' ), implode( '; ', $parts ) ),
+			sprintf( __( 'This change would lock you out: %s.', 'role-gatekeeper' ), implode( '; ', $parts ) ),
 			array( 'reasons' => $reasons )
 		);
 	}

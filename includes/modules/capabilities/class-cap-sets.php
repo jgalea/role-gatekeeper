@@ -1,5 +1,5 @@
 <?php
-namespace Rolewright\Modules\Capabilities;
+namespace Rolegate\Modules\Capabilities;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -8,8 +8,8 @@ defined( 'ABSPATH' ) || exit;
  * WordPress asks for; granting the new capabilities to roles is done by Cap_Service.
  */
 final class Cap_Sets {
-	const OPTION_SETS = 'rolewright_extra_cap_sets';
-	const OPTION_CPT  = 'rolewright_cpt_own_caps';
+	const OPTION_SETS = 'rolegate_extra_cap_sets';
+	const OPTION_CPT  = 'rolegate_cpt_own_caps';
 	const SET_IDS     = array( 'create', 'terms', 'privacy' );
 
 	/**
@@ -21,16 +21,16 @@ final class Cap_Sets {
 	public static function definitions(): array {
 		return array(
 			'create'  => array(
-				'label'       => __( 'Separate create capabilities', 'rolewright' ),
-				'description' => __( 'Adds create_posts and create_pages so adding new content can be allowed apart from editing it.', 'rolewright' ),
+				'label'       => __( 'Separate create capabilities', 'role-gatekeeper' ),
+				'description' => __( 'Adds create_posts and create_pages so adding new content can be allowed apart from editing it.', 'role-gatekeeper' ),
 			),
 			'terms'   => array(
-				'label'       => __( 'Category and tag capabilities', 'rolewright' ),
-				'description' => __( 'Adds edit, delete and assign capabilities for categories and tags, and manage, edit, delete and assign capabilities for tags.', 'rolewright' ),
+				'label'       => __( 'Category and tag capabilities', 'role-gatekeeper' ),
+				'description' => __( 'Adds edit, delete and assign capabilities for categories and tags, and manage, edit, delete and assign capabilities for tags.', 'role-gatekeeper' ),
 			),
 			'privacy' => array(
-				'label'       => __( 'Privacy capabilities', 'rolewright' ),
-				'description' => __( 'Adds export_others_personal_data, erase_others_personal_data and manage_privacy_options as their own capabilities (single sites only).', 'rolewright' ),
+				'label'       => __( 'Privacy capabilities', 'role-gatekeeper' ),
+				'description' => __( 'Adds export_others_personal_data, erase_others_personal_data and manage_privacy_options as their own capabilities (single sites only).', 'role-gatekeeper' ),
 			),
 		);
 	}

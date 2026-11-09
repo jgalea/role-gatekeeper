@@ -1,18 +1,18 @@
 <?php
-namespace Rolewright\Modules\Deny_Hierarchy;
+namespace Rolegate\Modules\Deny_Hierarchy;
 
-use Rolewright\Modules\Safety\Caps;
-use Rolewright\Modules\Safety\Guard;
+use Rolegate\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Guard;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Per-role denied capabilities. A deny on any of a user's roles removes the cap from that
  * user, whatever their other roles or per-user caps grant. Stored as role => cap list in
- * the rolewright_denied_caps option.
+ * the rolegate_denied_caps option.
  */
 final class Denials {
-	const OPTION = 'rolewright_denied_caps';
+	const OPTION = 'rolegate_denied_caps';
 
 	/** @var array<string,string[]>|null */
 	private static $map = null;
@@ -22,7 +22,7 @@ final class Denials {
 
 	public static function register(): void {
 		add_filter( 'user_has_cap', array( __CLASS__, 'filter_user_has_cap' ), PHP_INT_MAX - 1, 4 );
-		add_filter( 'rolewright_guard_user_caps', array( __CLASS__, 'filter_guard_caps' ), 10, 2 );
+		add_filter( 'rolegate_guard_user_caps', array( __CLASS__, 'filter_guard_caps' ), 10, 2 );
 		foreach ( array( 'add_option_', 'update_option_', 'delete_option_' ) as $hook ) {
 			add_action( $hook . self::OPTION, array( __CLASS__, 'reset_cache' ) );
 		}
@@ -181,7 +181,7 @@ final class Denials {
 	 */
 	public static function validate( int $actor_id, string $role, array $denied ) {
 		if ( ! get_role( $role ) ) {
-			return new \WP_Error( 'rolewright_no_role', __( 'That role does not exist.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_no_role', __( 'That role does not exist.', 'role-gatekeeper' ) );
 		}
 		$allowed = Hierarchy::assert_can_manage_role( $actor_id, $role );
 		if ( is_wp_error( $allowed ) ) {
@@ -192,9 +192,9 @@ final class Denials {
 			$above = Guard::missing( Guard::critical_subset( (array) get_role( $role )->capabilities ), Guard::user_caps( $actor_id ) );
 			if ( $above ) {
 				return new \WP_Error(
-					'rolewright_role_above_actor',
+					'rolegate_role_above_actor',
 					/* translators: %s: comma-separated capability names */
-					sprintf( __( 'You can\'t change denials on this role because it holds capabilities you don\'t have: %s.', 'rolewright' ), implode( ', ', $above ) )
+					sprintf( __( 'You can\'t change denials on this role because it holds capabilities you don\'t have: %s.', 'role-gatekeeper' ), implode( ', ', $above ) )
 				);
 			}
 		}
@@ -209,7 +209,7 @@ final class Denials {
 			);
 			foreach ( $holders as $holder_id ) {
 				if ( (int) $holder_id !== $actor_id && ! Guard::can_act_on_user( $actor_id, (int) $holder_id ) ) {
-					return new \WP_Error( 'rolewright_holder_above_actor', __( 'You can\'t change denials on this role because some users who hold it have more capabilities than you.', 'rolewright' ) );
+					return new \WP_Error( 'rolegate_holder_above_actor', __( 'You can\'t change denials on this role because some users who hold it have more capabilities than you.', 'role-gatekeeper' ) );
 				}
 			}
 		}
@@ -231,9 +231,9 @@ final class Denials {
 		}
 		if ( $invalid ) {
 			return new \WP_Error(
-				'rolewright_invalid_cap',
+				'rolegate_invalid_cap',
 				/* translators: %s: comma-separated capability names */
-				sprintf( __( 'These capability names are not valid: %s.', 'rolewright' ), implode( ', ', array_map( 'sanitize_text_field', $invalid ) ) )
+				sprintf( __( 'These capability names are not valid: %s.', 'role-gatekeeper' ), implode( ', ', array_map( 'sanitize_text_field', $invalid ) ) )
 			);
 		}
 		$clean = array_values( array_unique( $clean ) );
@@ -248,9 +248,9 @@ final class Denials {
 			}
 			if ( $unheld ) {
 				return new \WP_Error(
-					'rolewright_role_above_actor',
+					'rolegate_role_above_actor',
 					/* translators: %s: comma-separated capability names */
-					sprintf( __( 'You can\'t deny these capabilities because you don\'t hold them yourself: %s.', 'rolewright' ), implode( ', ', $unheld ) )
+					sprintf( __( 'You can\'t deny these capabilities because you don\'t hold them yourself: %s.', 'role-gatekeeper' ), implode( ', ', $unheld ) )
 				);
 			}
 		}
@@ -263,15 +263,15 @@ final class Denials {
 		}
 		if ( $protected ) {
 			return new \WP_Error(
-				'rolewright_protected_role',
+				'rolegate_protected_role',
 				/* translators: %s: comma-separated capability names */
-				sprintf( __( 'The Administrator role can\'t be denied these capabilities: %s.', 'rolewright' ), implode( ', ', $protected ) )
+				sprintf( __( 'The Administrator role can\'t be denied these capabilities: %s.', 'role-gatekeeper' ), implode( ', ', $protected ) )
 			);
 		}
 
 		$actor = get_userdata( $actor_id );
 		if ( $actor && in_array( 'read', $clean, true ) && in_array( $role, (array) $actor->roles, true ) ) {
-			return new \WP_Error( 'rolewright_lockout', __( 'You can\'t deny the read capability on your own role.', 'rolewright' ), array( 'reasons' => array( 'read' ) ) );
+			return new \WP_Error( 'rolegate_lockout', __( 'You can\'t deny the read capability on your own role.', 'role-gatekeeper' ), array( 'reasons' => array( 'read' ) ) );
 		}
 
 		if ( ! $super ) {
@@ -283,9 +283,9 @@ final class Denials {
 			}
 			if ( $not_allowed ) {
 				return new \WP_Error(
-					'rolewright_cap_not_held',
+					'rolegate_cap_not_held',
 					/* translators: %s: comma-separated capability names */
-					sprintf( __( 'Lifting a denial grants the capability back, and you don\'t hold these yourself: %s.', 'rolewright' ), implode( ', ', $not_allowed ) )
+					sprintf( __( 'Lifting a denial grants the capability back, and you don\'t hold these yourself: %s.', 'role-gatekeeper' ), implode( ', ', $not_allowed ) )
 				);
 			}
 		}
@@ -295,9 +295,9 @@ final class Denials {
 		$reasons        = self::lockout_reasons_for( $actor_id, $after );
 		if ( $reasons ) {
 			return new \WP_Error(
-				'rolewright_lockout',
+				'rolegate_lockout',
 				/* translators: %s: reason codes */
-				sprintf( __( 'These denials would lock you out (%s).', 'rolewright' ), implode( ', ', $reasons ) ),
+				sprintf( __( 'These denials would lock you out (%s).', 'role-gatekeeper' ), implode( ', ', $reasons ) ),
 				array( 'reasons' => $reasons )
 			);
 		}
@@ -305,7 +305,7 @@ final class Denials {
 	}
 
 	/**
-	 * Validates and stores $role's denial list, then fires rolewright_changed.
+	 * Validates and stores $role's denial list, then fires rolegate_changed.
 	 *
 	 * @param string[] $denied
 	 * @return true|\WP_Error
@@ -328,7 +328,7 @@ final class Denials {
 		update_option( self::OPTION, $map, true );
 		self::reset_cache();
 		do_action(
-			'rolewright_changed',
+			'rolegate_changed',
 			'access.updated',
 			array(
 				'actor'  => $actor_id,

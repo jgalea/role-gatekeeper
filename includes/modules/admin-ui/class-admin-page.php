@@ -1,28 +1,28 @@
 <?php
-namespace Rolewright\Modules\Admin_Ui;
+namespace Rolegate\Modules\Admin_Ui;
 
-use Rolewright\Core\Settings;
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Core\Settings;
+use Rolegate\Modules\Safety\Caps;
 
 defined( 'ABSPATH' ) || exit;
 
 final class Admin_Page {
-	const SLUG = 'rolewright-admin-ui';
+	const SLUG = 'role-gatekeeper-admin-ui';
 
 	private $hook = '';
 
 	public function register(): void {
 		add_action( 'admin_menu', array( $this, 'menu' ) );
-		add_action( 'admin_post_rolewright_admin_ui_save', array( $this, 'handle_save' ) );
-		add_action( 'admin_post_rolewright_admin_ui_refresh', array( $this, 'handle_refresh' ) );
+		add_action( 'admin_post_rolegate_admin_ui_save', array( $this, 'handle_save' ) );
+		add_action( 'admin_post_rolegate_admin_ui_refresh', array( $this, 'handle_refresh' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'assets' ) );
 	}
 
 	public function menu(): void {
 		$this->hook = (string) add_submenu_page(
 			Settings::MENU_SLUG,
-			__( 'Admin interface', 'rolewright' ),
-			__( 'Admin interface', 'rolewright' ),
+			__( 'Admin interface', 'role-gatekeeper' ),
+			__( 'Admin interface', 'role-gatekeeper' ),
 			Caps::MANAGE_ACCESS,
 			self::SLUG,
 			array( $this, 'render' )
@@ -33,8 +33,8 @@ final class Admin_Page {
 		if ( $hook !== $this->hook ) {
 			return;
 		}
-		wp_enqueue_style( 'rolewright-admin-ui', ROLEWRIGHT_URL . 'assets/admin-ui/admin-ui.css', array(), ROLEWRIGHT_VERSION );
-		wp_enqueue_script( 'rolewright-admin-ui', ROLEWRIGHT_URL . 'assets/admin-ui/admin-ui.js', array(), ROLEWRIGHT_VERSION, true );
+		wp_enqueue_style( 'rolegate-admin-ui', ROLEGATE_URL . 'assets/admin-ui/admin-ui.css', array(), ROLEGATE_VERSION );
+		wp_enqueue_script( 'rolegate-admin-ui', ROLEGATE_URL . 'assets/admin-ui/admin-ui.js', array(), ROLEGATE_VERSION, true );
 	}
 
 	private static function page_url( string $scope, string $target, array $extra = array() ): string {
@@ -57,16 +57,16 @@ final class Admin_Page {
 
 	public function handle_save(): void {
 		if ( ! current_user_can( Caps::MANAGE_ACCESS ) ) {
-			wp_die( esc_html__( 'You do not have permission to do that.', 'rolewright' ), '', array( 'response' => 403 ) );
+			wp_die( esc_html__( 'You do not have permission to do that.', 'role-gatekeeper' ), '', array( 'response' => 403 ) );
 		}
-		check_admin_referer( 'rolewright_admin_ui_save' );
+		check_admin_referer( 'rolegate_admin_ui_save' );
 		$scope  = isset( $_POST['scope'] ) && 'user' === $_POST['scope'] ? 'user' : 'role';
 		$target = isset( $_POST['target'] ) ? sanitize_text_field( wp_unslash( $_POST['target'] ) ) : '';
 		$raw    = isset( $_POST['rule'] ) && is_array( $_POST['rule'] ) ? wp_unslash( $_POST['rule'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized in Rules::sanitize().
 		$result = Rules::save( get_current_user_id(), $scope, $target, $raw );
 		$args   = array();
 		if ( is_wp_error( $result ) ) {
-			set_transient( 'rolewright_admin_ui_err_' . get_current_user_id(), $result->get_error_message(), MINUTE_IN_SECONDS );
+			set_transient( 'rolegate_admin_ui_err_' . get_current_user_id(), $result->get_error_message(), MINUTE_IN_SECONDS );
 			$args['rw_error'] = 1;
 		} else {
 			$args['rw_saved'] = 1;
@@ -77,9 +77,9 @@ final class Admin_Page {
 
 	public function handle_refresh(): void {
 		if ( ! current_user_can( Caps::MANAGE_ACCESS ) ) {
-			wp_die( esc_html__( 'You do not have permission to do that.', 'rolewright' ), '', array( 'response' => 403 ) );
+			wp_die( esc_html__( 'You do not have permission to do that.', 'role-gatekeeper' ), '', array( 'response' => 403 ) );
 		}
-		check_admin_referer( 'rolewright_admin_ui_refresh' );
+		check_admin_referer( 'rolegate_admin_ui_refresh' );
 		Discovery::refresh();
 		$scope  = isset( $_POST['scope'] ) && 'user' === $_POST['scope'] ? 'user' : 'role';
 		$target = isset( $_POST['target'] ) ? sanitize_text_field( wp_unslash( $_POST['target'] ) ) : '';
@@ -89,14 +89,14 @@ final class Admin_Page {
 
 	public function render(): void {
 		if ( ! current_user_can( Caps::MANAGE_ACCESS ) ) {
-			wp_die( esc_html__( 'You do not have permission to view this page.', 'rolewright' ) );
+			wp_die( esc_html__( 'You do not have permission to view this page.', 'role-gatekeeper' ) );
 		}
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
 		$scope  = isset( $_GET['user'] ) ? 'user' : 'role';
 		$target = isset( $_GET[ $scope ] ) ? sanitize_text_field( wp_unslash( $_GET[ $scope ] ) ) : '';
 		// phpcs:enable
 
-		echo '<div class="wrap rw-admin-ui"><h1>' . esc_html__( 'Admin interface', 'rolewright' ) . '</h1>';
+		echo '<div class="wrap rw-admin-ui"><h1>' . esc_html__( 'Admin interface', 'role-gatekeeper' ) . '</h1>';
 		$this->notices();
 
 		$roles = array();
@@ -118,7 +118,7 @@ final class Admin_Page {
 			$u     = get_userdata( absint( $target ) );
 			$valid = $u && ! is_super_admin( $u->ID ) && ! in_array( 'administrator', (array) $u->roles, true );
 			if ( $u && ! $valid ) {
-				echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Administrators cannot be restricted.', 'rolewright' ) . '</p></div>';
+				echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Administrators cannot be restricted.', 'role-gatekeeper' ) . '</p></div>';
 			}
 			if ( $valid ) {
 				$target = (string) $u->ID;
@@ -131,10 +131,10 @@ final class Admin_Page {
 
 		$rule = Rules::get( $scope, $target );
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" class="rw-form">';
-		echo '<input type="hidden" name="action" value="rolewright_admin_ui_save" />';
+		echo '<input type="hidden" name="action" value="rolegate_admin_ui_save" />';
 		echo '<input type="hidden" name="scope" value="' . esc_attr( $scope ) . '" />';
 		echo '<input type="hidden" name="target" value="' . esc_attr( $target ) . '" />';
-		wp_nonce_field( 'rolewright_admin_ui_save' );
+		wp_nonce_field( 'rolegate_admin_ui_save' );
 
 		$this->section_menu( $rule );
 		$this->section_screens( $rule );
@@ -142,26 +142,26 @@ final class Admin_Page {
 		$this->section_plugins( $rule );
 		$this->section_theme_and_bar( $rule );
 
-		submit_button( __( 'Save restrictions', 'rolewright' ) );
+		submit_button( __( 'Save restrictions', 'role-gatekeeper' ) );
 		echo '</form>';
 		echo '<form id="rw-refresh-form" method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
-		echo '<input type="hidden" name="action" value="rolewright_admin_ui_refresh" />';
+		echo '<input type="hidden" name="action" value="rolegate_admin_ui_refresh" />';
 		echo '<input type="hidden" name="scope" value="' . esc_attr( $scope ) . '" />';
 		echo '<input type="hidden" name="target" value="' . esc_attr( $target ) . '" />';
-		wp_nonce_field( 'rolewright_admin_ui_refresh' );
+		wp_nonce_field( 'rolegate_admin_ui_refresh' );
 		echo '</form></div>';
 	}
 
 	private function notices(): void {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
 		if ( isset( $_GET['rw_saved'] ) ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Restrictions saved.', 'rolewright' ) . '</p></div>';
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Restrictions saved.', 'role-gatekeeper' ) . '</p></div>';
 		}
 		if ( isset( $_GET['rw_refreshed'] ) ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Meta box and dashboard widget lists refreshed.', 'rolewright' ) . '</p></div>';
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Meta box and dashboard widget lists refreshed.', 'role-gatekeeper' ) . '</p></div>';
 		}
 		if ( isset( $_GET['rw_error'] ) ) {
-			$key = 'rolewright_admin_ui_err_' . get_current_user_id();
+			$key = 'rolegate_admin_ui_err_' . get_current_user_id();
 			$msg = get_transient( $key );
 			delete_transient( $key );
 			if ( is_string( $msg ) && '' !== $msg ) {
@@ -175,19 +175,19 @@ final class Admin_Page {
 		echo '<div class="rw-picker">';
 		echo '<form method="get" action="' . esc_url( admin_url( 'admin.php' ) ) . '">';
 		echo '<input type="hidden" name="page" value="' . esc_attr( self::SLUG ) . '" />';
-		echo '<label for="rw-role">' . esc_html__( 'Role', 'rolewright' ) . '</label> ';
+		echo '<label for="rw-role">' . esc_html__( 'Role', 'role-gatekeeper' ) . '</label> ';
 		echo '<select id="rw-role" name="role">';
 		foreach ( $roles as $slug => $name ) {
 			printf( '<option value="%s" %s>%s</option>', esc_attr( $slug ), selected( 'role' === $scope && $target === $slug, true, false ), esc_html( $name ) );
 		}
 		echo '</select> ';
-		submit_button( __( 'Edit role', 'rolewright' ), 'secondary', '', false );
+		submit_button( __( 'Edit role', 'role-gatekeeper' ), 'secondary', '', false );
 		echo '</form>';
 		echo '<form method="get" action="' . esc_url( admin_url( 'admin.php' ) ) . '">';
 		echo '<input type="hidden" name="page" value="' . esc_attr( self::SLUG ) . '" />';
-		echo '<label for="rw-user">' . esc_html__( 'Or a single user (ID)', 'rolewright' ) . '</label> ';
+		echo '<label for="rw-user">' . esc_html__( 'Or a single user (ID)', 'role-gatekeeper' ) . '</label> ';
 		echo '<input type="number" min="1" id="rw-user" name="user" value="' . esc_attr( 'user' === $scope ? $target : '' ) . '" class="small-text" /> ';
-		submit_button( __( 'Edit user', 'rolewright' ), 'secondary', '', false );
+		submit_button( __( 'Edit user', 'role-gatekeeper' ), 'secondary', '', false );
 		echo '</form></div>';
 	}
 
@@ -204,9 +204,9 @@ final class Admin_Page {
 		ksort( $menu );
 		$items = $rule['menu']['items'];
 
-		echo '<h2>' . esc_html__( 'Admin menu', 'rolewright' ) . '</h2>';
-		echo '<p class="description">' . esc_html__( 'Blocked items disappear from the menu and their addresses redirect to the first page the user can open. The Rolewright menu and the profile page are never blocked.', 'rolewright' ) . '</p>';
-		$this->model_radios( 'rule[menu][model]', $rule['menu']['model'], __( 'Block the selected items', 'rolewright' ), __( 'Block everything except the selected items', 'rolewright' ) );
+		echo '<h2>' . esc_html__( 'Admin menu', 'role-gatekeeper' ) . '</h2>';
+		echo '<p class="description">' . esc_html__( 'Blocked items disappear from the menu and their addresses redirect to the first page the user can open. The Role Gatekeeper menu and the profile page are never blocked.', 'role-gatekeeper' ) . '</p>';
+		$this->model_radios( 'rule[menu][model]', $rule['menu']['model'], __( 'Block the selected items', 'role-gatekeeper' ), __( 'Block everything except the selected items', 'role-gatekeeper' ) );
 		echo '<div class="rw-tree">';
 		foreach ( $menu as $item ) {
 			$slug = (string) ( $item[2] ?? '' );
@@ -240,7 +240,7 @@ final class Admin_Page {
 	}
 
 	private function section_screens( array $rule ): void {
-		echo '<h2>' . esc_html__( 'Appearance and editing screens', 'rolewright' ) . '</h2><ul>';
+		echo '<h2>' . esc_html__( 'Appearance and editing screens', 'role-gatekeeper' ) . '</h2><ul>';
 		foreach ( Engine::block_defs() as $id => $def ) {
 			printf(
 				'<li><label><input type="checkbox" name="rule[blocks][]" value="%1$s" %2$s /> %3$s</label></li>',
@@ -254,15 +254,15 @@ final class Admin_Page {
 
 	private function section_boxes( array $rule ): void {
 		$seen = Discovery::seen()['metaboxes'];
-		echo '<h2>' . esc_html__( 'Meta boxes and dashboard widgets', 'rolewright' ) . '</h2>';
-		echo '<p class="description">' . esc_html__( 'The list is learned as screens load. Refresh re-reads every editable post type and the dashboard.', 'rolewright' ) . ' ';
-		echo '<button type="submit" class="button" form="rw-refresh-form">' . esc_html__( 'Refresh list', 'rolewright' ) . '</button></p>';
+		echo '<h2>' . esc_html__( 'Meta boxes and dashboard widgets', 'role-gatekeeper' ) . '</h2>';
+		echo '<p class="description">' . esc_html__( 'The list is learned as screens load. Refresh re-reads every editable post type and the dashboard.', 'role-gatekeeper' ) . ' ';
+		echo '<button type="submit" class="button" form="rw-refresh-form">' . esc_html__( 'Refresh list', 'role-gatekeeper' ) . '</button></p>';
 		if ( ! $seen ) {
-			echo '<p>' . esc_html__( 'Nothing recorded yet. Use Refresh list.', 'rolewright' ) . '</p>';
+			echo '<p>' . esc_html__( 'Nothing recorded yet. Use Refresh list.', 'role-gatekeeper' ) . '</p>';
 		}
 		foreach ( $seen as $type => $boxes ) {
 			if ( 'dashboard' === $type ) {
-				$heading = __( 'Dashboard widgets', 'rolewright' );
+				$heading = __( 'Dashboard widgets', 'role-gatekeeper' );
 			} else {
 				$obj     = get_post_type_object( $type );
 				$heading = $obj ? $obj->labels->singular_name : $type;
@@ -283,11 +283,11 @@ final class Admin_Page {
 
 	private function section_plugins( array $rule ): void {
 		require_once ABSPATH . 'wp-admin/includes/plugin.php';
-		$own = plugin_basename( ROLEWRIGHT_FILE );
-		echo '<h2>' . esc_html__( 'Plugins', 'rolewright' ) . '</h2>';
-		echo '<p class="description">' . esc_html__( 'Hidden plugins disappear from the plugin list. Locked plugins cannot be activated, deactivated or deleted, in the admin or over REST.', 'rolewright' ) . '</p>';
-		$this->model_radios( 'rule[plugins][model]', $rule['plugins']['model'], __( 'Lock the selected plugins', 'rolewright' ), __( 'Lock every plugin except the selected ones', 'rolewright' ) );
-		echo '<div class="rw-scroll" style="overflow-x:auto"><table class="widefat striped rw-plugins"><thead><tr><th>' . esc_html__( 'Plugin', 'rolewright' ) . '</th><th>' . esc_html__( 'Locked / allowed', 'rolewright' ) . '</th><th>' . esc_html__( 'Hidden', 'rolewright' ) . '</th></tr></thead><tbody>';
+		$own = plugin_basename( ROLEGATE_FILE );
+		echo '<h2>' . esc_html__( 'Plugins', 'role-gatekeeper' ) . '</h2>';
+		echo '<p class="description">' . esc_html__( 'Hidden plugins disappear from the plugin list. Locked plugins cannot be activated, deactivated or deleted, in the admin or over REST.', 'role-gatekeeper' ) . '</p>';
+		$this->model_radios( 'rule[plugins][model]', $rule['plugins']['model'], __( 'Lock the selected plugins', 'role-gatekeeper' ), __( 'Lock every plugin except the selected ones', 'role-gatekeeper' ) );
+		echo '<div class="rw-scroll" style="overflow-x:auto"><table class="widefat striped rw-plugins"><thead><tr><th>' . esc_html__( 'Plugin', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'Locked / allowed', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'Hidden', 'role-gatekeeper' ) . '</th></tr></thead><tbody>';
 		foreach ( get_plugins() as $file => $data ) {
 			if ( $file === $own ) {
 				continue;
@@ -299,25 +299,25 @@ final class Admin_Page {
 				checked( in_array( $file, $rule['plugins']['locked'], true ), true, false ),
 				checked( in_array( $file, $rule['plugins']['hidden'], true ), true, false ),
 				/* translators: %s: plugin name */
-				esc_attr( sprintf( __( 'Locked or allowed: %s', 'rolewright' ), $data['Name'] ) ),
+				esc_attr( sprintf( __( 'Locked or allowed: %s', 'role-gatekeeper' ), $data['Name'] ) ),
 				/* translators: %s: plugin name */
-				esc_attr( sprintf( __( 'Hidden: %s', 'rolewright' ), $data['Name'] ) )
+				esc_attr( sprintf( __( 'Hidden: %s', 'role-gatekeeper' ), $data['Name'] ) )
 			);
 		}
 		echo '</tbody></table></div>';
 	}
 
 	private function section_theme_and_bar( array $rule ): void {
-		echo '<h2>' . esc_html__( 'Themes', 'rolewright' ) . '</h2>';
-		echo '<p><label><input type="checkbox" name="rule[themes_locked]" value="1" ' . checked( ! empty( $rule['themes_locked'] ), true, false ) . ' /> ' . esc_html__( 'Cannot switch the active theme', 'rolewright' ) . '</label></p>';
+		echo '<h2>' . esc_html__( 'Themes', 'role-gatekeeper' ) . '</h2>';
+		echo '<p><label><input type="checkbox" name="rule[themes_locked]" value="1" ' . checked( ! empty( $rule['themes_locked'] ), true, false ) . ' /> ' . esc_html__( 'Cannot switch the active theme', 'role-gatekeeper' ) . '</label></p>';
 
-		echo '<h2>' . esc_html__( 'Toolbar', 'rolewright' ) . '</h2>';
+		echo '<h2>' . esc_html__( 'Toolbar', 'role-gatekeeper' ) . '</h2>';
 		$bar = Discovery::seen()['bar'];
 		foreach ( Engine::protected_bar_nodes() as $node ) {
 			unset( $bar[ $node ] );
 		}
 		if ( ! $bar ) {
-			echo '<p>' . esc_html__( 'Toolbar items are learned as pages load. Open another admin page and come back.', 'rolewright' ) . '</p>';
+			echo '<p>' . esc_html__( 'Toolbar items are learned as pages load. Open another admin page and come back.', 'role-gatekeeper' ) . '</p>';
 			return;
 		}
 		echo '<ul class="rw-bar">';

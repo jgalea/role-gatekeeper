@@ -1,7 +1,7 @@
 <?php
-namespace Rolewright\Modules\Admin_Ui;
+namespace Rolegate\Modules\Admin_Ui;
 
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Caps;
 use WP_Error;
 
 defined( 'ABSPATH' ) || exit;
@@ -100,7 +100,7 @@ final class Enforcer {
 		$can_manage = self::can_manage();
 
 		if ( 'themes.php' === $pagenow && $eff['themes_locked'] && isset( $_GET['action'] ) && 'activate' === $_GET['action'] ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			wp_die( esc_html__( 'You are not allowed to switch themes.', 'rolewright' ), '', array( 'response' => 403 ) );
+			wp_die( esc_html__( 'You are not allowed to switch themes.', 'role-gatekeeper' ), '', array( 'response' => 403 ) );
 		}
 
 		$reason = Engine::decide( (string) $pagenow, $plugin_page ? (string) $plugin_page : null, $query, Discovery::menu(), Discovery::submenu(), $eff, $can_manage );
@@ -256,7 +256,7 @@ final class Enforcer {
 	/** Case-insensitive, because plugin paths resolve that way on case-insensitive file systems. */
 	private static function plugin_blocked( string $plugin, array $eff ): bool {
 		$plugin = strtolower( $plugin );
-		if ( strtolower( plugin_basename( ROLEWRIGHT_FILE ) ) === $plugin ) {
+		if ( strtolower( plugin_basename( ROLEGATE_FILE ) ) === $plugin ) {
 			return false;
 		}
 		foreach ( array( 'plugins_deny', 'plugins_allow', 'plugins_hide' ) as $key ) {
@@ -284,7 +284,7 @@ final class Enforcer {
 			return $plugins;
 		}
 		foreach ( $eff['plugins_hide'] as $file ) {
-			if ( plugin_basename( ROLEWRIGHT_FILE ) !== $file ) {
+			if ( plugin_basename( ROLEGATE_FILE ) !== $file ) {
 				unset( $plugins[ $file ] );
 			}
 		}
@@ -294,7 +294,7 @@ final class Enforcer {
 	public function refuse_plugin_action( $plugin ): void {
 		$eff = self::eff();
 		if ( null !== $eff && is_string( $plugin ) && self::plugin_blocked( $plugin, $eff ) ) {
-			wp_die( esc_html__( 'You are not allowed to change this plugin.', 'rolewright' ), '', array( 'response' => 403 ) );
+			wp_die( esc_html__( 'You are not allowed to change this plugin.', 'role-gatekeeper' ), '', array( 'response' => 403 ) );
 		}
 	}
 
@@ -339,13 +339,13 @@ final class Enforcer {
 		foreach ( Engine::blocked_rest_prefixes( $eff ) as $prefix ) {
 			$prefix = strtolower( $prefix );
 			if ( $route === $prefix || 0 === strpos( $route, $prefix . '/' ) ) {
-				return new WP_Error( 'rolewright_blocked', __( 'This area is not available to your account.', 'rolewright' ), array( 'status' => 403 ) );
+				return new WP_Error( 'rolegate_blocked', __( 'This area is not available to your account.', 'role-gatekeeper' ), array( 'status' => 403 ) );
 			}
 		}
 		if ( preg_match( '#^/wp/v2/plugins/(.+)$#i', $route, $m ) ) {
 			$file = strtolower( rawurldecode( $m[1] ) ) . '.php';
 			if ( in_array( $file, array_map( 'strtolower', $eff['plugins_hide'] ), true ) ) {
-				return new WP_Error( 'rest_plugin_not_found', __( 'Plugin not found.', 'rolewright' ), array( 'status' => 404 ) );
+				return new WP_Error( 'rest_plugin_not_found', __( 'Plugin not found.', 'role-gatekeeper' ), array( 'status' => 404 ) );
 			}
 		}
 		return $response;

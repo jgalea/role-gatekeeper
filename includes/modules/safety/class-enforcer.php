@@ -1,5 +1,5 @@
 <?php
-namespace Rolewright\Modules\Safety;
+namespace Rolegate\Modules\Safety;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -121,7 +121,7 @@ final class Enforcer {
 		}
 		$target = ( $update && ! empty( $user->ID ) ) ? (int) $user->ID : 0;
 		if ( ! Guard::can_assign_role( $actor, (string) $user->role, $target ) ) {
-			$errors->add( 'rolewright_role_not_allowed', __( 'You can\'t give that role: it carries capabilities you don\'t hold.', 'rolewright' ) );
+			$errors->add( 'rolegate_role_not_allowed', __( 'You can\'t give that role: it carries capabilities you don\'t hold.', 'role-gatekeeper' ) );
 		}
 	}
 
@@ -147,7 +147,7 @@ final class Enforcer {
 			$target = 'me' === strtolower( $m[1] ) ? $actor : (int) $m[1];
 		}
 		if ( $target && 'DELETE' !== $request->get_method() && ! Guard::can_act_on_user( $actor, $target ) ) {
-			return new \WP_Error( 'rolewright_user_above_actor', __( 'You can\'t edit a user who holds capabilities you don\'t have.', 'rolewright' ), array( 'status' => 403 ) );
+			return new \WP_Error( 'rolegate_user_above_actor', __( 'You can\'t edit a user who holds capabilities you don\'t have.', 'role-gatekeeper' ), array( 'status' => 403 ) );
 		}
 		$roles = $request->get_param( 'roles' );
 		if ( null === $roles ) {
@@ -155,7 +155,7 @@ final class Enforcer {
 		}
 		foreach ( (array) $roles as $role ) {
 			if ( ! Guard::can_assign_role( $actor, (string) $role, $target ) ) {
-				return new \WP_Error( 'rolewright_role_not_allowed', __( 'You can\'t give that role: it carries capabilities you don\'t hold.', 'rolewright' ), array( 'status' => 403 ) );
+				return new \WP_Error( 'rolegate_role_not_allowed', __( 'You can\'t give that role: it carries capabilities you don\'t hold.', 'role-gatekeeper' ), array( 'status' => 403 ) );
 			}
 		}
 		return $response;
@@ -185,7 +185,7 @@ final class Enforcer {
 			return $check;
 		}
 		$actor = self::actor();
-		if ( ! $actor || Guard::is_super( $actor ) || ! apply_filters( 'rolewright_storage_backstop', true, 'user', $object_id ) ) {
+		if ( ! $actor || Guard::is_super( $actor ) || ! apply_filters( 'rolegate_storage_backstop', true, 'user', $object_id ) ) {
 			return $check;
 		}
 		$target = (int) $object_id;
@@ -222,7 +222,7 @@ final class Enforcer {
 			return $check;
 		}
 		self::$blocked_users[ $target ] = true;
-		do_action( 'rolewright_escalation_blocked', 'user', $actor, $target, array_values( $gained ) );
+		do_action( 'rolegate_escalation_blocked', 'user', $actor, $target, array_values( $gained ) );
 		return false;
 	}
 
@@ -250,7 +250,7 @@ final class Enforcer {
 					$user->set_role( '' );
 				}
 			);
-			do_action( 'rolewright_escalation_blocked', 'new_user', $actor, (int) $user_id, $extra );
+			do_action( 'rolegate_escalation_blocked', 'new_user', $actor, (int) $user_id, $extra );
 		}
 	}
 
@@ -260,8 +260,8 @@ final class Enforcer {
 	 * own system context are trusted and skipped.
 	 */
 	private function strip_anonymous_registration( int $user_id ): void {
-		$trusted = (bool) apply_filters( 'rolewright_trust_anonymous_user_creation', defined( 'WP_CLI' ) && WP_CLI, $user_id );
-		if ( self::$system > 0 || $trusted || ! apply_filters( 'rolewright_storage_backstop', true, 'user', $user_id ) ) {
+		$trusted = (bool) apply_filters( 'rolegate_trust_anonymous_user_creation', defined( 'WP_CLI' ) && WP_CLI, $user_id );
+		if ( self::$system > 0 || $trusted || ! apply_filters( 'rolegate_storage_backstop', true, 'user', $user_id ) ) {
 			return;
 		}
 		$user = get_userdata( $user_id );
@@ -285,7 +285,7 @@ final class Enforcer {
 				}
 			}
 		);
-		do_action( 'rolewright_escalation_blocked', 'new_user', 0, $user_id, $critical );
+		do_action( 'rolegate_escalation_blocked', 'new_user', 0, $user_id, $critical );
 	}
 
 	/**
@@ -302,7 +302,7 @@ final class Enforcer {
 			return $value;
 		}
 		if ( ! Guard::can_assign_role( $actor, (string) $value, 0 ) ) {
-			do_action( 'rolewright_escalation_blocked', 'default_role', $actor, 0, array( (string) $value ) );
+			do_action( 'rolegate_escalation_blocked', 'default_role', $actor, 0, array( (string) $value ) );
 			return $old;
 		}
 		return $value;
@@ -323,7 +323,7 @@ final class Enforcer {
 		if ( $wpdb->get_blog_prefix() . 'user_roles' !== $option || self::$system > 0 || ! is_array( $value ) || ! is_array( $old ) ) {
 			return $value;
 		}
-		if ( ! apply_filters( 'rolewright_storage_backstop', true, 'roles', 0 ) ) {
+		if ( ! apply_filters( 'rolegate_storage_backstop', true, 'roles', 0 ) ) {
 			return $value;
 		}
 		$caps_of = function ( array $roles, string $name ) {
@@ -376,7 +376,7 @@ final class Enforcer {
 		if ( ! $reason ) {
 			return $value;
 		}
-		do_action( 'rolewright_escalation_blocked', 'roles', $actor, $reason, array_values( array_unique( $detail ) ) );
+		do_action( 'rolegate_escalation_blocked', 'roles', $actor, $reason, array_values( array_unique( $detail ) ) );
 		return $old;
 	}
 }

@@ -1,14 +1,14 @@
 <?php
 /**
- * Run on a multisite install: wp eval-file wp-content/plugins/rolewright/tests/multisite-smoke.php
+ * Run on a multisite install: wp eval-file wp-content/plugins/role-gatekeeper/tests/multisite-smoke.php
  * Set RW_MS_SITES to change how many subsites it creates (default 104, so paging past
  * get_sites()'s 100-site default is exercised).
  */
 
-use Rolewright\Modules\Multisite\Multisite_Module;
-use Rolewright\Modules\Multisite\Network_Sync;
-use Rolewright\Modules\Portability\Role_Store;
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Modules\Multisite\Multisite_Module;
+use Rolegate\Modules\Multisite\Network_Sync;
+use Rolegate\Modules\Portability\Role_Store;
+use Rolegate\Modules\Safety\Caps;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
@@ -57,7 +57,7 @@ $rw_make = function ( $login ) use ( &$rw_users, $rw_suffix ) {
 };
 $rw_events = array();
 add_action(
-	'rolewright_changed',
+	'rolegate_changed',
 	function ( $type, $data ) use ( &$rw_events ) {
 		$rw_events[] = array( $type, $data );
 	},
@@ -81,8 +81,8 @@ $rw_role_on = function ( $site, $slug ) {
 
 try {
 	$rw_ok( $rw_super > 0, 'found a super admin' );
-	$rw_ok( false !== has_action( 'network_admin_menu', array( \Rolewright\Core\Plugin::modules()['multisite'], 'menu' ) ), 'network admin page registered on multisite' );
-	$rw_ok( false !== has_filter( 'rolewright_multisite_site_admin_access' ), 'site-admin access filter registered' );
+	$rw_ok( false !== has_action( 'network_admin_menu', array( \Rolegate\Core\Plugin::modules()['multisite'], 'menu' ) ), 'network admin page registered on multisite' );
+	$rw_ok( false !== has_filter( 'rolegate_multisite_site_admin_access' ), 'site-admin access filter registered' );
 
 	$rw_net = get_network();
 	for ( $i = 0; $i < $rw_count; $i++ ) {
@@ -112,7 +112,7 @@ try {
 	$rw_plain = $rw_make( 'rw_plain' );
 	add_user_to_blog( $rw_main, $rw_plain, 'administrator' );
 	$rw_err = Network_Sync::start( $rw_plain, $rw_main, array( $rw_role ), 'replace', false );
-	$rw_ok( is_wp_error( $rw_err ) && 'rolewright_forbidden' === $rw_err->get_error_code(), 'site administrator cannot start apply-to-all-sites' );
+	$rw_ok( is_wp_error( $rw_err ) && 'rolegate_forbidden' === $rw_err->get_error_code(), 'site administrator cannot start apply-to-all-sites' );
 
 	update_site_option( Multisite_Module::OPTION_BATCH, 40 );
 	wp_set_current_user( $rw_super );
@@ -208,13 +208,13 @@ try {
 	$rw_ok( array( 'subscriber' ) === array_values( ( new \WP_User( $rw_u2, '', $rw_s1 ) )->roles ), 'existing member keeps their role' );
 	$rw_ok( in_array( 'editor', ( new \WP_User( $rw_u2, '', $rw_few[1] ) )->roles, true ), 'non-member added with source role' );
 
-	// Site administrators and Rolewright pages.
+	// Site administrators and Role Gatekeeper pages.
 	$rw_sa = $rw_make( 'rw_siteadmin' );
 	add_user_to_blog( $rw_s1, $rw_sa, 'administrator' );
 	switch_to_blog( $rw_s1 );
 	Caps::grant_to_administrator();
 	delete_site_option( Multisite_Module::OPTION_SITE_ADMIN );
-	$rw_ok( ! user_can( $rw_sa, Caps::MANAGE ), 'site admin blocked from Rolewright pages by default' );
+	$rw_ok( ! user_can( $rw_sa, Caps::MANAGE ), 'site admin blocked from Role Gatekeeper pages by default' );
 	$rw_ok( ! user_can( $rw_sa, Caps::IMPORT ), 'site admin cannot import by default' );
 	$rw_ok( user_can( $rw_super, Caps::MANAGE ) && user_can( $rw_super, Caps::IMPORT ), 'super admin keeps access' );
 	update_site_option( Multisite_Module::OPTION_SITE_ADMIN, true );

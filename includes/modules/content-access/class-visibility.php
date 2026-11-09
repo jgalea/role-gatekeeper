@@ -1,12 +1,12 @@
 <?php
-namespace Rolewright\Modules\Content_Access;
+namespace Rolegate\Modules\Content_Access;
 
 defined( 'ABSPATH' ) || exit;
 
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Caps;
 
 final class Visibility {
-	const ATTRS = array( 'rolewrightMode', 'rolewrightRoles' );
+	const ATTRS = array( 'rolegateMode', 'rolegateRoles' );
 
 	/**
 	 * Set while the block renderer previews a block for a user who may edit the post:
@@ -24,20 +24,20 @@ final class Visibility {
 		add_filter( 'rest_request_after_callbacks', array( $this, 'reset_preview' ), 0 );
 		add_filter( 'rest_post_dispatch', array( $this, 'reset_preview' ), 0 );
 		add_filter( 'wp_insert_post_data', array( $this, 'guard_saved_attributes' ), 20, 2 );
-		add_shortcode( 'rolewright_if', array( $this, 'sc_if' ) );
-		add_shortcode( 'rolewright_logged_in', array( $this, 'sc_logged_in' ) );
-		add_shortcode( 'rolewright_logged_out', array( $this, 'sc_logged_out' ) );
-		add_shortcode( 'rolewright_login_form', array( $this, 'sc_login_form' ) );
+		add_shortcode( 'rolegate_if', array( $this, 'sc_if' ) );
+		add_shortcode( 'rolegate_logged_in', array( $this, 'sc_logged_in' ) );
+		add_shortcode( 'rolegate_logged_out', array( $this, 'sc_logged_out' ) );
+		add_shortcode( 'rolegate_login_form', array( $this, 'sc_login_form' ) );
 	}
 
 	public function block_attributes( array $args ): array {
-		$attrs                    = isset( $args['attributes'] ) && is_array( $args['attributes'] ) ? $args['attributes'] : array();
-		$attrs['rolewrightMode']  = array( 'type' => 'string' );
-		$attrs['rolewrightRoles'] = array(
+		$attrs                  = isset( $args['attributes'] ) && is_array( $args['attributes'] ) ? $args['attributes'] : array();
+		$attrs['rolegateMode']  = array( 'type' => 'string' );
+		$attrs['rolegateRoles'] = array(
 			'type'  => 'array',
 			'items' => array( 'type' => 'string' ),
 		);
-		$args['attributes']       = $attrs;
+		$args['attributes']     = $attrs;
 		return $args;
 	}
 
@@ -90,14 +90,14 @@ final class Visibility {
 	}
 
 	public function render_block( $content, array $block ) {
-		if ( empty( $block['attrs']['rolewrightMode'] ) ) {
+		if ( empty( $block['attrs']['rolegateMode'] ) ) {
 			return $content;
 		}
 		if ( self::$editor_preview && isset( $block['blockName'] ) && strtolower( (string) $block['blockName'] ) === self::$editor_preview['name'] && self::visibility_attrs( $block['attrs'] ) == self::$editor_preview['attrs'] ) { // phpcs:ignore Universal.Operators.StrictComparisons.LooseEqual -- array equality ignoring key order is intended.
 			return $content;
 		}
-		$roles = isset( $block['attrs']['rolewrightRoles'] ) && is_array( $block['attrs']['rolewrightRoles'] ) ? $block['attrs']['rolewrightRoles'] : array();
-		return Access::matches( Access::sanitize_mode( $block['attrs']['rolewrightMode'] ), $roles ) ? $content : '';
+		$roles = isset( $block['attrs']['rolegateRoles'] ) && is_array( $block['attrs']['rolegateRoles'] ) ? $block['attrs']['rolegateRoles'] : array();
+		return Access::matches( Access::sanitize_mode( $block['attrs']['rolegateMode'] ), $roles ) ? $content : '';
 	}
 
 	/**
@@ -177,7 +177,7 @@ final class Visibility {
 	}
 
 	public function sc_if( $atts, $content = '' ): string {
-		$atts  = shortcode_atts( array( 'roles' => '' ), (array) $atts, 'rolewright_if' );
+		$atts  = shortcode_atts( array( 'roles' => '' ), (array) $atts, 'rolegate_if' );
 		$roles = Access::sanitize_roles( $atts['roles'] );
 		if ( ! $roles || ! Access::matches( 'roles', $roles ) ) {
 			return '';
@@ -199,7 +199,7 @@ final class Visibility {
 			Access::mark_uncacheable();
 			return '';
 		}
-		$atts     = shortcode_atts( array( 'redirect' => '' ), (array) $atts, 'rolewright_login_form' );
+		$atts     = shortcode_atts( array( 'redirect' => '' ), (array) $atts, 'rolegate_login_form' );
 		$redirect = '' !== $atts['redirect'] ? wp_validate_redirect( esc_url_raw( $atts['redirect'] ), '' ) : '';
 		if ( '' === $redirect ) {
 			$post     = get_post();
@@ -209,7 +209,7 @@ final class Visibility {
 			array(
 				'echo'     => false,
 				'redirect' => $redirect,
-				'form_id'  => 'rolewright-login-form',
+				'form_id'  => 'rolegate-login-form',
 			)
 		);
 	}

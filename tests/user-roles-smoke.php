@@ -1,12 +1,12 @@
 <?php
 /**
- * Run: wp eval-file wp-content/plugins/rolewright/tests/user-roles-smoke.php
+ * Run: wp eval-file wp-content/plugins/role-gatekeeper/tests/user-roles-smoke.php
  */
 
-use Rolewright\Modules\Safety\Caps;
-use Rolewright\Modules\User_Roles\Profile;
-use Rolewright\Modules\User_Roles\Users;
-use Rolewright\Modules\User_Roles\Users_List;
+use Rolegate\Modules\Safety\Caps;
+use Rolegate\Modules\User_Roles\Profile;
+use Rolegate\Modules\User_Roles\Users;
+use Rolegate\Modules\User_Roles\Users_List;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
@@ -67,7 +67,7 @@ $rw_edit = function ( $id, $actor, array $fields ) use ( $rw_post ) {
 			array(
 				'email'                         => $u->user_email,
 				'nickname'                      => $u->user_login,
-				'rolewright_user_nonce'         => wp_create_nonce( 'rolewright_user_' . $id ),
+				'rolegate_user_nonce'         => wp_create_nonce( 'rolegate_user_' . $id ),
 			),
 			$fields
 		)
@@ -87,7 +87,7 @@ $rw_edit = function ( $id, $actor, array $fields ) use ( $rw_post ) {
 	return $out;
 };
 add_action(
-	'rolewright_changed',
+	'rolegate_changed',
 	function ( $type, $data ) use ( &$rw_events ) {
 		$rw_events[] = array( $type, $data );
 	},
@@ -114,7 +114,7 @@ try {
 	Caps::grant_to_administrator();
 
 	$admin    = $rw_make( 'rw_admin', 'administrator' );
-	// On multisite a site administrator is not the site's owner: core keeps edit_user for super admins and Rolewright keeps its manage caps for them. The single-site administrator maps to a super admin.
+	// On multisite a site administrator is not the site's owner: core keeps edit_user for super admins and Role Gatekeeper keeps its manage caps for them. The single-site administrator maps to a super admin.
 	if ( is_multisite() ) {
 		grant_super_admin( $admin );
 		add_action( 'wpmu_delete_user', 'revoke_super_admin', 1 );
@@ -130,12 +130,12 @@ try {
 	// Reading.
 	$rw_ok( array( 'subscriber' ) === Users::get_roles( $victim ), 'get_roles returns the primary role' );
 	$rw_ok( array() === Users::get_roles( 999999 ), 'get_roles on a missing user is empty' );
-	add_filter( 'rolewright_user_roles', $f = function ( $r ) {
+	add_filter( 'rolegate_user_roles', $f = function ( $r ) {
 		$r[] = 'virtual';
 		return $r;
 	} );
-	$rw_ok( in_array( 'virtual', Users::get_roles( $victim ), true ), 'get_roles honors rolewright_user_roles' );
-	remove_filter( 'rolewright_user_roles', $f );
+	$rw_ok( in_array( 'virtual', Users::get_roles( $victim ), true ), 'get_roles honors rolegate_user_roles' );
+	remove_filter( 'rolegate_user_roles', $f );
 
 	// Admin changes roles.
 	$res = Users::change_roles( $admin, $victim, array( 'author', 'contributor' ), array() );
@@ -153,7 +153,7 @@ try {
 
 	// Self and unknown.
 	$res = Users::change_roles( $admin, $admin, array( 'editor' ), array() );
-	$rw_ok( is_wp_error( $res ) && 'rolewright_self_role' === $res->get_error_code(), 'admin cannot change own roles' );
+	$rw_ok( is_wp_error( $res ) && 'rolegate_self_role' === $res->get_error_code(), 'admin cannot change own roles' );
 	$res = Users::change_roles( $admin, $victim, array( 'no_such_role_x' ), array() );
 	$rw_ok( is_wp_error( $res ), 'unknown role refused' );
 	$res = Users::change_roles( $admin, $admin2, array(), array( 'administrator' ) );
@@ -185,17 +185,17 @@ try {
 		$rw_post( array( '_wpnonce' => wp_create_nonce( 'bulk-users' ) ) );
 	};
 	$rw_bulk_as( $admin );
-	$out = $rw_list->handle_bulk( admin_url( 'users.php' ), 'rolewright_add:contributor', array( $victim, $victim2, $admin ) );
+	$out = $rw_list->handle_bulk( admin_url( 'users.php' ), 'rolegate_add:contributor', array( $victim, $victim2, $admin ) );
 	parse_str( (string) wp_parse_url( $out, PHP_URL_QUERY ), $q );
-	$rw_ok( '2' === ( $q['rolewright_done'] ?? '' ) && '1' === ( $q['rolewright_skip'] ?? '' ) && in_array( 'contributor', $rw_roles_of( $victim ), true ) && ! in_array( 'contributor', $rw_roles_of( $admin ), true ), 'bulk add: two users changed, own account skipped' );
-	$out = $rw_list->handle_bulk( admin_url( 'users.php' ), 'rolewright_remove:contributor', array( $victim, $victim2 ) );
+	$rw_ok( '2' === ( $q['rolegate_done'] ?? '' ) && '1' === ( $q['rolegate_skip'] ?? '' ) && in_array( 'contributor', $rw_roles_of( $victim ), true ) && ! in_array( 'contributor', $rw_roles_of( $admin ), true ), 'bulk add: two users changed, own account skipped' );
+	$out = $rw_list->handle_bulk( admin_url( 'users.php' ), 'rolegate_remove:contributor', array( $victim, $victim2 ) );
 	$rw_ok( ! in_array( 'contributor', $rw_roles_of( $victim ), true ) && ! in_array( 'contributor', $rw_roles_of( $victim2 ), true ), 'bulk remove role' );
 	$rw_ok( $rw_list->handle_bulk( 'x', 'delete', array( 1 ) ) === 'x', 'bulk handler ignores other actions' );
 	$rw_bulk_as( $pu );
-	$out = $rw_list->handle_bulk( admin_url( 'users.php' ), 'rolewright_add:editor', array( $victim, $victim2 ) );
+	$out = $rw_list->handle_bulk( admin_url( 'users.php' ), 'rolegate_add:editor', array( $victim, $victim2 ) );
 	parse_str( (string) wp_parse_url( $out, PHP_URL_QUERY ), $q );
-	$rw_ok( '0' === ( $q['rolewright_done'] ?? '' ) && '2' === ( $q['rolewright_skip'] ?? '' ) && ! in_array( 'editor', $rw_roles_of( $victim ), true ), 'promote-only user cannot bulk add editor' );
-	$out = $rw_list->handle_bulk( admin_url( 'users.php' ), 'rolewright_add:administrator', array( $victim ) );
+	$rw_ok( '0' === ( $q['rolegate_done'] ?? '' ) && '2' === ( $q['rolegate_skip'] ?? '' ) && ! in_array( 'editor', $rw_roles_of( $victim ), true ), 'promote-only user cannot bulk add editor' );
+	$out = $rw_list->handle_bulk( admin_url( 'users.php' ), 'rolegate_add:administrator', array( $victim ) );
 	$rw_ok( ! in_array( 'administrator', $rw_roles_of( $victim ), true ), 'promote-only user cannot bulk add administrator' );
 	$rw_post( array( '_wpnonce' => 'bad' ) );
 	$died = false;
@@ -206,7 +206,7 @@ try {
 	} );
 	try {
 		wp_set_current_user( $admin );
-		$rw_list->handle_bulk( admin_url( 'users.php' ), 'rolewright_add:contributor', array( $victim ) );
+		$rw_list->handle_bulk( admin_url( 'users.php' ), 'rolegate_add:contributor', array( $victim ) );
 	} catch ( \RuntimeException $e ) {
 		$died = true;
 	}
@@ -215,33 +215,33 @@ try {
 	$rw_post( array() );
 
 	// Profile flow.
-	$res = $rw_edit( $victim, $admin, array( 'role' => 'author', 'rolewright_user_roles_present' => '1', 'rolewright_user_roles' => array( 'contributor', 'subscriber' ) ) );
+	$res = $rw_edit( $victim, $admin, array( 'role' => 'author', 'rolegate_user_roles_present' => '1', 'rolegate_user_roles' => array( 'contributor', 'subscriber' ) ) );
 	$rw_ok( ! is_wp_error( $res ) && array( 'author', 'contributor', 'subscriber' ) === $rw_roles_of( $victim ) && 'author' === get_userdata( $victim )->roles[0], 'profile save: primary plus extras' );
 	$ev = $rw_last_event( 'user.roles' );
 	$rw_ok( $ev && $victim === $ev['target'] && array( 'subscriber' ) === $ev['before']['roles'] && 3 === count( $ev['after']['roles'] ), 'profile save fires user.roles with before/after' );
-	$res = $rw_edit( $victim, $admin, array( 'role' => 'editor', 'rolewright_user_roles_present' => '1', 'rolewright_user_roles' => array( 'contributor' ) ) );
+	$res = $rw_edit( $victim, $admin, array( 'role' => 'editor', 'rolegate_user_roles_present' => '1', 'rolegate_user_roles' => array( 'contributor' ) ) );
 	$rw_ok( ! is_wp_error( $res ) && array( 'contributor', 'editor' ) === $rw_roles_of( $victim ), 'profile save: changing primary and unticking extras drops them' );
-	$res = $rw_edit( $victim, $admin, array( 'role' => '', 'rolewright_user_roles_present' => '1', 'rolewright_user_roles' => array( 'contributor' ) ) );
+	$res = $rw_edit( $victim, $admin, array( 'role' => '', 'rolegate_user_roles_present' => '1', 'rolegate_user_roles' => array( 'contributor' ) ) );
 	$rw_ok( ! is_wp_error( $res ) && array( 'contributor' ) === $rw_roles_of( $victim ), 'profile save: no primary role, extras kept' );
-	$res = $rw_edit( $victim, $admin, array( 'role' => '', 'rolewright_user_roles_present' => '1' ) );
+	$res = $rw_edit( $victim, $admin, array( 'role' => '', 'rolegate_user_roles_present' => '1' ) );
 	$rw_ok( ! is_wp_error( $res ) && array() === $rw_roles_of( $victim ), 'profile save: a user with no roles at all' );
-	$res = $rw_edit( $victim, $admin, array( 'role' => 'subscriber', 'rolewright_user_roles_present' => '1', 'rolewright_user_nonce' => 'bad' ) );
+	$res = $rw_edit( $victim, $admin, array( 'role' => 'subscriber', 'rolegate_user_roles_present' => '1', 'rolegate_user_nonce' => 'bad' ) );
 	$rw_ok( is_wp_error( $res ) && array( 'subscriber' ) !== $rw_roles_of( $victim ), 'profile save with a bad nonce is refused' );
 	Users::change_roles( $admin, $victim, array( 'subscriber' ), array() );
 
-	$res = $rw_edit( $victim, $promoter, array( 'role' => 'subscriber', 'rolewright_user_roles_present' => '1', 'rolewright_user_roles' => array( 'editor' ) ) );
+	$res = $rw_edit( $victim, $promoter, array( 'role' => 'subscriber', 'rolegate_user_roles_present' => '1', 'rolegate_user_roles' => array( 'editor' ) ) );
 	$rw_ok( is_wp_error( $res ) && array( 'subscriber' ) === $rw_roles_of( $victim ), 'promoter cannot add editor as extra on the profile screen' );
-	$res = $rw_edit( $victim, $promoter, array( 'role' => 'subscriber', 'rolewright_user_roles_present' => '1', 'rolewright_user_roles' => array( 'administrator' ) ) );
+	$res = $rw_edit( $victim, $promoter, array( 'role' => 'subscriber', 'rolegate_user_roles_present' => '1', 'rolegate_user_roles' => array( 'administrator' ) ) );
 	$rw_ok( is_wp_error( $res ) && array( 'subscriber' ) === $rw_roles_of( $victim ), 'promoter cannot add administrator as extra on the profile screen' );
-	$res = $rw_edit( $victim, $promoter, array( 'role' => 'administrator', 'rolewright_user_roles_present' => '1' ) );
+	$res = $rw_edit( $victim, $promoter, array( 'role' => 'administrator', 'rolegate_user_roles_present' => '1' ) );
 	$rw_ok( is_wp_error( $res ) && array( 'subscriber' ) === $rw_roles_of( $victim ), 'promoter cannot set administrator as primary on the profile screen' );
-	$res = $rw_edit( $victim, $promoter, array( 'role' => 'subscriber', 'rolewright_user_roles_present' => '1', 'rolewright_user_roles' => array( 'author' ) ) );
+	$res = $rw_edit( $victim, $promoter, array( 'role' => 'subscriber', 'rolegate_user_roles_present' => '1', 'rolegate_user_roles' => array( 'author' ) ) );
 	$rw_ok( ! is_wp_error( $res ) && array( 'author', 'subscriber' ) === $rw_roles_of( $victim ), 'promoter can add a harmless extra role on the profile screen' );
 	Users::change_roles( $admin, $victim, array(), array( 'author' ) );
 	$before_self = $rw_roles_of( $promoter );
-	$rw_edit( $promoter, $promoter, array( 'role' => 'administrator', 'rolewright_user_roles_present' => '1', 'rolewright_user_roles' => array( 'administrator' ) ) );
+	$rw_edit( $promoter, $promoter, array( 'role' => 'administrator', 'rolegate_user_roles_present' => '1', 'rolegate_user_roles' => array( 'administrator' ) ) );
 	$rw_ok( $before_self === $rw_roles_of( $promoter ), 'own profile save cannot change own roles' );
-	$res = $rw_edit( $admin, $promoter, array( 'role' => 'subscriber', 'rolewright_user_roles_present' => '1' ) );
+	$res = $rw_edit( $admin, $promoter, array( 'role' => 'subscriber', 'rolegate_user_roles_present' => '1' ) );
 	$rw_ok( array( 'administrator' ) === $rw_roles_of( $admin ) && ! user_can( $promoter, 'edit_user', $admin ), 'promoter cannot demote an administrator on the profile screen' );
 
 	// New user.
@@ -256,7 +256,7 @@ try {
 					'email'                 => $login . '@example.com',
 					'pass1'                 => 'Xy9!longPassw0rdzz',
 					'pass2'                 => 'Xy9!longPassw0rdzz',
-					'rolewright_user_nonce' => wp_create_nonce( 'rolewright_user_0' ),
+					'rolegate_user_nonce' => wp_create_nonce( 'rolegate_user_0' ),
 				),
 				$fields
 			)
@@ -267,41 +267,41 @@ try {
 		}
 		return $id;
 	};
-	$id = $rw_new( $admin, array( 'role' => 'author', 'rolewright_user_roles_present' => '1', 'rolewright_user_roles' => array( 'contributor' ) ) );
+	$id = $rw_new( $admin, array( 'role' => 'author', 'rolegate_user_roles_present' => '1', 'rolegate_user_roles' => array( 'contributor' ) ) );
 	$rw_ok( ! is_wp_error( $id ) && array( 'author', 'contributor' ) === $rw_roles_of( $id ), 'new user: primary plus extra role' );
 	$ev = $rw_last_event( 'user.roles' );
 	$rw_ok( $ev && ! is_wp_error( $id ) && $id === $ev['target'] && array() === $ev['before']['roles'] && 2 === count( $ev['after']['roles'] ), 'new user fires user.roles from an empty before' );
-	$id = $rw_new( $promoter, array( 'role' => 'subscriber', 'rolewright_user_roles_present' => '1', 'rolewright_user_roles' => array( 'editor' ) ) );
+	$id = $rw_new( $promoter, array( 'role' => 'subscriber', 'rolegate_user_roles_present' => '1', 'rolegate_user_roles' => array( 'editor' ) ) );
 	$rw_ok( is_wp_error( $id ), 'promoter cannot create a user with an editor extra role' );
-	$id = $rw_new( $promoter, array( 'role' => 'subscriber', 'rolewright_user_roles_present' => '1', 'rolewright_user_roles' => array( 'administrator' ) ) );
+	$id = $rw_new( $promoter, array( 'role' => 'subscriber', 'rolegate_user_roles_present' => '1', 'rolegate_user_roles' => array( 'administrator' ) ) );
 	$rw_ok( is_wp_error( $id ), 'promoter cannot create a user with an administrator extra role' );
 
 	// Per-user capabilities.
 	$cap = 'rw_t_cap_' . $rw_suffix;
 	$rw_ok( ! user_can( $victim, 'edit_pages' ), 'setup: victim lacks edit_pages' );
-	$res = $rw_edit( $victim, $admin, array( 'role' => 'subscriber', 'rolewright_user_caps_present' => '1', 'rolewright_user_caps' => array( 'edit_pages' ), 'rolewright_user_cap_new' => strtoupper( $cap ) ) );
+	$res = $rw_edit( $victim, $admin, array( 'role' => 'subscriber', 'rolegate_user_caps_present' => '1', 'rolegate_user_caps' => array( 'edit_pages' ), 'rolegate_user_cap_new' => strtoupper( $cap ) ) );
 	clean_user_cache( $victim );
 	$rw_ok( ! is_wp_error( $res ) && user_can( $victim, 'edit_pages' ) && user_can( $victim, $cap ), 'admin grants a listed and a typed capability on the profile' );
 	$ev = $rw_last_event( 'user.caps' );
 	$rw_ok( $ev && $victim === $ev['target'] && array() === $ev['before']['caps'] && isset( $ev['after']['caps']['edit_pages'] ), 'user.caps event carries before and after' );
-	$res = $rw_edit( $victim, $admin, array( 'role' => 'subscriber', 'rolewright_user_caps_present' => '1', 'rolewright_user_caps' => array( 'edit_pages' ) ) );
+	$res = $rw_edit( $victim, $admin, array( 'role' => 'subscriber', 'rolegate_user_caps_present' => '1', 'rolegate_user_caps' => array( 'edit_pages' ) ) );
 	clean_user_cache( $victim );
 	$rw_ok( ! is_wp_error( $res ) && user_can( $victim, 'edit_pages' ) && ! user_can( $victim, $cap ), 'unticked capability is revoked' );
-	$res = $rw_edit( $victim, $admin, array( 'role' => 'subscriber', 'rolewright_user_caps_present' => '1', 'rolewright_user_caps' => array() ) );
+	$res = $rw_edit( $victim, $admin, array( 'role' => 'subscriber', 'rolegate_user_caps_present' => '1', 'rolegate_user_caps' => array() ) );
 	clean_user_cache( $victim );
 	$rw_ok( array() === Users::direct_caps( $victim ) && array( 'subscriber' ) === $rw_roles_of( $victim ), 'revoking all leaves the role intact' );
 	$res = Users::change_caps( $admin, $victim, array( 'bad cap!' ), array() );
-	$rw_ok( is_wp_error( $res ) && 'rolewright_invalid_cap' === $res->get_error_code(), 'invalid capability name refused' );
+	$rw_ok( is_wp_error( $res ) && 'rolegate_invalid_cap' === $res->get_error_code(), 'invalid capability name refused' );
 	$res = Users::change_caps( $admin, $victim, array( 'subscriber' ), array() );
 	$rw_ok( is_wp_error( $res ), 'a role name cannot be written as a capability' );
 	$res = Users::change_caps( $admin, $admin, array( 'edit_pages' ), array() );
-	$rw_ok( is_wp_error( $res ) && 'rolewright_self_caps' === $res->get_error_code(), 'cannot change own capabilities' );
+	$rw_ok( is_wp_error( $res ) && 'rolegate_self_caps' === $res->get_error_code(), 'cannot change own capabilities' );
 
 	foreach ( array( $promoter, $pu ) as $who ) {
 		$res = Users::change_caps( $who, $victim, array( 'edit_pages' ), array() );
-		$rw_ok( is_wp_error( $res ) && ! user_can( $victim, 'edit_pages' ), 'user without rolewright_manage_users cannot grant per-user caps' );
+		$rw_ok( is_wp_error( $res ) && ! user_can( $victim, 'edit_pages' ), 'user without rolegate_manage_users cannot grant per-user caps' );
 	}
-	$res = $rw_edit( $victim, $promoter, array( 'role' => 'subscriber', 'rolewright_user_caps_present' => '1', 'rolewright_user_caps' => array( 'manage_options' ) ) );
+	$res = $rw_edit( $victim, $promoter, array( 'role' => 'subscriber', 'rolegate_user_caps_present' => '1', 'rolegate_user_caps' => array( 'manage_options' ) ) );
 	clean_user_cache( $victim );
 	$rw_ok( ! user_can( $victim, 'manage_options' ), 'promoter cannot grant manage_options through the profile screen' );
 	foreach ( array( 'manage_options', 'install_plugins', 'unfiltered_html', Caps::MANAGE_ROLES, 'edit_pages' ) as $c ) {
@@ -338,33 +338,33 @@ try {
 	Users::change_roles( $admin, $victim, array(), array( 'author' ) );
 	$out = Users::count_no_role();
 	$rw_ok( true === Users::change_roles( $admin, $norole, array( 'subscriber' ), array() ) && Users::count_no_role() === $out - 1, 'assigning a role removes the user from the no-role set' );
-	$_GET = array( 'rolewright_no_role' => '1' );
+	$_GET = array( 'rolegate_no_role' => '1' );
 	$views = $rw_list->views( array( 'all' => '<a href="x" class="current" aria-current="page">All</a>' ) );
-	$rw_ok( isset( $views['rolewright_none'] ) && false === strpos( $views['all'], 'current' ) && false !== strpos( $views['rolewright_none'], 'current' ), 'views add a current No role link' );
+	$rw_ok( isset( $views['rolegate_none'] ) && false === strpos( $views['all'], 'current' ) && false !== strpos( $views['rolegate_none'], 'current' ), 'views add a current No role link' );
 	$GLOBALS['pagenow'] = 'users.php';
 	wp_set_current_user( $admin );
 	$wpq = new \WP_User_Query( array( 'fields' => 'ID' ) );
 	$ids = array_map( 'intval', $wpq->get_results() );
-	$rw_ok( in_array( $onlycap, $ids, true ) && ! in_array( $admin, $ids, true ), 'users.php?rolewright_no_role=1 lists only users without a role' );
+	$rw_ok( in_array( $onlycap, $ids, true ) && ! in_array( $admin, $ids, true ), 'users.php?rolegate_no_role=1 lists only users without a role' );
 	$_GET = array();
 	unset( $GLOBALS['pagenow'] );
 
 	// Column.
 	$cols = $rw_list->columns( array( 'cb' => 'x', 'username' => 'Username', 'role' => 'Role', 'posts' => 'Posts' ) );
-	$rw_ok( ! isset( $cols['role'] ) && 'Roles' === $cols['rolewright_roles'] && array_keys( $cols ) === array( 'cb', 'username', 'rolewright_roles', 'posts' ), 'Roles column replaces the core Role column in place' );
+	$rw_ok( ! isset( $cols['role'] ) && 'Roles' === $cols['rolegate_roles'] && array_keys( $cols ) === array( 'cb', 'username', 'rolegate_roles', 'posts' ), 'Roles column replaces the core Role column in place' );
 	Users::change_roles( $admin, $victim, array( 'author' ), array() );
-	$html = $rw_list->column( '', 'rolewright_roles', $victim );
+	$html = $rw_list->column( '', 'rolegate_roles', $victim );
 	$rw_ok( false !== strpos( $html, 'role=subscriber' ) && false !== strpos( $html, 'role=author' ) && false !== strpos( $html, ', ' ), 'Roles column lists every role with filter links' );
-	$rw_ok( false !== strpos( $rw_list->column( '', 'rolewright_roles', $onlycap ), 'rolewright_no_role=1' ), 'Roles column links users without a role to the filter' );
+	$rw_ok( false !== strpos( $rw_list->column( '', 'rolegate_roles', $onlycap ), 'rolegate_no_role=1' ), 'Roles column links users without a role to the filter' );
 	$rw_ok( 'keep' === $rw_list->column( 'keep', 'other', $victim ), 'other columns pass through' );
 
 	// Bulk action list.
 	wp_set_current_user( $admin );
 	$acts = $rw_list->bulk_actions( array() );
-	$rw_ok( isset( $acts['rolewright_add:editor'], $acts['rolewright_remove:editor'] ), 'admin sees add and remove role bulk actions' );
+	$rw_ok( isset( $acts['rolegate_add:editor'], $acts['rolegate_remove:editor'] ), 'admin sees add and remove role bulk actions' );
 	wp_set_current_user( $pu );
 	$acts = $rw_list->bulk_actions( array() );
-	$rw_ok( ! isset( $acts['rolewright_add:administrator'], $acts['rolewright_add:editor'] ), 'promote-only user is not offered administrator or editor' );
+	$rw_ok( ! isset( $acts['rolegate_add:administrator'], $acts['rolegate_add:editor'] ), 'promote-only user is not offered administrator or editor' );
 	wp_set_current_user( $victim );
 	$rw_ok( array( 'a' => 1 ) === $rw_list->bulk_actions( array( 'a' => 1 ) ), 'users without promote_users get no bulk actions' );
 
@@ -374,7 +374,7 @@ try {
 	// Last administrator: the actor holds every administrator cap through a clone role, so the target is the only administrator.
 	$rw_clone = 'rw_t_clone_' . $rw_suffix;
 	$rw_roles[] = $rw_clone;
-	\Rolewright\Modules\Safety\Enforcer::as_system(
+	\Rolegate\Modules\Safety\Enforcer::as_system(
 		function () use ( $rw_clone ) {
 			add_role( $rw_clone, 'Clone', get_role( 'administrator' )->capabilities );
 		}
@@ -407,17 +407,17 @@ try {
 		$rw_ok( array( $rw_last ) === $only, 'last admin setup: exactly one administrator left' );
 		$res = Users::change_roles( $rw_actor, $rw_last, array(), array( 'administrator' ) );
 		// With the role hierarchy on, an administrator clone ranks below the Administrator role and is refused before the last-admin check.
-		$rw_hier = \Rolewright\Core\Plugin::is_enabled( 'deny-hierarchy' );
-		$rw_ok( is_wp_error( $res ) && in_array( $res->get_error_code(), $rw_hier ? array( 'rolewright_user_above_actor', 'rolewright_cannot_promote' ) : array( 'rolewright_last_admin' ), true ) && in_array( 'administrator', $rw_roles_of( $rw_last ), true ), 'last admin: removing the Administrator role from the only administrator is refused' );
+		$rw_hier = \Rolegate\Core\Plugin::is_enabled( 'deny-hierarchy' );
+		$rw_ok( is_wp_error( $res ) && in_array( $res->get_error_code(), $rw_hier ? array( 'rolegate_user_above_actor', 'rolegate_cannot_promote' ) : array( 'rolegate_last_admin' ), true ) && in_array( 'administrator', $rw_roles_of( $rw_last ), true ), 'last admin: removing the Administrator role from the only administrator is refused' );
 		wp_set_current_user( $rw_actor );
 		$rw_post( array( '_wpnonce' => wp_create_nonce( 'bulk-users' ) ) );
-		$out = $rw_list->handle_bulk( admin_url( 'users.php' ), 'rolewright_remove:administrator', array( $rw_last ) );
+		$out = $rw_list->handle_bulk( admin_url( 'users.php' ), 'rolegate_remove:administrator', array( $rw_last ) );
 		parse_str( (string) wp_parse_url( $out, PHP_URL_QUERY ), $q );
-		$rw_ok( '1' === ( $q['rolewright_skip'] ?? '' ) && in_array( 'administrator', $rw_roles_of( $rw_last ), true ), 'last admin: bulk remove skips the only administrator' );
+		$rw_ok( '1' === ( $q['rolegate_skip'] ?? '' ) && in_array( 'administrator', $rw_roles_of( $rw_last ), true ), 'last admin: bulk remove skips the only administrator' );
 		$rw_post( array() );
 		$second = $rw_make( 'rw_t_secondadm', 'administrator' );
 		$res = Users::check_roles_change( $rw_actor, $rw_last, array(), array( 'administrator' ) );
-		$rw_ok( $rw_hier ? ( is_wp_error( $res ) && in_array( $res->get_error_code(), array( 'rolewright_user_above_actor', 'rolewright_cannot_promote' ), true ) ) : true === $res, 'last admin control: allowed once a second administrator exists (hierarchy: still refused, actor ranks below)' );
+		$rw_ok( $rw_hier ? ( is_wp_error( $res ) && in_array( $res->get_error_code(), array( 'rolegate_user_above_actor', 'rolegate_cannot_promote' ), true ) ) : true === $res, 'last admin control: allowed once a second administrator exists (hierarchy: still refused, actor ranks below)' );
 		wp_delete_user( $second );
 	} finally {
 		remove_filter( 'wp_die_handler', $rw_die_la );
@@ -432,7 +432,7 @@ try {
 	}
 
 	// Module metadata.
-	$mod = new \Rolewright\Modules\User_Roles\User_Roles_Module();
+	$mod = new \Rolegate\Modules\User_Roles\User_Roles_Module();
 	$rw_ok( 'user-roles' === $mod->id() && $mod->default_enabled(), 'module id and default' );
 } catch ( \Throwable $e ) {
 	++$rw_fail;

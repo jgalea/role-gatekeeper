@@ -1,8 +1,8 @@
 <?php
-namespace Rolewright\Modules\Site_Access;
+namespace Rolegate\Modules\Site_Access;
 
-use Rolewright\Modules\Safety\Caps;
-use Rolewright\Modules\Safety\Rescue;
+use Rolegate\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Rescue;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -22,7 +22,7 @@ final class Admin_Gate {
 		if ( is_super_admin( $user->ID ) || Rescue::is_eligible( $user ) || user_can( $user, Caps::MANAGE ) ) {
 			return true;
 		}
-		return (bool) apply_filters( 'rolewright_site_access_admin_exempt', false, $user );
+		return (bool) apply_filters( 'rolegate_site_access_admin_exempt', false, $user );
 	}
 
 	public static function is_gated( \WP_User $user, array $settings ): bool {
@@ -48,7 +48,7 @@ final class Admin_Gate {
 		if ( ! self::is_gated( $user, $settings ) ) {
 			return;
 		}
-		wp_safe_redirect( self::target( $settings ), 302, 'Rolewright' );
+		wp_safe_redirect( self::target( $settings ), 302, 'Role Gatekeeper' );
 		exit;
 	}
 

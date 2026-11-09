@@ -1,11 +1,11 @@
 <?php
-namespace Rolewright\Modules\Content_Access;
+namespace Rolegate\Modules\Content_Access;
 
 defined( 'ABSPATH' ) || exit;
 
 final class Access {
-	const META_ROLES   = '_rolewright_roles';
-	const META_MESSAGE = '_rolewright_message';
+	const META_ROLES   = '_rolegate_roles';
+	const META_MESSAGE = '_rolegate_message';
 
 	/** @var array<int,array> */
 	private static $snapshots = array();
@@ -109,7 +109,7 @@ final class Access {
 				}
 			}
 		}
-		return (bool) apply_filters( 'rolewright_can_view_post', $allowed, $post_id, wp_get_current_user() );
+		return (bool) apply_filters( 'rolegate_can_view_post', $allowed, $post_id, wp_get_current_user() );
 	}
 
 	public static function is_denied( int $post_id ): bool {
@@ -203,12 +203,12 @@ final class Access {
 		if ( '' !== trim( $rules['message'] ) ) {
 			$html = wpautop( self::sanitize_message( $rules['message'] ) );
 		} else {
-			$html = '<p>' . esc_html__( "You don't have permission to view this content.", 'rolewright' ) . '</p>';
+			$html = '<p>' . esc_html__( "You don't have permission to view this content.", 'role-gatekeeper' ) . '</p>';
 		}
 		if ( ! is_user_logged_in() ) {
-			$html .= '<p><a href="' . esc_url( wp_login_url( (string) get_permalink( $post_id ) ) ) . '">' . esc_html__( 'Log in', 'rolewright' ) . '</a></p>';
+			$html .= '<p><a href="' . esc_url( wp_login_url( (string) get_permalink( $post_id ) ) ) . '">' . esc_html__( 'Log in', 'role-gatekeeper' ) . '</a></p>';
 		}
-		return (string) apply_filters( 'rolewright_denied_message_html', $html, $post_id );
+		return (string) apply_filters( 'rolegate_denied_message_html', $html, $post_id );
 	}
 
 	/**
@@ -261,7 +261,7 @@ final class Access {
 			return;
 		}
 		do_action(
-			'rolewright_changed',
+			'rolegate_changed',
 			'access.updated',
 			array(
 				'actor'  => get_current_user_id(),
@@ -284,7 +284,7 @@ final class Access {
 			return;
 		}
 		do_action(
-			'rolewright_changed',
+			'rolegate_changed',
 			'access.updated',
 			array(
 				'actor'  => get_current_user_id(),

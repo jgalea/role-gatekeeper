@@ -1,7 +1,7 @@
 <?php
-namespace Rolewright\Modules\Automation;
+namespace Rolegate\Modules\Automation;
 
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Caps;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -11,15 +11,15 @@ defined( 'ABSPATH' ) || exit;
  * runs as the calling user through the same Guard checks as the other surfaces.
  */
 final class Abilities {
-	const CATEGORY = 'rolewright';
+	const CATEGORY = 'rolegate';
 
 	public function register_category(): void {
 		if ( function_exists( 'wp_register_ability_category' ) ) {
 			wp_register_ability_category(
 				self::CATEGORY,
 				array(
-					'label'       => __( 'Rolewright', 'rolewright' ),
-					'description' => __( 'Roles, capabilities and user roles.', 'rolewright' ),
+					'label'       => __( 'Role Gatekeeper', 'role-gatekeeper' ),
+					'description' => __( 'Roles, capabilities and user roles.', 'role-gatekeeper' ),
 				)
 			);
 		}
@@ -34,8 +34,8 @@ final class Abilities {
 
 		$this->add(
 			'list-roles',
-			__( 'List roles', 'rolewright' ),
-			__( 'Lists every role with its slug, name, capability count and user count.', 'rolewright' ),
+			__( 'List roles', 'role-gatekeeper' ),
+			__( 'Lists every role with its slug, name, capability count and user count.', 'role-gatekeeper' ),
 			Caps::MANAGE_ROLES,
 			null,
 			true,
@@ -45,8 +45,8 @@ final class Abilities {
 		);
 		$this->add(
 			'get-role',
-			__( 'Get a role', 'rolewright' ),
-			__( 'Returns a role\'s name and capabilities.', 'rolewright' ),
+			__( 'Get a role', 'role-gatekeeper' ),
+			__( 'Returns a role\'s name and capabilities.', 'role-gatekeeper' ),
 			Caps::MANAGE_ROLES,
 			$this->schema( array( 'role' => $str ), array( 'role' ) ),
 			true,
@@ -56,8 +56,8 @@ final class Abilities {
 		);
 		$this->add(
 			'list-capabilities',
-			__( 'List capabilities', 'rolewright' ),
-			__( 'Lists every capability and the roles that grant it.', 'rolewright' ),
+			__( 'List capabilities', 'role-gatekeeper' ),
+			__( 'Lists every capability and the roles that grant it.', 'role-gatekeeper' ),
 			Caps::MANAGE_CAPS,
 			null,
 			true,
@@ -67,8 +67,8 @@ final class Abilities {
 		);
 		$this->add(
 			'get-user-capabilities',
-			__( 'Get a user\'s effective capabilities', 'rolewright' ),
-			__( 'Returns the roles, per-user capabilities and effective capabilities of a user.', 'rolewright' ),
+			__( 'Get a user\'s effective capabilities', 'role-gatekeeper' ),
+			__( 'Returns the roles, per-user capabilities and effective capabilities of a user.', 'role-gatekeeper' ),
 			Caps::MANAGE_USERS,
 			$this->schema( array( 'user' => array( 'type' => 'integer' ) ), array( 'user' ) ),
 			true,
@@ -83,8 +83,8 @@ final class Abilities {
 
 		$this->add(
 			'add-role-capability',
-			__( 'Grant a capability to a role', 'rolewright' ),
-			__( 'Grants a capability to a role. Needs confirm = true when the role is protected or the capability can take over the site.', 'rolewright' ),
+			__( 'Grant a capability to a role', 'role-gatekeeper' ),
+			__( 'Grants a capability to a role. Needs confirm = true when the role is protected or the capability can take over the site.', 'role-gatekeeper' ),
 			Caps::MANAGE_CAPS,
 			$this->schema(
 				array(
@@ -101,8 +101,8 @@ final class Abilities {
 		);
 		$this->add(
 			'remove-role-capability',
-			__( 'Remove a capability from a role', 'rolewright' ),
-			__( 'Removes a capability from a role. Needs confirm = true when the role is protected or the capability can take over the site. Changes that would lock the caller out are refused.', 'rolewright' ),
+			__( 'Remove a capability from a role', 'role-gatekeeper' ),
+			__( 'Removes a capability from a role. Needs confirm = true when the role is protected or the capability can take over the site. Changes that would lock the caller out are refused.', 'role-gatekeeper' ),
 			Caps::MANAGE_CAPS,
 			$this->schema(
 				array(
@@ -119,8 +119,8 @@ final class Abilities {
 		);
 		$this->add(
 			'assign-user-role',
-			__( 'Give a user a role', 'rolewright' ),
-			__( 'Adds a role to a user. Needs confirm = true when the role is protected or holds capabilities that can take over the site.', 'rolewright' ),
+			__( 'Give a user a role', 'role-gatekeeper' ),
+			__( 'Adds a role to a user. Needs confirm = true when the role is protected or holds capabilities that can take over the site.', 'role-gatekeeper' ),
 			Caps::MANAGE_USERS,
 			$this->schema(
 				array(
@@ -143,8 +143,8 @@ final class Abilities {
 		);
 		$this->add(
 			'unassign-user-role',
-			__( 'Take a role away from a user', 'rolewright' ),
-			__( 'Removes a role from a user. Changes that would lock the caller out are refused.', 'rolewright' ),
+			__( 'Take a role away from a user', 'role-gatekeeper' ),
+			__( 'Removes a role from a user. Changes that would lock the caller out are refused.', 'role-gatekeeper' ),
 			Caps::MANAGE_USERS,
 			$this->schema(
 				array(
@@ -161,8 +161,8 @@ final class Abilities {
 		);
 		$this->add(
 			'delete-role',
-			__( 'Delete a role', 'rolewright' ),
-			__( 'Deletes a role that has no users. Needs confirm = true when the role is protected or holds capabilities that can take over the site.', 'rolewright' ),
+			__( 'Delete a role', 'role-gatekeeper' ),
+			__( 'Deletes a role that has no users. Needs confirm = true when the role is protected or holds capabilities that can take over the site.', 'role-gatekeeper' ),
 			Caps::MANAGE_ROLES,
 			$this->schema(
 				array(

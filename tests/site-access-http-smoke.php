@@ -1,13 +1,13 @@
 <?php
 /**
  * Real HTTP requests against the running site with private mode on.
- * Run: wp eval-file wp-content/plugins/rolewright/tests/site-access-http-smoke.php
+ * Run: wp eval-file wp-content/plugins/role-gatekeeper/tests/site-access-http-smoke.php
  * Base URL: RW_HTTP_BASE (default http://wordpress, the wp-env web container), Host header from home_url().
  */
 
-use Rolewright\Core\Plugin;
-use Rolewright\Modules\Site_Access\Gate;
-use Rolewright\Modules\Site_Access\Site_Access_Settings;
+use Rolegate\Core\Plugin;
+use Rolegate\Modules\Site_Access\Gate;
+use Rolegate\Modules\Site_Access\Site_Access_Settings;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );

@@ -1,5 +1,5 @@
 <?php
-namespace Rolewright\Modules\Portability;
+namespace Rolegate\Modules\Portability;
 
 defined( 'ABSPATH' ) || exit;
 

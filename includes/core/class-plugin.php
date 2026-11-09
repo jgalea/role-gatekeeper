@@ -1,16 +1,16 @@
 <?php
-namespace Rolewright\Core;
+namespace Rolegate\Core;
 
 defined( 'ABSPATH' ) || exit;
 
 final class Plugin {
-	const OPTION_MODULES = 'rolewright_modules';
+	const OPTION_MODULES = 'rolegate_modules';
 
 	/** @var Module[] */
 	private static $modules = array();
 
 	public static function boot(): void {
-		load_plugin_textdomain( 'rolewright', false, dirname( plugin_basename( ROLEWRIGHT_FILE ) ) . '/languages' );
+		load_plugin_textdomain( 'role-gatekeeper', false, dirname( plugin_basename( ROLEGATE_FILE ) ) . '/languages' );
 		$enabled = self::enabled_map();
 
 		foreach ( self::discover() as $module ) {
@@ -27,8 +27,8 @@ final class Plugin {
 	}
 
 	public static function activate(): void {
-		\Rolewright\Modules\Safety\Caps::grant_to_administrator();
-		do_action( 'rolewright_activate' );
+		\Rolegate\Modules\Safety\Caps::grant_to_administrator();
+		do_action( 'rolegate_activate' );
 	}
 
 	/** @return Module[] */
@@ -60,14 +60,14 @@ final class Plugin {
 
 	/**
 	 * A module lives in includes/modules/<name>/class-<name>-module.php and defines
-	 * Rolewright\Modules\<Name>\<Name>_Module (hyphens in <name> become underscores, words capitalised).
+	 * Rolegate\Modules\<Name>\<Name>_Module (hyphens in <name> become underscores, words capitalised).
 	 */
 	private static function discover(): array {
 		$found = array();
-		foreach ( (array) glob( ROLEWRIGHT_DIR . 'includes/modules/*', GLOB_ONLYDIR ) as $dir ) {
+		foreach ( (array) glob( ROLEGATE_DIR . 'includes/modules/*', GLOB_ONLYDIR ) as $dir ) {
 			$name  = basename( $dir );
 			$camel = str_replace( ' ', '_', ucwords( str_replace( '-', ' ', $name ) ) );
-			$class = 'Rolewright\\Modules\\' . $camel . '\\' . $camel . '_Module';
+			$class = 'Rolegate\\Modules\\' . $camel . '\\' . $camel . '_Module';
 			if ( file_exists( $dir . '/class-' . $name . '-module.php' ) && class_exists( $class ) ) {
 				$found[] = new $class();
 			}

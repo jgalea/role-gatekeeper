@@ -1,7 +1,7 @@
 <?php
-namespace Rolewright\Modules\Capabilities;
+namespace Rolegate\Modules\Capabilities;
 
-use Rolewright\Modules\Roles\Role_Store;
+use Rolegate\Modules\Roles\Role_Store;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -9,21 +9,21 @@ defined( 'ABSPATH' ) || exit;
  * Knows which group a capability belongs to and how to label it.
  */
 final class Cap_Catalog {
-	const OPTION_CUSTOM = 'rolewright_custom_caps';
+	const OPTION_CUSTOM = 'rolegate_custom_caps';
 
 	/** @return array<string,string> group id => label, in display order */
 	public static function group_labels(): array {
 		return array(
-			'general'    => __( 'General', 'rolewright' ),
-			'posts'      => __( 'Posts', 'rolewright' ),
-			'pages'      => __( 'Pages', 'rolewright' ),
-			'media'      => __( 'Media', 'rolewright' ),
-			'users'      => __( 'Users', 'rolewright' ),
-			'plugins'    => __( 'Plugins', 'rolewright' ),
-			'themes'     => __( 'Themes', 'rolewright' ),
-			'appearance' => __( 'Appearance', 'rolewright' ),
-			'tools'      => __( 'Tools', 'rolewright' ),
-			'settings'   => __( 'Settings', 'rolewright' ),
+			'general'    => __( 'General', 'role-gatekeeper' ),
+			'posts'      => __( 'Posts', 'role-gatekeeper' ),
+			'pages'      => __( 'Pages', 'role-gatekeeper' ),
+			'media'      => __( 'Media', 'role-gatekeeper' ),
+			'users'      => __( 'Users', 'role-gatekeeper' ),
+			'plugins'    => __( 'Plugins', 'role-gatekeeper' ),
+			'themes'     => __( 'Themes', 'role-gatekeeper' ),
+			'appearance' => __( 'Appearance', 'role-gatekeeper' ),
+			'tools'      => __( 'Tools', 'role-gatekeeper' ),
+			'settings'   => __( 'Settings', 'role-gatekeeper' ),
 		);
 	}
 
@@ -110,7 +110,7 @@ final class Cap_Catalog {
 		return (bool) preg_match( '/^level_(\d|10)$/', $cap ) || in_array( $cap, array( 'edit_files', 'manage_links' ), true );
 	}
 
-	/** @return string[] every capability name Rolewright knows or finds on a role */
+	/** @return string[] every capability name Role Gatekeeper knows or finds on a role */
 	public static function universe( array $extra = array() ): array {
 		$caps = array();
 		foreach ( self::core_map() as $list ) {
@@ -226,20 +226,20 @@ final class Cap_Catalog {
 				$type       = get_post_type_object( substr( $id, 4 ) );
 				$out[ $id ] = array(
 					/* translators: %s: post type label */
-					'label' => sprintf( __( '%s (post type)', 'rolewright' ), $type ? $type->labels->name : substr( $id, 4 ) ),
+					'label' => sprintf( __( '%s (post type)', 'role-gatekeeper' ), $type ? $type->labels->name : substr( $id, 4 ) ),
 					'caps'  => $list,
 				);
 			}
 		}
 		if ( ! empty( $bucket['custom'] ) ) {
 			$out['custom'] = array(
-				'label' => __( 'Custom', 'rolewright' ),
+				'label' => __( 'Custom', 'role-gatekeeper' ),
 				'caps'  => $bucket['custom'],
 			);
 		}
 		if ( ! empty( $bucket['deprecated'] ) ) {
 			$out['deprecated'] = array(
-				'label' => __( 'Deprecated', 'rolewright' ),
+				'label' => __( 'Deprecated', 'role-gatekeeper' ),
 				'caps'  => $bucket['deprecated'],
 			);
 		}
@@ -248,23 +248,23 @@ final class Cap_Catalog {
 
 	public static function label( string $cap ): string {
 		$overrides = array(
-			'read'                        => __( 'Read (log in and view the dashboard)', 'rolewright' ),
-			'edit_dashboard'              => __( 'Edit dashboard', 'rolewright' ),
-			'unfiltered_html'             => __( 'Post unfiltered HTML', 'rolewright' ),
-			'unfiltered_upload'           => __( 'Upload unfiltered files', 'rolewright' ),
-			'manage_options'              => __( 'Manage settings', 'rolewright' ),
-			'edit_theme_options'          => __( 'Edit theme options (menus, widgets)', 'rolewright' ),
-			'customize'                   => __( 'Use the Customizer', 'rolewright' ),
-			'update_core'                 => __( 'Update WordPress', 'rolewright' ),
-			'export_others_personal_data' => __( 'Export other users\' personal data', 'rolewright' ),
-			'erase_others_personal_data'  => __( 'Erase other users\' personal data', 'rolewright' ),
+			'read'                        => __( 'Read (log in and view the dashboard)', 'role-gatekeeper' ),
+			'edit_dashboard'              => __( 'Edit dashboard', 'role-gatekeeper' ),
+			'unfiltered_html'             => __( 'Post unfiltered HTML', 'role-gatekeeper' ),
+			'unfiltered_upload'           => __( 'Upload unfiltered files', 'role-gatekeeper' ),
+			'manage_options'              => __( 'Manage settings', 'role-gatekeeper' ),
+			'edit_theme_options'          => __( 'Edit theme options (menus, widgets)', 'role-gatekeeper' ),
+			'customize'                   => __( 'Use the Customizer', 'role-gatekeeper' ),
+			'update_core'                 => __( 'Update WordPress', 'role-gatekeeper' ),
+			'export_others_personal_data' => __( 'Export other users\' personal data', 'role-gatekeeper' ),
+			'erase_others_personal_data'  => __( 'Erase other users\' personal data', 'role-gatekeeper' ),
 		);
 		if ( isset( $overrides[ $cap ] ) ) {
 			return $overrides[ $cap ];
 		}
 		if ( preg_match( '/^level_(\d+)$/', $cap, $m ) ) {
 			/* translators: %s: level number */
-			return sprintf( __( 'User level %s', 'rolewright' ), $m[1] );
+			return sprintf( __( 'User level %s', 'role-gatekeeper' ), $m[1] );
 		}
 		return ucfirst( trim( str_replace( array( '_', '-', ':' ), ' ', $cap ) ) );
 	}

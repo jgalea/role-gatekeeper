@@ -1,30 +1,30 @@
 <?php
-namespace Rolewright\Modules\Roles;
+namespace Rolegate\Modules\Roles;
 
-use Rolewright\Modules\Safety\Caps;
-use Rolewright\Modules\Safety\Guard;
+use Rolegate\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Guard;
 
 defined( 'ABSPATH' ) || exit;
 
 final class Role_List {
 	public function render(): void {
 		if ( ! current_user_can( Caps::MANAGE_ROLES ) ) {
-			wp_die( esc_html__( 'You do not have permission to view this page.', 'rolewright' ) );
+			wp_die( esc_html__( 'You do not have permission to view this page.', 'role-gatekeeper' ) );
 		}
 		$actor   = get_current_user_id();
 		$roles   = Role_Store::all();
 		$counts  = Role_Store::user_counts();
 		$default = (string) get_option( 'default_role' );
 		$extras  = Role_Service::extra_default_roles();
-		$notices = get_transient( 'rolewright_roles_notice_' . $actor );
-		delete_transient( 'rolewright_roles_notice_' . $actor );
+		$notices = get_transient( 'rolegate_roles_notice_' . $actor );
+		delete_transient( 'rolegate_roles_notice_' . $actor );
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only view selector.
 		$do = isset( $_GET['do'] ) ? sanitize_key( wp_unslash( $_GET['do'] ) ) : '';
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$target = isset( $_GET['role'] ) ? sanitize_key( wp_unslash( $_GET['role'] ) ) : '';
 
-		echo '<div class="wrap"><h1>' . esc_html__( 'Roles', 'rolewright' ) . '</h1>';
+		echo '<div class="wrap"><h1>' . esc_html__( 'Roles', 'role-gatekeeper' ) . '</h1>';
 		foreach ( is_array( $notices ) ? $notices : array() as $n ) {
 			printf( '<div class="notice notice-%1$s is-dismissible"><p>%2$s</p></div>', esc_attr( $n[0] ), esc_html( $n[1] ) );
 		}
@@ -50,36 +50,36 @@ final class Role_List {
 	private function render_name_form( string $do, string $role, string $current ): void {
 		$title = 'rename' === $do
 			/* translators: %s: role name */
-			? sprintf( __( 'Rename "%s"', 'rolewright' ), $current )
+			? sprintf( __( 'Rename "%s"', 'role-gatekeeper' ), $current )
 			/* translators: %s: role name */
-			: sprintf( __( 'Clone "%s"', 'rolewright' ), $current );
+			: sprintf( __( 'Clone "%s"', 'role-gatekeeper' ), $current );
 		echo '<h2>' . esc_html( $title ) . '</h2>';
 		$this->form_open( $do );
 		echo '<input type="hidden" name="role" value="' . esc_attr( $role ) . '" />';
-		echo '<p><label for="rw-name">' . esc_html__( 'Name', 'rolewright' ) . '</label> ';
+		echo '<p><label for="rw-name">' . esc_html__( 'Name', 'role-gatekeeper' ) . '</label> ';
 		echo '<input type="text" id="rw-name" name="name" class="regular-text" required value="' . esc_attr( 'rename' === $do ? $current : '' ) . '" /> ';
-		submit_button( 'rename' === $do ? __( 'Rename role', 'rolewright' ) : __( 'Clone role', 'rolewright' ), 'primary', '', false );
-		echo ' <a href="' . esc_url( Roles_Module::page_url() ) . '" class="button">' . esc_html__( 'Cancel', 'rolewright' ) . '</a></p></form>';
+		submit_button( 'rename' === $do ? __( 'Rename role', 'role-gatekeeper' ) : __( 'Clone role', 'role-gatekeeper' ), 'primary', '', false );
+		echo ' <a href="' . esc_url( Roles_Module::page_url() ) . '" class="button">' . esc_html__( 'Cancel', 'role-gatekeeper' ) . '</a></p></form>';
 	}
 
 	private function render_add_form(): void {
-		echo '<h2>' . esc_html__( 'Add role', 'rolewright' ) . '</h2>';
+		echo '<h2>' . esc_html__( 'Add role', 'role-gatekeeper' ) . '</h2>';
 		$this->form_open( 'create' );
-		echo '<p><label for="rw-new-role">' . esc_html__( 'Name', 'rolewright' ) . '</label> ';
+		echo '<p><label for="rw-new-role">' . esc_html__( 'Name', 'role-gatekeeper' ) . '</label> ';
 		echo '<input type="text" id="rw-new-role" name="name" class="regular-text" required /> ';
-		submit_button( __( 'Add role', 'rolewright' ), 'secondary', '', false );
-		echo '</p><p class="description">' . esc_html__( 'New roles start with the read capability. Edit the rest under Capabilities.', 'rolewright' ) . '</p></form>';
+		submit_button( __( 'Add role', 'role-gatekeeper' ), 'secondary', '', false );
+		echo '</p><p class="description">' . esc_html__( 'New roles start with the read capability. Edit the rest under Capabilities.', 'role-gatekeeper' ) . '</p></form>';
 	}
 
 	private function render_table( int $actor, array $roles, array $counts, string $default, array $extras ): void {
-		echo '<h2>' . esc_html__( 'All roles', 'rolewright' ) . '</h2>';
+		echo '<h2>' . esc_html__( 'All roles', 'role-gatekeeper' ) . '</h2>';
 		$this->form_open( 'bulk_delete', 'id="rw-bulk"' );
-		echo '<p><button type="submit" class="button action" onclick="return confirm(\'' . esc_js( __( 'Delete the selected roles?', 'rolewright' ) ) . '\');">' . esc_html__( 'Delete selected', 'rolewright' ) . '</button> ';
-		echo '<span class="description">' . esc_html__( 'Only roles without users can be deleted.', 'rolewright' ) . '</span></p>';
+		echo '<p><button type="submit" class="button action" onclick="return confirm(\'' . esc_js( __( 'Delete the selected roles?', 'role-gatekeeper' ) ) . '\');">' . esc_html__( 'Delete selected', 'role-gatekeeper' ) . '</button> ';
+		echo '<span class="description">' . esc_html__( 'Only roles without users can be deleted.', 'role-gatekeeper' ) . '</span></p>';
 		echo '<div class="rw-scroll" style="overflow-x:auto"><table class="widefat striped rw-roles-table" style="min-width:600px"><thead><tr>';
 		echo '<td class="manage-column check-column"></td>';
-		echo '<th>' . esc_html__( 'Role', 'rolewright' ) . '</th><th>' . esc_html__( 'Slug', 'rolewright' ) . '</th>';
-		echo '<th>' . esc_html__( 'Users', 'rolewright' ) . '</th><th>' . esc_html__( 'Capabilities', 'rolewright' ) . '</th><th>' . esc_html__( 'Actions', 'rolewright' ) . '</th>';
+		echo '<th>' . esc_html__( 'Role', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'Slug', 'role-gatekeeper' ) . '</th>';
+		echo '<th>' . esc_html__( 'Users', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'Capabilities', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'Actions', 'role-gatekeeper' ) . '</th>';
 		echo '</tr></thead><tbody>';
 
 		foreach ( $roles as $slug => $data ) {
@@ -92,12 +92,12 @@ final class Role_List {
 			}
 			echo '</th><td><strong>' . esc_html( $data['name'] ) . '</strong>';
 			if ( $slug === $default ) {
-				echo ' <span class="description">' . esc_html__( '(default)', 'rolewright' ) . '</span>';
+				echo ' <span class="description">' . esc_html__( '(default)', 'role-gatekeeper' ) . '</span>';
 			} elseif ( in_array( $slug, $extras, true ) ) {
-				echo ' <span class="description">' . esc_html__( '(also assigned at registration)', 'rolewright' ) . '</span>';
+				echo ' <span class="description">' . esc_html__( '(also assigned at registration)', 'role-gatekeeper' ) . '</span>';
 			}
 			if ( $protected ) {
-				echo ' <span class="description">' . esc_html__( '(protected)', 'rolewright' ) . '</span>';
+				echo ' <span class="description">' . esc_html__( '(protected)', 'role-gatekeeper' ) . '</span>';
 			}
 			echo '</td><td><code>' . esc_html( $slug ) . '</code></td>';
 			echo '<td>' . esc_html( number_format_i18n( $users ) ) . '</td>';
@@ -105,7 +105,7 @@ final class Role_List {
 
 			$links = array();
 			if ( current_user_can( Caps::MANAGE_CAPS ) ) {
-				$links[] = '<a href="' . esc_url( admin_url( 'admin.php?page=rolewright-capabilities&role=' . rawurlencode( $slug ) ) ) . '">' . esc_html__( 'Capabilities', 'rolewright' ) . '</a>';
+				$links[] = '<a href="' . esc_url( admin_url( 'admin.php?page=role-gatekeeper-capabilities&role=' . rawurlencode( $slug ) ) ) . '">' . esc_html__( 'Capabilities', 'role-gatekeeper' ) . '</a>';
 			}
 			if ( 'administrator' !== $slug ) {
 				$links[] = '<a href="' . esc_url(
@@ -115,7 +115,7 @@ final class Role_List {
 							'role' => $slug,
 						)
 					)
-				) . '">' . esc_html__( 'Rename', 'rolewright' ) . '</a>';
+				) . '">' . esc_html__( 'Rename', 'role-gatekeeper' ) . '</a>';
 			}
 			$links[] = '<a href="' . esc_url(
 				Roles_Module::page_url(
@@ -124,10 +124,10 @@ final class Role_List {
 						'role' => $slug,
 					)
 				)
-			) . '">' . esc_html__( 'Clone', 'rolewright' ) . '</a>';
+			) . '">' . esc_html__( 'Clone', 'role-gatekeeper' ) . '</a>';
 			echo implode( ' | ', $links ); // phpcs:ignore WordPress.Security.EscapeOutput -- built from escaped parts.
 			if ( $deletable ) {
-				echo ' | <button type="submit" form="rw-del-' . esc_attr( $slug ) . '" class="button-link button-link-delete" style="min-height:32px" onclick="return confirm(\'' . esc_js( __( 'Delete this role?', 'rolewright' ) ) . '\');">' . esc_html__( 'Delete', 'rolewright' ) . '</button>';
+				echo ' | <button type="submit" form="rw-del-' . esc_attr( $slug ) . '" class="button-link button-link-delete" style="min-height:32px" onclick="return confirm(\'' . esc_js( __( 'Delete this role?', 'role-gatekeeper' ) ) . '\');">' . esc_html__( 'Delete', 'role-gatekeeper' ) . '</button>';
 			}
 			echo '</td></tr>';
 		}
@@ -142,15 +142,15 @@ final class Role_List {
 	}
 
 	private function render_defaults( array $roles, string $default, array $extras ): void {
-		echo '<h2>' . esc_html__( 'Default registration roles', 'rolewright' ) . '</h2>';
+		echo '<h2>' . esc_html__( 'Default registration roles', 'role-gatekeeper' ) . '</h2>';
 		$this->form_open( 'default' );
-		echo '<p><label for="rw-default">' . esc_html__( 'New users get the role', 'rolewright' ) . '</label> <select id="rw-default" name="role">';
+		echo '<p><label for="rw-default">' . esc_html__( 'New users get the role', 'role-gatekeeper' ) . '</label> <select id="rw-default" name="role">';
 		foreach ( $roles as $slug => $data ) {
 			if ( ! Guard::critical_subset( $data['caps'] ) ) {
 				printf( '<option value="%1$s"%2$s>%3$s</option>', esc_attr( $slug ), selected( $slug, $default, false ), esc_html( $data['name'] ) );
 			}
 		}
-		echo '</select></p><fieldset><legend>' . esc_html__( 'and also these roles', 'rolewright' ) . '</legend>';
+		echo '</select></p><fieldset><legend>' . esc_html__( 'and also these roles', 'role-gatekeeper' ) . '</legend>';
 		foreach ( $roles as $slug => $data ) {
 			if ( ! Guard::critical_subset( $data['caps'] ) ) {
 				printf(
@@ -161,22 +161,22 @@ final class Role_List {
 				);
 			}
 		}
-		echo '</fieldset><p class="description">' . esc_html__( 'Roles with powerful capabilities are not offered here.', 'rolewright' ) . '</p>';
-		submit_button( __( 'Save default roles', 'rolewright' ), 'secondary' );
+		echo '</fieldset><p class="description">' . esc_html__( 'Roles with powerful capabilities are not offered here.', 'role-gatekeeper' ) . '</p>';
+		submit_button( __( 'Save default roles', 'role-gatekeeper' ), 'secondary' );
 		echo '</form>';
 	}
 
 	private function render_reset(): void {
-		echo '<h2>' . esc_html__( 'Reset roles', 'rolewright' ) . '</h2>';
+		echo '<h2>' . esc_html__( 'Reset roles', 'role-gatekeeper' ) . '</h2>';
 		$this->form_open( 'reset' );
-		echo '<p>' . esc_html__( 'Puts Administrator, Editor, Author, Contributor and Subscriber back to the WordPress defaults. Capabilities that plugins added to these roles are removed. Custom roles are left alone. The current roles are saved as a backup first.', 'rolewright' ) . '</p>';
-		echo '<p><label><input type="checkbox" name="confirm_reset" value="1" /> ' . esc_html__( 'I understand that plugin-added capabilities on the core roles will be removed.', 'rolewright' ) . '</label></p>';
-		submit_button( __( 'Reset roles', 'rolewright' ), 'delete' );
+		echo '<p>' . esc_html__( 'Puts Administrator, Editor, Author, Contributor and Subscriber back to the WordPress defaults. Capabilities that plugins added to these roles are removed. Custom roles are left alone. The current roles are saved as a backup first.', 'role-gatekeeper' ) . '</p>';
+		echo '<p><label><input type="checkbox" name="confirm_reset" value="1" /> ' . esc_html__( 'I understand that plugin-added capabilities on the core roles will be removed.', 'role-gatekeeper' ) . '</label></p>';
+		submit_button( __( 'Reset roles', 'role-gatekeeper' ), 'delete' );
 		echo '</form>';
 		$backups = Role_Service::backups();
 		if ( $backups ) {
 			/* translators: %s: date and time of the latest backup */
-			echo '<p class="description">' . esc_html( sprintf( __( 'Latest backup: %s.', 'rolewright' ), wp_date( 'Y-m-d H:i', (int) $backups[0]['time'] ) ) ) . '</p>';
+			echo '<p class="description">' . esc_html( sprintf( __( 'Latest backup: %s.', 'role-gatekeeper' ), wp_date( 'Y-m-d H:i', (int) $backups[0]['time'] ) ) ) . '</p>';
 		}
 	}
 }

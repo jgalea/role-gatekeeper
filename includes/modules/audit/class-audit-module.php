@@ -1,36 +1,36 @@
 <?php
-namespace Rolewright\Modules\Audit;
+namespace Rolegate\Modules\Audit;
 
-use Rolewright\Core\Module;
+use Rolegate\Core\Module;
 
 defined( 'ABSPATH' ) || exit;
 
 class Audit_Module extends Module {
-	const OPTION_SETTINGS = 'rolewright_audit_settings';
+	const OPTION_SETTINGS = 'rolegate_audit_settings';
 
 	public function id(): string {
 		return 'audit';
 	}
 
 	public function title(): string {
-		return __( 'Audit log and permissions viewer', 'rolewright' );
+		return __( 'Audit log and permissions viewer', 'role-gatekeeper' );
 	}
 
 	public function description(): string {
-		return __( 'Records role, capability and user changes with a revert button, and shows who holds a capability right now.', 'rolewright' );
+		return __( 'Records role, capability and user changes with a revert button, and shows who holds a capability right now.', 'role-gatekeeper' );
 	}
 
 	public function init(): void {
-		add_action( 'rolewright_activate', array( Store::class, 'install' ) );
+		add_action( 'rolegate_activate', array( Store::class, 'install' ) );
 		add_action( 'init', array( Store::class, 'maybe_upgrade' ), 2 );
 		add_action( 'wp_initialize_site', array( Store::class, 'on_initialize_site' ), 20 );
 		add_action( 'init', array( Store::class, 'schedule' ), 3 );
 		add_action( Store::CRON_HOOK, array( Store::class, 'prune' ) );
 
 		$recorder = new Recorder();
-		add_action( 'rolewright_changed', array( $recorder, 'on_changed' ), 10, 2 );
-		add_action( 'rolewright_escalation_blocked', array( $recorder, 'on_blocked' ), 10, 4 );
-		add_action( 'rolewright_rescue_used', array( $recorder, 'on_rescue' ), 10, 1 );
+		add_action( 'rolegate_changed', array( $recorder, 'on_changed' ), 10, 2 );
+		add_action( 'rolegate_escalation_blocked', array( $recorder, 'on_blocked' ), 10, 4 );
+		add_action( 'rolegate_rescue_used', array( $recorder, 'on_rescue' ), 10, 1 );
 
 		if ( is_admin() ) {
 			( new Audit_Page() )->register();

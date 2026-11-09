@@ -1,17 +1,17 @@
 <?php
-namespace Rolewright\Modules\Automation;
+namespace Rolegate\Modules\Automation;
 
-use Rolewright\Modules\Safety\Caps;
-use Rolewright\Modules\Safety\Guard;
+use Rolegate\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Guard;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Role, capability and user-role operations shared by WP-CLI, REST and Abilities. Every write
- * goes through Gate (Guard assertions) and announces itself with rolewright_changed.
+ * goes through Gate (Guard assertions) and announces itself with rolegate_changed.
  */
 final class Ops {
-	const FORMAT  = 'rolewright';
+	const FORMAT  = 'rolegate';
 	const VERSION = 1;
 
 	/** @return array<int,array{slug:string,name:string,caps:int,users:int,protected:bool}> */
@@ -35,7 +35,7 @@ final class Ops {
 	public static function get_role( string $slug ) {
 		$role = get_role( $slug );
 		if ( ! $role ) {
-			return new \WP_Error( 'rolewright_no_role', __( 'That role does not exist.', 'rolewright' ), array( 'status' => 404 ) );
+			return new \WP_Error( 'rolegate_no_role', __( 'That role does not exist.', 'role-gatekeeper' ), array( 'status' => 404 ) );
 		}
 		return array(
 			'slug'         => $slug,
@@ -52,11 +52,11 @@ final class Ops {
 	public static function add_role( int $actor, string $name, string $slug, array $caps ) {
 		$name = sanitize_text_field( $name );
 		if ( '' === $name ) {
-			return new \WP_Error( 'rolewright_invalid_name', __( 'Enter a role name.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_invalid_name', __( 'Enter a role name.', 'role-gatekeeper' ) );
 		}
 		$slug = '' === $slug ? self::slug_from( $name ) : strtolower( trim( $slug ) );
 		if ( '' === $slug ) {
-			return new \WP_Error( 'rolewright_invalid_name', __( 'That name can\'t be turned into a role slug.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_invalid_name', __( 'That name can\'t be turned into a role slug.', 'role-gatekeeper' ) );
 		}
 		$valid = Guard::valid_new_role_slug( $slug );
 		if ( is_wp_error( $valid ) ) {
@@ -85,7 +85,7 @@ final class Ops {
 	public static function clone_role( int $actor, string $source, string $name, string $slug ) {
 		$from = get_role( $source );
 		if ( ! $from ) {
-			return new \WP_Error( 'rolewright_no_role', __( 'The role to copy does not exist.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_no_role', __( 'The role to copy does not exist.', 'role-gatekeeper' ) );
 		}
 		return self::add_role( $actor, $name, $slug, Guard::normalize_caps( (array) $from->capabilities ) );
 	}
@@ -93,7 +93,7 @@ final class Ops {
 	/** @return true|\WP_Error */
 	public static function delete_role( int $actor, string $slug ) {
 		if ( ! get_role( $slug ) ) {
-			return new \WP_Error( 'rolewright_no_role', __( 'That role does not exist.', 'rolewright' ), array( 'status' => 404 ) );
+			return new \WP_Error( 'rolegate_no_role', __( 'That role does not exist.', 'role-gatekeeper' ), array( 'status' => 404 ) );
 		}
 		$ok = Gate::delete_role( $actor, $slug );
 		if ( is_wp_error( $ok ) ) {
@@ -107,7 +107,7 @@ final class Ops {
 			)
 		);
 		if ( $members ) {
-			return new \WP_Error( 'rolewright_role_in_use', __( 'The role still has users. Move them to another role first.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_role_in_use', __( 'The role still has users. Move them to another role first.', 'role-gatekeeper' ) );
 		}
 		$before = self::get_role( $slug );
 		remove_role( $slug );
@@ -128,11 +128,11 @@ final class Ops {
 	public static function reset_role( int $actor, string $slug ) {
 		$defaults = Defaults::for_role( $slug );
 		if ( null === $defaults ) {
-			return new \WP_Error( 'rolewright_not_core_role', __( 'Only the WordPress core roles can be reset.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_not_core_role', __( 'Only the WordPress core roles can be reset.', 'role-gatekeeper' ) );
 		}
 		$role = get_role( $slug );
 		if ( ! $role ) {
-			return new \WP_Error( 'rolewright_no_role', __( 'That role does not exist.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_no_role', __( 'That role does not exist.', 'role-gatekeeper' ) );
 		}
 		if ( 'administrator' === $slug ) {
 			foreach ( Caps::all() as $cap ) {
@@ -149,7 +149,7 @@ final class Ops {
 	public static function apply_role_caps( int $actor, string $slug, array $new ) {
 		$role = get_role( $slug );
 		if ( ! $role ) {
-			return new \WP_Error( 'rolewright_no_role', __( 'That role does not exist.', 'rolewright' ), array( 'status' => 404 ) );
+			return new \WP_Error( 'rolegate_no_role', __( 'That role does not exist.', 'role-gatekeeper' ), array( 'status' => 404 ) );
 		}
 		$current = Guard::normalize_caps( (array) $role->capabilities );
 		$new     = Guard::normalize_caps( $new );
@@ -181,7 +181,7 @@ final class Ops {
 	public static function change_role_caps( int $actor, string $slug, array $add, array $remove, array $deny = array() ) {
 		$role = get_role( $slug );
 		if ( ! $role ) {
-			return new \WP_Error( 'rolewright_no_role', __( 'That role does not exist.', 'rolewright' ), array( 'status' => 404 ) );
+			return new \WP_Error( 'rolegate_no_role', __( 'That role does not exist.', 'role-gatekeeper' ), array( 'status' => 404 ) );
 		}
 		$new = Guard::normalize_caps( (array) $role->capabilities );
 		foreach ( $add as $cap ) {
@@ -224,7 +224,7 @@ final class Ops {
 	public static function user_summary( int $user_id, int $actor = 0 ) {
 		$user = get_userdata( $user_id );
 		if ( ! $user ) {
-			return new \WP_Error( 'rolewright_no_user', __( 'That user does not exist.', 'rolewright' ), array( 'status' => 404 ) );
+			return new \WP_Error( 'rolegate_no_user', __( 'That user does not exist.', 'role-gatekeeper' ), array( 'status' => 404 ) );
 		}
 		$ok = Gate::site_member( $actor, $user_id );
 		if ( is_wp_error( $ok ) ) {
@@ -245,14 +245,14 @@ final class Ops {
 	public static function assign_role( int $actor, int $target, string $role ) {
 		$user = get_userdata( $target );
 		if ( ! $user ) {
-			return new \WP_Error( 'rolewright_no_user', __( 'That user does not exist.', 'rolewright' ), array( 'status' => 404 ) );
+			return new \WP_Error( 'rolegate_no_user', __( 'That user does not exist.', 'role-gatekeeper' ), array( 'status' => 404 ) );
 		}
 		$ok = Gate::site_member( $actor, $target );
 		if ( is_wp_error( $ok ) ) {
 			return $ok;
 		}
 		if ( in_array( $role, (array) $user->roles, true ) ) {
-			return new \WP_Error( 'rolewright_already_has_role', __( 'The user already has that role.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_already_has_role', __( 'The user already has that role.', 'role-gatekeeper' ) );
 		}
 		foreach ( array( Gate::assign_role( $actor, $role, $target ), Gate::act_on_user( $actor, $target ) ) as $ok ) {
 			if ( is_wp_error( $ok ) ) {
@@ -274,14 +274,14 @@ final class Ops {
 	public static function unassign_role( int $actor, int $target, string $role ) {
 		$user = get_userdata( $target );
 		if ( ! $user ) {
-			return new \WP_Error( 'rolewright_no_user', __( 'That user does not exist.', 'rolewright' ), array( 'status' => 404 ) );
+			return new \WP_Error( 'rolegate_no_user', __( 'That user does not exist.', 'role-gatekeeper' ), array( 'status' => 404 ) );
 		}
 		$ok = Gate::site_member( $actor, $target );
 		if ( is_wp_error( $ok ) ) {
 			return $ok;
 		}
 		if ( ! in_array( $role, (array) $user->roles, true ) ) {
-			return new \WP_Error( 'rolewright_user_lacks_role', __( 'The user doesn\'t have that role.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_user_lacks_role', __( 'The user doesn\'t have that role.', 'role-gatekeeper' ) );
 		}
 		$ok = Gate::act_on_user( $actor, $target );
 		if ( is_wp_error( $ok ) ) {
@@ -329,13 +329,13 @@ final class Ops {
 	public static function import_json( int $actor, string $json, bool $dry_run ) {
 		$data = json_decode( trim( $json ), true, 8 );
 		if ( JSON_ERROR_NONE !== json_last_error() || ! is_array( $data ) ) {
-			return new \WP_Error( 'rolewright_import_json', __( 'The file is not valid JSON.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_import_json', __( 'The file is not valid JSON.', 'role-gatekeeper' ) );
 		}
 		if ( ( $data['format'] ?? '' ) !== self::FORMAT || ! isset( $data['version'] ) || ! is_int( $data['version'] ) || $data['version'] < 1 || $data['version'] > self::VERSION ) {
-			return new \WP_Error( 'rolewright_import_format', __( 'This is not a Rolewright role file this version understands.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_import_format', __( 'This is not a Role Gatekeeper role file this version understands.', 'role-gatekeeper' ) );
 		}
 		if ( ! isset( $data['roles'] ) || ! is_array( $data['roles'] ) || count( $data['roles'] ) > 100 ) {
-			return new \WP_Error( 'rolewright_import_schema', __( 'The file has no usable roles list.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_import_schema', __( 'The file has no usable roles list.', 'role-gatekeeper' ) );
 		}
 
 		$user        = $actor > 0 ? get_userdata( $actor ) : false;
@@ -392,9 +392,9 @@ final class Ops {
 				'final'    => $final,
 			);
 			if ( $exists && Guard::is_protected_role( $slug ) ) {
-				$row['blocked'] = __( 'Protected role. Imports never overwrite it.', 'rolewright' );
+				$row['blocked'] = __( 'Protected role. Imports never overwrite it.', 'role-gatekeeper' );
 			} elseif ( in_array( $slug, $actor_roles, true ) ) {
-				$row['blocked'] = __( 'This is the acting user\'s own role. Imports never overwrite it.', 'rolewright' );
+				$row['blocked'] = __( 'This is the acting user\'s own role. Imports never overwrite it.', 'role-gatekeeper' );
 			} elseif ( 'unchanged' !== $row['action'] ) {
 				$check = Gate::modify_role( $actor, $slug, $final );
 				if ( is_wp_error( $check ) ) {
@@ -408,7 +408,7 @@ final class Ops {
 		if ( ! $dry_run ) {
 			foreach ( $rows as $row ) {
 				if ( $row['blocked'] ) {
-					return new \WP_Error( 'rolewright_import_blocked', sprintf( /* translators: 1: role slug, 2: reason */ __( 'Nothing was imported. Role %1$s: %2$s', 'rolewright' ), $row['slug'], $row['blocked'] ), array( 'rows' => $rows ) );
+					return new \WP_Error( 'rolegate_import_blocked', sprintf( /* translators: 1: role slug, 2: reason */ __( 'Nothing was imported. Role %1$s: %2$s', 'role-gatekeeper' ), $row['slug'], $row['blocked'] ), array( 'rows' => $rows ) );
 				}
 			}
 			$changes_before = array();
@@ -492,9 +492,9 @@ final class Ops {
 				return $cap;
 			}
 			return new \WP_Error(
-				'rolewright_invalid_cap',
+				'rolegate_invalid_cap',
 				/* translators: %s: capability name */
-				sprintf( __( 'Not a valid capability name: %s.', 'rolewright' ), substr( preg_replace( '/[^\x20-\x7E]/', '?', $cap ), 0, 60 ) )
+				sprintf( __( 'Not a valid capability name: %s.', 'role-gatekeeper' ), substr( preg_replace( '/[^\x20-\x7E]/', '?', $cap ), 0, 60 ) )
 			);
 		}
 		return $clean;
@@ -502,7 +502,7 @@ final class Ops {
 
 	public static function fire( string $type, int $actor, string $target, array $before, array $after ): void {
 		do_action(
-			'rolewright_changed',
+			'rolegate_changed',
 			$type,
 			array(
 				'actor'  => $actor,

@@ -1,7 +1,7 @@
 <?php
-namespace Rolewright\Modules\Content_Access;
+namespace Rolegate\Modules\Content_Access;
 
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Caps;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -10,8 +10,8 @@ defined( 'ABSPATH' ) || exit;
  * widget_display_callback. Native blocks use the block visibility attributes instead.
  */
 final class Widget_Visibility {
-	const MODE  = 'rolewright_mode';
-	const ROLES = 'rolewright_roles';
+	const MODE  = 'rolegate_mode';
+	const ROLES = 'rolegate_roles';
 
 	public function register(): void {
 		add_action( 'in_widget_form', array( $this, 'form' ), 10, 3 );
@@ -28,12 +28,12 @@ final class Widget_Visibility {
 		$mode     = Access::sanitize_mode( $instance[ self::MODE ] ?? '' );
 		$roles    = Access::sanitize_roles( $instance[ self::ROLES ] ?? array() );
 		$modes    = array(
-			'all'        => __( 'Everyone', 'rolewright' ),
-			'logged_in'  => __( 'Logged-in users', 'rolewright' ),
-			'logged_out' => __( 'Logged-out visitors', 'rolewright' ),
-			'roles'      => __( 'Selected roles', 'rolewright' ),
+			'all'        => __( 'Everyone', 'role-gatekeeper' ),
+			'logged_in'  => __( 'Logged-in users', 'role-gatekeeper' ),
+			'logged_out' => __( 'Logged-out visitors', 'role-gatekeeper' ),
+			'roles'      => __( 'Selected roles', 'role-gatekeeper' ),
 		);
-		echo '<p><label for="' . esc_attr( $widget->get_field_id( self::MODE ) ) . '">' . esc_html__( 'Show to', 'rolewright' ) . '</label>';
+		echo '<p><label for="' . esc_attr( $widget->get_field_id( self::MODE ) ) . '">' . esc_html__( 'Show to', 'role-gatekeeper' ) . '</label>';
 		echo '<select class="widefat" id="' . esc_attr( $widget->get_field_id( self::MODE ) ) . '" name="' . esc_attr( $widget->get_field_name( self::MODE ) ) . '">';
 		foreach ( $modes as $value => $label ) {
 			printf( '<option value="%1$s" %2$s>%3$s</option>', esc_attr( $value ), selected( $mode, $value, false ), esc_html( $label ) );

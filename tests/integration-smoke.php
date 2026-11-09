@@ -1,28 +1,28 @@
 <?php
 /**
  * Cross-module checks. Needs every module on except site-access:
- * wp option update rolewright_modules '{"deny-hierarchy":true,"automation":true,...}' --format=json
- * Run: wp eval-file wp-content/plugins/rolewright/tests/integration-smoke.php
+ * wp option update rolegate_modules '{"deny-hierarchy":true,"automation":true,...}' --format=json
+ * Run: wp eval-file wp-content/plugins/role-gatekeeper/tests/integration-smoke.php
  */
 
-use Rolewright\Core\Plugin;
-use Rolewright\Modules\Admin_Ui\Rules as Ui_Rules;
-use Rolewright\Modules\Audit\Reverter;
-use Rolewright\Modules\Audit\Store;
-use Rolewright\Modules\Automation\Ops;
-use Rolewright\Modules\Capabilities\Cap_Service;
-use Rolewright\Modules\Content_Access\Access;
-use Rolewright\Modules\Deny_Hierarchy\Denials;
-use Rolewright\Modules\Deny_Hierarchy\Hierarchy;
-use Rolewright\Modules\Edit_Scope\Rules as Scope_Rules;
-use Rolewright\Modules\Portability\Exporter;
-use Rolewright\Modules\Portability\Importer;
-use Rolewright\Modules\Portability\Sections;
-use Rolewright\Modules\Roles\Role_Service;
-use Rolewright\Modules\Safety\Caps;
-use Rolewright\Modules\Safety\Enforcer;
-use Rolewright\Modules\Safety\Guard;
-use Rolewright\Modules\User_Roles\Users;
+use Rolegate\Core\Plugin;
+use Rolegate\Modules\Admin_Ui\Rules as Ui_Rules;
+use Rolegate\Modules\Audit\Reverter;
+use Rolegate\Modules\Audit\Store;
+use Rolegate\Modules\Automation\Ops;
+use Rolegate\Modules\Capabilities\Cap_Service;
+use Rolegate\Modules\Content_Access\Access;
+use Rolegate\Modules\Deny_Hierarchy\Denials;
+use Rolegate\Modules\Deny_Hierarchy\Hierarchy;
+use Rolegate\Modules\Edit_Scope\Rules as Scope_Rules;
+use Rolegate\Modules\Portability\Exporter;
+use Rolegate\Modules\Portability\Importer;
+use Rolegate\Modules\Portability\Sections;
+use Rolegate\Modules\Roles\Role_Service;
+use Rolegate\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Enforcer;
+use Rolegate\Modules\Safety\Guard;
+use Rolegate\Modules\User_Roles\Users;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
@@ -75,7 +75,7 @@ $make  = function ( $login, $role ) use ( &$users, $sfx ) {
 };
 $events = array();
 add_action(
-	'rolewright_changed',
+	'rolegate_changed',
 	function ( $type, $data ) use ( &$events ) {
 		$events[] = array( $type, $data );
 	},
@@ -97,7 +97,7 @@ foreach ( array( Denials::OPTION, Hierarchy::OPTION, Ui_Rules::OPTION, Scope_Rul
 }
 
 $admin = $make( 'rw_int_admin', 'administrator' );
-	// On multisite a site administrator is not the site's owner: core keeps edit_user for super admins and Rolewright keeps its manage caps for them. The single-site administrator maps to a super admin.
+	// On multisite a site administrator is not the site's owner: core keeps edit_user for super admins and Role Gatekeeper keeps its manage caps for them. The single-site administrator maps to a super admin.
 	if ( is_multisite() ) {
 		grant_super_admin( $admin );
 		add_action( 'wpmu_delete_user', 'revoke_super_admin', 1 );
@@ -169,20 +169,20 @@ try {
 	$mid  = $make( 'rw_int_mid', $mid_role );
 	$high = $make( 'rw_int_high', $top_role );
 	wp_set_current_user( $mid );
-	$rw_ok( 'rolewright_role_above_position' === $code( Cap_Service::update_role( $mid, $top_role, array( 'read' ) ) ), 'hierarchy veto: capabilities refuses a role above the actor' );
-	$rw_ok( 'rolewright_role_above_position' === $code( Role_Service::delete( $mid, $top_role ) ), 'hierarchy veto: roles refuses deleting a role above the actor' );
+	$rw_ok( 'rolegate_role_above_position' === $code( Cap_Service::update_role( $mid, $top_role, array( 'read' ) ) ), 'hierarchy veto: capabilities refuses a role above the actor' );
+	$rw_ok( 'rolegate_role_above_position' === $code( Role_Service::delete( $mid, $top_role ) ), 'hierarchy veto: roles refuses deleting a role above the actor' );
 	$rw_ok( is_wp_error( Users::change_roles( $mid, $member, array( $top_role ), array() ) ), 'hierarchy veto: user-roles refuses assigning a role above the actor' );
 	$rw_ok( is_wp_error( Users::change_roles( $mid, $high, array( $slug ), array() ) ), 'hierarchy veto: user-roles refuses acting on a user above the actor' );
 	$rw_ok( is_array( Cap_Service::update_role( $mid, $slug, array( 'read', 'edit_posts' ) ) ), 'control: a role below the actor can be edited' );
 	$rw_ok( true === Users::change_roles( $mid, $member, array( $slug ), array() ), 'control: a role below the actor can be assigned' );
-	$rw_ok( 'rolewright_cap_not_held' === $code( Cap_Service::update_role( $mid, $slug, array( 'read', 'manage_options' ) ) ), 'Guard still refuses a critical cap below the hierarchy' );
+	$rw_ok( 'rolegate_cap_not_held' === $code( Cap_Service::update_role( $mid, $slug, array( 'read', 'manage_options' ) ) ), 'Guard still refuses a critical cap below the hierarchy' );
 	$rw_ok( is_wp_error( Ops::assign_role( $mid, $member, $top_role ) ), 'hierarchy veto: automation assign refuses a role above the actor' );
 	wp_set_current_user( $admin );
 	$shell   = 'rw_int_shell_' . $sfx;
 	$roles[] = $shell;
 	$rw_ok( $shell === Ops::add_role( 0, 'Int Shell ' . $sfx, $shell, array( 'read' ) ), 'automation shell: the hierarchy does not block the shell actor' );
-	$rw_ok( 'rolewright_protected_role' === $code( Ops::delete_role( 0, 'administrator' ) ), 'automation shell: Guard still protects the administrator role with the hierarchy on' );
-	$rw_ok( 90 <= Hierarchy::default_position_for_caps( array( Caps::MANAGE_ROLES => true ) ) && 90 <= Hierarchy::default_position_for_caps( array( Caps::MANAGE_USERS => true ) ), 'hierarchy: Rolewright manager caps rank a role with the user managers' );
+	$rw_ok( 'rolegate_protected_role' === $code( Ops::delete_role( 0, 'administrator' ) ), 'automation shell: Guard still protects the administrator role with the hierarchy on' );
+	$rw_ok( 90 <= Hierarchy::default_position_for_caps( array( Caps::MANAGE_ROLES => true ) ) && 90 <= Hierarchy::default_position_for_caps( array( Caps::MANAGE_USERS => true ) ), 'hierarchy: Role Gatekeeper manager caps rank a role with the user managers' );
 
 	// Hierarchy positions follow the roles that exist.
 	$gone = 'rw_int_gone_' . $sfx;
@@ -233,7 +233,7 @@ try {
 		'file'
 	);
 	$rw_ok( is_array( $payload ) && array( 'rw_int_ok_' . $sfx ) === array_keys( $payload['roles'] ), 'importer: role slugs equal to a capability, a post-type cap or a critical cap name are skipped' );
-	$rw_ok( false === Importer::sanitize_role_slug( 'manage_options' ) && false === Importer::sanitize_role_slug( 'edit_posts' ) && false === Importer::sanitize_role_slug( 'rolewright_manage' ), 'importer: sanitize_role_slug refuses capability and critical names' );
+	$rw_ok( false === Importer::sanitize_role_slug( 'manage_options' ) && false === Importer::sanitize_role_slug( 'edit_posts' ) && false === Importer::sanitize_role_slug( 'rolegate_manage' ), 'importer: sanitize_role_slug refuses capability and critical names' );
 	$rw_ok( 'editor' === Importer::sanitize_role_slug( 'editor' ), 'control: an existing role slug is accepted' );
 
 	// Content-access strips visibility attributes written with JSON unicode escapes.
@@ -242,15 +242,15 @@ try {
 	wp_set_current_user( $author );
 	// Written with JSON unicode escapes (u004d is M, u0052 is R), so the attribute names never appear literally.
 	$bs      = chr( 92 );
-	$escaped = '<!-- wp:paragraph {"rolewright' . $bs . 'u004dode":"hide","rolewright' . $bs . 'u0052oles":["editor"]} --><p>x</p><!-- /wp:paragraph -->';
-	$rw_ok( false === strpos( $escaped, 'rolewrightMode' ), 'fixture: the escaped content does not contain the attribute name literally' );
+	$escaped = '<!-- wp:paragraph {"rolegate' . $bs . 'u004dode":"hide","rolegate' . $bs . 'u0052oles":["editor"]} --><p>x</p><!-- /wp:paragraph -->';
+	$rw_ok( false === strpos( $escaped, 'rolegateMode' ), 'fixture: the escaped content does not contain the attribute name literally' );
 	$pid     = wp_insert_post( wp_slash( array( 'post_title' => 'Esc ' . $sfx, 'post_content' => $escaped, 'post_status' => 'draft', 'post_author' => $author ) ) );
 	$blocks  = parse_blocks( (string) get_post_field( 'post_content', $pid ) );
-	$rw_ok( $pid && empty( $blocks[0]['attrs']['rolewrightMode'] ) && empty( $blocks[0]['attrs']['rolewrightRoles'] ), 'content-access: a user without manage_access can\'t add escaped visibility attributes' );
+	$rw_ok( $pid && empty( $blocks[0]['attrs']['rolegateMode'] ) && empty( $blocks[0]['attrs']['rolegateRoles'] ), 'content-access: a user without manage_access can\'t add escaped visibility attributes' );
 	wp_set_current_user( $admin );
 	$pid2    = wp_insert_post( wp_slash( array( 'post_title' => 'Esc2 ' . $sfx, 'post_content' => $escaped, 'post_status' => 'draft', 'post_author' => $admin ) ) );
 	$blocks  = parse_blocks( (string) get_post_field( 'post_content', $pid2 ) );
-	$rw_ok( 'hide' === ( $blocks[0]['attrs']['rolewrightMode'] ?? '' ), 'control: a user with manage_access keeps them' );
+	$rw_ok( 'hide' === ( $blocks[0]['attrs']['rolegateMode'] ?? '' ), 'control: a user with manage_access keeps them' );
 	wp_delete_post( (int) $pid, true );
 	wp_delete_post( (int) $pid2, true );
 
@@ -283,7 +283,7 @@ try {
 	$bad = $parsed;
 	$bad['sections']['deny'] = array( 'denied' => array( 'administrator' => array( Caps::MANAGE ) ) );
 	$res = Importer::apply( $bad, $admin, array( 'roles' => array(), 'sections' => array( 'deny' ) ) );
-	$rw_ok( is_wp_error( $res ) || ! empty( $res['errors'] ), 'portability: a deny on the administrator\'s Rolewright caps is refused' );
+	$rw_ok( is_wp_error( $res ) || ! empty( $res['errors'] ), 'portability: a deny on the administrator\'s Role Gatekeeper caps is refused' );
 	$rw_ok( ! in_array( Caps::MANAGE, Denials::for_role( 'administrator' ), true ), 'portability: refused deny section wrote nothing' );
 
 	$lim_role = 'rw_int_lim_' . $sfx;
@@ -314,9 +314,9 @@ try {
 		remove_user_from_blog( (int) $outsider, get_current_blog_id() );
 		$site_admin = $make( 'rw_int_siteadm', 'administrator' );
 		wp_set_current_user( $site_admin );
-		$rw_ok( 'rolewright_not_site_member' === $code( Ops::assign_role( $site_admin, (int) $outsider, 'subscriber' ) ), 'multisite automation: assign refuses a user from another site' );
-		$rw_ok( 'rolewright_not_site_member' === $code( Ops::unassign_role( $site_admin, (int) $outsider, 'subscriber' ) ), 'multisite automation: unassign refuses a user from another site' );
-		$rw_ok( 'rolewright_not_site_member' === $code( Ops::user_summary( (int) $outsider, $site_admin ) ), 'multisite automation: user read refuses a user from another site' );
+		$rw_ok( 'rolegate_not_site_member' === $code( Ops::assign_role( $site_admin, (int) $outsider, 'subscriber' ) ), 'multisite automation: assign refuses a user from another site' );
+		$rw_ok( 'rolegate_not_site_member' === $code( Ops::unassign_role( $site_admin, (int) $outsider, 'subscriber' ) ), 'multisite automation: unassign refuses a user from another site' );
+		$rw_ok( 'rolegate_not_site_member' === $code( Ops::user_summary( (int) $outsider, $site_admin ) ), 'multisite automation: user read refuses a user from another site' );
 		$rw_ok( ! is_user_member_of_blog( (int) $outsider, get_current_blog_id() ), 'multisite automation: refused assign added nothing' );
 		$rw_ok( ! is_wp_error( Ops::user_summary( $member, $site_admin ) ), 'control: a site member can be read' );
 		wp_set_current_user( $admin );

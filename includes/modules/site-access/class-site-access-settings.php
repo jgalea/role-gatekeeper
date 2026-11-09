@@ -1,12 +1,12 @@
 <?php
-namespace Rolewright\Modules\Site_Access;
+namespace Rolegate\Modules\Site_Access;
 
-use Rolewright\Modules\Safety\Guard;
+use Rolegate\Modules\Safety\Guard;
 
 defined( 'ABSPATH' ) || exit;
 
 final class Site_Access_Settings {
-	const OPTION = 'rolewright_site_access';
+	const OPTION = 'rolegate_site_access';
 
 	public static function defaults(): array {
 		return array(
@@ -43,7 +43,7 @@ final class Site_Access_Settings {
 		$out['toolbar_hide_gated'] = ! empty( $raw['toolbar_hide_gated'] );
 
 		if ( $out['private_enabled'] && empty( $current['private_enabled'] ) && empty( $raw['confirm_private'] ) ) {
-			return new \WP_Error( 'rolewright_confirm', __( 'Tick the confirmation box to turn private-site mode on.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_confirm', __( 'Tick the confirmation box to turn private-site mode on.', 'role-gatekeeper' ) );
 		}
 
 		$paths = isset( $raw['allow_paths'] ) ? $raw['allow_paths'] : '';
@@ -61,10 +61,10 @@ final class Site_Access_Settings {
 		$cap = isset( $raw['admin_gate_cap'] ) ? Guard::sanitize_cap_name( (string) $raw['admin_gate_cap'] ) : false;
 		if ( $out['admin_gate'] ) {
 			if ( false === $cap ) {
-				return new \WP_Error( 'rolewright_bad_cap', __( 'Choose a valid capability for wp-admin access.', 'rolewright' ) );
+				return new \WP_Error( 'rolegate_bad_cap', __( 'Choose a valid capability for wp-admin access.', 'role-gatekeeper' ) );
 			}
 			if ( $actor_id && ! user_can( $actor_id, $cap ) ) {
-				return new \WP_Error( 'rolewright_self_lockout', __( 'You do not hold that capability yourself, so choosing it could lock you out of wp-admin.', 'rolewright' ) );
+				return new \WP_Error( 'rolegate_self_lockout', __( 'You do not hold that capability yourself, so choosing it could lock you out of wp-admin.', 'role-gatekeeper' ) );
 			}
 		}
 		$out['admin_gate_cap'] = false === $cap ? 'edit_posts' : $cap;
@@ -73,7 +73,7 @@ final class Site_Access_Settings {
 		if ( '' !== $url ) {
 			$checked = Redirects::sanitize_target( $url );
 			if ( false === $checked ) {
-				return new \WP_Error( 'rolewright_bad_redirect', __( 'The redirect URL must be a page on this site and cannot point into wp-admin or the login page.', 'rolewright' ) );
+				return new \WP_Error( 'rolegate_bad_redirect', __( 'The redirect URL must be a page on this site and cannot point into wp-admin or the login page.', 'role-gatekeeper' ) );
 			}
 			$url = $checked;
 		}
@@ -119,7 +119,7 @@ final class Site_Access_Settings {
 		$before = self::get();
 		update_option( self::OPTION, $new, false );
 		do_action(
-			'rolewright_changed',
+			'rolegate_changed',
 			'access.updated',
 			array(
 				'actor'  => $actor_id,

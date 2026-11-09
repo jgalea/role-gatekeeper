@@ -1,7 +1,7 @@
 <?php
-namespace Rolewright\Modules\User_Roles;
+namespace Rolegate\Modules\User_Roles;
 
-use Rolewright\Modules\Safety\Guard;
+use Rolegate\Modules\Safety\Guard;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -20,12 +20,12 @@ final class Users {
 		 * @param string[] $roles
 		 * @param int      $user_id
 		 */
-		$roles = apply_filters( 'rolewright_user_roles', $roles, (int) $user_id );
+		$roles = apply_filters( 'rolegate_user_roles', $roles, (int) $user_id );
 		return is_array( $roles ) ? array_values( $roles ) : array();
 	}
 
 	/**
-	 * Roles as stored, without the rolewright_user_roles filter.
+	 * Roles as stored, without the rolegate_user_roles filter.
 	 *
 	 * @return string[]
 	 */
@@ -60,7 +60,7 @@ final class Users {
 	}
 
 	public static function no_role_url(): string {
-		return add_query_arg( 'rolewright_no_role', '1', admin_url( 'users.php' ) );
+		return add_query_arg( 'rolegate_no_role', '1', admin_url( 'users.php' ) );
 	}
 
 	/**
@@ -145,7 +145,7 @@ final class Users {
 			return true;
 		}
 		if ( ! is_user_member_of_blog( $target, get_current_blog_id() ) ) {
-			return new \WP_Error( 'rolewright_not_site_member', __( 'That user is not a member of this site.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_not_site_member', __( 'That user is not a member of this site.', 'role-gatekeeper' ) );
 		}
 		return true;
 	}
@@ -157,27 +157,27 @@ final class Users {
 	 */
 	public static function check_roles_change( int $actor, int $target, array $add, array $remove ) {
 		if ( $target > 0 && ! get_userdata( $target ) ) {
-			return new \WP_Error( 'rolewright_no_user', __( 'That user does not exist.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_no_user', __( 'That user does not exist.', 'role-gatekeeper' ) );
 		}
 		$member = self::check_site_member( $actor, $target );
 		if ( true !== $member ) {
 			return $member;
 		}
 		if ( $actor > 0 && $target === $actor ) {
-			return new \WP_Error( 'rolewright_self_role', __( 'You can\'t change your own roles.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_self_role', __( 'You can\'t change your own roles.', 'role-gatekeeper' ) );
 		}
 		if ( $target > 0 ? ! user_can( $actor, 'promote_user', $target ) : ! user_can( $actor, 'promote_users' ) ) {
-			return new \WP_Error( 'rolewright_cannot_promote', __( 'You can\'t change the roles of this user.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_cannot_promote', __( 'You can\'t change the roles of this user.', 'role-gatekeeper' ) );
 		}
 		if ( $target > 0 && ! Guard::can_act_on_user( $actor, $target ) ) {
-			return new \WP_Error( 'rolewright_user_above_actor', __( 'This user holds capabilities you don\'t have.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_user_above_actor', __( 'This user holds capabilities you don\'t have.', 'role-gatekeeper' ) );
 		}
 		foreach ( $add as $role ) {
 			if ( ! get_role( $role ) ) {
-				return new \WP_Error( 'rolewright_no_role', __( 'That role does not exist.', 'rolewright' ) );
+				return new \WP_Error( 'rolegate_no_role', __( 'That role does not exist.', 'role-gatekeeper' ) );
 			}
 			if ( ! Guard::can_assign_role( $actor, $role, $target ) ) {
-				return new \WP_Error( 'rolewright_role_not_allowed', __( 'You can\'t give that role: it carries capabilities you don\'t hold.', 'rolewright' ) );
+				return new \WP_Error( 'rolegate_role_not_allowed', __( 'You can\'t give that role: it carries capabilities you don\'t hold.', 'role-gatekeeper' ) );
 			}
 		}
 		if ( $target > 0 && in_array( 'administrator', $remove, true ) && in_array( 'administrator', self::raw_roles( $target ), true ) ) {
@@ -189,7 +189,7 @@ final class Users {
 				)
 			);
 			if ( count( $admins ) < 2 ) {
-				return new \WP_Error( 'rolewright_last_admin', __( 'The last administrator can\'t lose the Administrator role.', 'rolewright' ) );
+				return new \WP_Error( 'rolegate_last_admin', __( 'The last administrator can\'t lose the Administrator role.', 'role-gatekeeper' ) );
 			}
 		}
 		return true;
@@ -223,7 +223,7 @@ final class Users {
 		$after = self::raw_roles( $target );
 		if ( array_diff( $add, $after ) || array_intersect( $remove, $after ) ) {
 			self::announce_roles( $actor, $target, $before, $after );
-			return new \WP_Error( 'rolewright_blocked', __( 'The change was refused by the safety rules.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_blocked', __( 'The change was refused by the safety rules.', 'role-gatekeeper' ) );
 		}
 		self::announce_roles( $actor, $target, $before, $after );
 		return true;
@@ -242,7 +242,7 @@ final class Users {
 			return;
 		}
 		do_action(
-			'rolewright_changed',
+			'rolegate_changed',
 			'user.roles',
 			array(
 				'actor'  => $actor,
@@ -259,21 +259,21 @@ final class Users {
 	 * @return array{0:string[],1:string[]}|\WP_Error
 	 */
 	public static function check_caps_change( int $actor, int $target, array $add, array $remove ) {
-		if ( ! user_can( $actor, \Rolewright\Modules\Safety\Caps::MANAGE_USERS ) ) {
-			return new \WP_Error( 'rolewright_cannot_manage_users', __( 'You can\'t edit user capabilities.', 'rolewright' ) );
+		if ( ! user_can( $actor, \Rolegate\Modules\Safety\Caps::MANAGE_USERS ) ) {
+			return new \WP_Error( 'rolegate_cannot_manage_users', __( 'You can\'t edit user capabilities.', 'role-gatekeeper' ) );
 		}
 		if ( ! get_userdata( $target ) ) {
-			return new \WP_Error( 'rolewright_no_user', __( 'That user does not exist.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_no_user', __( 'That user does not exist.', 'role-gatekeeper' ) );
 		}
 		$member = self::check_site_member( $actor, $target );
 		if ( true !== $member ) {
 			return $member;
 		}
 		if ( $target === $actor ) {
-			return new \WP_Error( 'rolewright_self_caps', __( 'You can\'t change your own capabilities.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_self_caps', __( 'You can\'t change your own capabilities.', 'role-gatekeeper' ) );
 		}
 		if ( ! user_can( $actor, 'edit_user', $target ) || ! Guard::can_act_on_user( $actor, $target ) ) {
-			return new \WP_Error( 'rolewright_user_above_actor', __( 'This user holds capabilities you don\'t have.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_user_above_actor', __( 'This user holds capabilities you don\'t have.', 'role-gatekeeper' ) );
 		}
 		$existing = self::direct_caps( $target );
 		$clean    = array();
@@ -283,13 +283,13 @@ final class Users {
 			}
 			$name = Guard::sanitize_cap_name( (string) $cap );
 			if ( false === $name ) {
-				return new \WP_Error( 'rolewright_invalid_cap', sprintf( /* translators: %s: capability name */ __( '"%s" is not a valid capability name.', 'rolewright' ), $cap ) );
+				return new \WP_Error( 'rolegate_invalid_cap', sprintf( /* translators: %s: capability name */ __( '"%s" is not a valid capability name.', 'role-gatekeeper' ), $cap ) );
 			}
 			if ( Guard::is_role_slug_name( $name ) ) {
-				return new \WP_Error( 'rolewright_cap_is_role', sprintf( /* translators: %s: capability name */ __( '"%s" is a role name, so it can\'t be a per-user capability. Assign the role instead.', 'rolewright' ), $name ) );
+				return new \WP_Error( 'rolegate_cap_is_role', sprintf( /* translators: %s: capability name */ __( '"%s" is a role name, so it can\'t be a per-user capability. Assign the role instead.', 'role-gatekeeper' ), $name ) );
 			}
 			if ( ! Guard::can_grant_cap( $actor, $name ) ) {
-				return new \WP_Error( 'rolewright_cap_not_held', sprintf( /* translators: %s: capability name */ __( 'You can\'t grant "%s": you don\'t hold it.', 'rolewright' ), $name ) );
+				return new \WP_Error( 'rolegate_cap_not_held', sprintf( /* translators: %s: capability name */ __( 'You can\'t grant "%s": you don\'t hold it.', 'role-gatekeeper' ), $name ) );
 			}
 			$clean[] = $name;
 		}
@@ -336,7 +336,7 @@ final class Users {
 		self::announce_caps( $actor, $target, $before, $after );
 		foreach ( $add as $cap ) {
 			if ( ! isset( $after[ $cap ] ) ) {
-				return new \WP_Error( 'rolewright_blocked', __( 'The change was refused by the safety rules.', 'rolewright' ) );
+				return new \WP_Error( 'rolegate_blocked', __( 'The change was refused by the safety rules.', 'role-gatekeeper' ) );
 			}
 		}
 		return true;
@@ -351,7 +351,7 @@ final class Users {
 			return;
 		}
 		do_action(
-			'rolewright_changed',
+			'rolegate_changed',
 			'user.caps',
 			array(
 				'actor'  => $actor,

@@ -1,14 +1,14 @@
 <?php
-namespace Rolewright\Modules\Audit;
+namespace Rolegate\Modules\Audit;
 
-use Rolewright\Modules\Safety\Caps;
-use Rolewright\Modules\Safety\Guard;
+use Rolegate\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Guard;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Restores the state before a logged change, through the same Guard assertions the original
- * change needed. The result fires rolewright_changed with revert_of, which the recorder logs.
+ * change needed. The result fires rolegate_changed with revert_of, which the recorder logs.
  */
 final class Reverter {
 	const TYPES = array( 'role.created', 'role.deleted', 'role.renamed', 'caps.updated', 'user.roles', 'user.caps', 'roles.reset', 'role.default_set' );
@@ -40,17 +40,17 @@ final class Reverter {
 	public static function revert( int $entry_id, int $actor ) {
 		$row = Store::get( $entry_id );
 		if ( ! $row ) {
-			return new \WP_Error( 'rolewright_audit_missing', __( 'That log entry no longer exists.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_audit_missing', __( 'That log entry no longer exists.', 'role-gatekeeper' ) );
 		}
 		if ( ! in_array( $row->type, self::TYPES, true ) ) {
-			return new \WP_Error( 'rolewright_audit_not_revertible', __( 'This kind of entry can\'t be reverted.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_audit_not_revertible', __( 'This kind of entry can\'t be reverted.', 'role-gatekeeper' ) );
 		}
 		if ( (int) $row->reverted_by > 0 ) {
-			return new \WP_Error( 'rolewright_audit_already_reverted', __( 'This entry was already reverted.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_audit_already_reverted', __( 'This entry was already reverted.', 'role-gatekeeper' ) );
 		}
 		foreach ( self::required_caps( $row->type ) as $cap ) {
 			if ( ! user_can( $actor, $cap ) ) {
-				return new \WP_Error( 'rolewright_audit_forbidden', __( 'You don\'t have permission to revert this change.', 'rolewright' ) );
+				return new \WP_Error( 'rolegate_audit_forbidden', __( 'You don\'t have permission to revert this change.', 'role-gatekeeper' ) );
 			}
 		}
 
@@ -77,14 +77,14 @@ final class Reverter {
 			case 'user.caps':
 				return self::revert_user_caps( $entry_id, $actor, (int) $row->target, $diff );
 		}
-		return new \WP_Error( 'rolewright_audit_not_revertible', __( 'This kind of entry can\'t be reverted.', 'rolewright' ) );
+		return new \WP_Error( 'rolegate_audit_not_revertible', __( 'This kind of entry can\'t be reverted.', 'role-gatekeeper' ) );
 	}
 
 	/** @return true|\WP_Error */
 	private static function revert_created( int $entry_id, int $actor, string $slug ) {
 		$role = get_role( $slug );
 		if ( ! $role ) {
-			return new \WP_Error( 'rolewright_no_role', __( 'That role does not exist any more.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_no_role', __( 'That role does not exist any more.', 'role-gatekeeper' ) );
 		}
 		$users = get_users(
 			array(
@@ -94,7 +94,7 @@ final class Reverter {
 			)
 		);
 		if ( $users ) {
-			return new \WP_Error( 'rolewright_role_in_use', __( 'The role still has users. Move them to another role first.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_role_in_use', __( 'The role still has users. Move them to another role first.', 'role-gatekeeper' ) );
 		}
 		$ok = Guard::assert_can_delete_role( $actor, $slug );
 		if ( is_wp_error( $ok ) ) {
@@ -140,10 +140,10 @@ final class Reverter {
 	private static function revert_renamed( int $entry_id, int $actor, string $slug, array $detail ) {
 		$old = isset( $detail['old_label'] ) ? (string) $detail['old_label'] : '';
 		if ( '' === $old ) {
-			return new \WP_Error( 'rolewright_audit_not_revertible', __( 'The previous name was not recorded.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_audit_not_revertible', __( 'The previous name was not recorded.', 'role-gatekeeper' ) );
 		}
 		if ( ! get_role( $slug ) ) {
-			return new \WP_Error( 'rolewright_no_role', __( 'That role does not exist any more.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_no_role', __( 'That role does not exist any more.', 'role-gatekeeper' ) );
 		}
 		$ok = Guard::assert_can_rename_role( $actor, $slug );
 		if ( is_wp_error( $ok ) ) {
@@ -162,7 +162,7 @@ final class Reverter {
 	private static function revert_role_caps( int $entry_id, int $actor, string $slug, array $diff ) {
 		$role = get_role( $slug );
 		if ( ! $role ) {
-			return new \WP_Error( 'rolewright_no_role', __( 'That role does not exist any more.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_no_role', __( 'That role does not exist any more.', 'role-gatekeeper' ) );
 		}
 		$current = Guard::normalize_caps( (array) $role->capabilities );
 		$new     = Diff::undo_caps( $current, (array) ( $diff['caps'] ?? array() ) );
@@ -189,29 +189,29 @@ final class Reverter {
 	/** @return true|\WP_Error */
 	private static function revert_user_roles( int $entry_id, int $actor, int $target, array $diff ) {
 		if ( $actor === $target ) {
-			return new \WP_Error( 'rolewright_self_role', __( 'You can\'t change your own roles.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_self_role', __( 'You can\'t change your own roles.', 'role-gatekeeper' ) );
 		}
 		$user = get_userdata( $target );
 		if ( ! $user ) {
-			return new \WP_Error( 'rolewright_no_user', __( 'That user does not exist any more.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_no_user', __( 'That user does not exist any more.', 'role-gatekeeper' ) );
 		}
 		$add    = array_map( 'strval', (array) ( $diff['roles']['removed'] ?? array() ) );
 		$remove = array_map( 'strval', (array) ( $diff['roles']['added'] ?? array() ) );
 		$before = array_values( (array) $user->roles );
 		$after  = array_values( array_unique( array_merge( array_diff( $before, $remove ), $add ) ) );
 		if ( ! Guard::can_act_on_user( $actor, $target ) ) {
-			return new \WP_Error( 'rolewright_user_above_actor', __( 'You can\'t change a user who holds capabilities you don\'t have.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_user_above_actor', __( 'You can\'t change a user who holds capabilities you don\'t have.', 'role-gatekeeper' ) );
 		}
 		foreach ( $add as $role ) {
 			if ( ! get_role( $role ) ) {
-				return new \WP_Error( 'rolewright_no_role', __( 'A role from this entry does not exist any more.', 'rolewright' ) );
+				return new \WP_Error( 'rolegate_no_role', __( 'A role from this entry does not exist any more.', 'role-gatekeeper' ) );
 			}
 			if ( ! Guard::can_assign_role( $actor, $role, $target ) ) {
-				return new \WP_Error( 'rolewright_cannot_assign', __( 'You can\'t assign a role from this entry.', 'rolewright' ) );
+				return new \WP_Error( 'rolegate_cannot_assign', __( 'You can\'t assign a role from this entry.', 'role-gatekeeper' ) );
 			}
 		}
 		if ( $actor !== $target && ! user_can( $actor, 'promote_user', $target ) ) {
-			return new \WP_Error( 'rolewright_cannot_promote', __( 'You can\'t change the roles of this user.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_cannot_promote', __( 'You can\'t change the roles of this user.', 'role-gatekeeper' ) );
 		}
 		if ( in_array( 'administrator', $before, true ) && ! in_array( 'administrator', $after, true ) ) {
 			$admins = get_users(
@@ -222,7 +222,7 @@ final class Reverter {
 				)
 			);
 			if ( count( $admins ) < 2 ) {
-				return new \WP_Error( 'rolewright_last_admin', __( 'The last administrator can\'t lose the Administrator role.', 'rolewright' ) );
+				return new \WP_Error( 'rolegate_last_admin', __( 'The last administrator can\'t lose the Administrator role.', 'role-gatekeeper' ) );
 			}
 		}
 		$ok = self::check_user_result( $actor, $after, self::user_own_caps( $user ) );
@@ -246,16 +246,16 @@ final class Reverter {
 	/** @return true|\WP_Error */
 	private static function revert_user_caps( int $entry_id, int $actor, int $target, array $diff ) {
 		if ( $actor === $target ) {
-			return new \WP_Error( 'rolewright_self_caps', __( 'You can\'t change your own capabilities.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_self_caps', __( 'You can\'t change your own capabilities.', 'role-gatekeeper' ) );
 		}
 		$user = get_userdata( $target );
 		if ( ! $user ) {
-			return new \WP_Error( 'rolewright_no_user', __( 'That user does not exist any more.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_no_user', __( 'That user does not exist any more.', 'role-gatekeeper' ) );
 		}
 		$current = self::user_own_caps( $user );
 		$new     = Diff::undo_caps( $current, (array) ( $diff['caps'] ?? array() ) );
 		if ( ! Guard::can_act_on_user( $actor, $target ) || ( $actor !== $target && ! user_can( $actor, 'edit_user', $target ) ) ) {
-			return new \WP_Error( 'rolewright_user_above_actor', __( 'You can\'t change a user who holds capabilities you don\'t have.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_user_above_actor', __( 'You can\'t change a user who holds capabilities you don\'t have.', 'role-gatekeeper' ) );
 		}
 		$ok = self::refuse_ungrantable( $actor, self::changed_caps( $current, $new ) );
 		if ( is_wp_error( $ok ) ) {
@@ -263,7 +263,7 @@ final class Reverter {
 		}
 		foreach ( array_keys( array_diff_key( $new, $current ) ) as $cap ) {
 			if ( Guard::is_role_slug_name( (string) $cap ) ) {
-				return new \WP_Error( 'rolewright_cap_is_role', __( 'A capability from this entry is now a role name, so it can\'t be restored as a per-user capability.', 'rolewright' ) );
+				return new \WP_Error( 'rolegate_cap_is_role', __( 'A capability from this entry is now a role name, so it can\'t be restored as a per-user capability.', 'role-gatekeeper' ) );
 			}
 		}
 		$ok = self::check_user_result( $actor, array_values( (array) $user->roles ), $new );
@@ -290,7 +290,7 @@ final class Reverter {
 	private static function revert_roles_reset( int $entry_id, int $actor, array $diff, array $detail ) {
 		$plan = (array) ( $diff['role_caps'] ?? array() );
 		if ( ! $plan ) {
-			return new \WP_Error( 'rolewright_audit_not_revertible', __( 'Nothing was recorded to restore.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_audit_not_revertible', __( 'Nothing was recorded to restore.', 'role-gatekeeper' ) );
 		}
 		$proposed = array();
 		$current  = array();
@@ -315,10 +315,10 @@ final class Reverter {
 			}
 		}
 		if ( Guard::lockout_reasons_for( $actor, $proposed ) ) {
-			return new \WP_Error( 'rolewright_lockout', __( 'This revert would lock you out of Rolewright.', 'rolewright' ), array( 'reasons' => Guard::lockout_reasons_for( $actor, $proposed ) ) );
+			return new \WP_Error( 'rolegate_lockout', __( 'This revert would lock you out of Role Gatekeeper.', 'role-gatekeeper' ), array( 'reasons' => Guard::lockout_reasons_for( $actor, $proposed ) ) );
 		}
 		$labels = (array) ( $detail['labels'] ?? array() );
-		\Rolewright\Modules\Safety\Enforcer::as_system(
+		\Rolegate\Modules\Safety\Enforcer::as_system(
 			function () use ( $proposed, $current, $labels ) {
 				foreach ( $proposed as $slug => $new ) {
 					$role = get_role( $slug );
@@ -353,24 +353,24 @@ final class Reverter {
 		$default = (string) ( $detail['default_before'] ?? '' );
 		$extras  = array_values( array_diff( array_map( 'strval', (array) ( $detail['extras_before'] ?? array() ) ), array( $default ) ) );
 		if ( '' === $default ) {
-			return new \WP_Error( 'rolewright_audit_not_revertible', __( 'The previous default role was not recorded.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_audit_not_revertible', __( 'The previous default role was not recorded.', 'role-gatekeeper' ) );
 		}
 		foreach ( array_merge( array( $default ), $extras ) as $role ) {
 			$obj = get_role( $role );
 			if ( ! $obj ) {
-				return new \WP_Error( 'rolewright_no_role', __( 'A role from this entry does not exist any more.', 'rolewright' ) );
+				return new \WP_Error( 'rolegate_no_role', __( 'A role from this entry does not exist any more.', 'role-gatekeeper' ) );
 			}
 			if ( Guard::critical_subset( (array) $obj->capabilities ) ) {
-				return new \WP_Error( 'rolewright_cannot_assign', __( 'A role holding critical capabilities can\'t be a default role.', 'rolewright' ) );
+				return new \WP_Error( 'rolegate_cannot_assign', __( 'A role holding critical capabilities can\'t be a default role.', 'role-gatekeeper' ) );
 			}
 		}
-		$now_extras = get_option( 'rolewright_extra_default_roles', array() );
+		$now_extras = get_option( 'rolegate_extra_default_roles', array() );
 		$before     = array(
 			'default' => (string) get_option( 'default_role' ),
 			'extras'  => is_array( $now_extras ) ? array_values( $now_extras ) : array(),
 		);
 		update_option( 'default_role', $default );
-		update_option( 'rolewright_extra_default_roles', $extras, false );
+		update_option( 'rolegate_extra_default_roles', $extras, false );
 		self::announce(
 			'role.default_set',
 			$entry_id,
@@ -387,7 +387,7 @@ final class Reverter {
 
 	/**
 	 * Refuses a change to the actor's own roles or per-user caps that leaves them without read
-	 * or Rolewright access.
+	 * or Role Gatekeeper access.
 	 *
 	 * @param string[]           $roles
 	 * @param array<string,bool>|null $user_caps Null keeps the user's current per-user caps.
@@ -402,7 +402,7 @@ final class Reverter {
 		}
 		$reasons = array_diff( Guard::lockout_reasons( $roles, $user_caps, self::roles_caps() ), array( 'no_manager_role' ) );
 		if ( $reasons ) {
-			return new \WP_Error( 'rolewright_lockout', __( 'This revert would lock you out of your own account or of Rolewright.', 'rolewright' ), array( 'reasons' => array_values( $reasons ) ) );
+			return new \WP_Error( 'rolegate_lockout', __( 'This revert would lock you out of your own account or of Role Gatekeeper.', 'role-gatekeeper' ), array( 'reasons' => array_values( $reasons ) ) );
 		}
 		return true;
 	}
@@ -476,9 +476,9 @@ final class Reverter {
 		}
 		if ( $refused ) {
 			return new \WP_Error(
-				'rolewright_cap_not_held',
+				'rolegate_cap_not_held',
 				/* translators: %s: comma-separated capability names */
-				sprintf( __( 'You can\'t grant or lift a capability you don\'t hold yourself: %s.', 'rolewright' ), implode( ', ', $refused ) )
+				sprintf( __( 'You can\'t grant or lift a capability you don\'t hold yourself: %s.', 'role-gatekeeper' ), implode( ', ', $refused ) )
 			);
 		}
 		return true;
@@ -498,9 +498,9 @@ final class Reverter {
 		$above = Guard::missing( Guard::critical_subset( $new ), Guard::user_caps( $actor ) );
 		if ( $above ) {
 			return new \WP_Error(
-				'rolewright_role_above_actor',
+				'rolegate_role_above_actor',
 				/* translators: %s: comma-separated capability names */
-				sprintf( __( 'This revert would give the role capabilities you don\'t have: %s.', 'rolewright' ), implode( ', ', $above ) )
+				sprintf( __( 'This revert would give the role capabilities you don\'t have: %s.', 'role-gatekeeper' ), implode( ', ', $above ) )
 			);
 		}
 		return true;
@@ -522,9 +522,9 @@ final class Reverter {
 		$above     = Guard::missing( Guard::critical_subset( $effective ), Guard::user_caps( $actor ) );
 		if ( $above ) {
 			return new \WP_Error(
-				'rolewright_user_above_actor',
+				'rolegate_user_above_actor',
 				/* translators: %s: comma-separated capability names */
-				sprintf( __( 'This revert would give the user capabilities you don\'t have: %s.', 'rolewright' ), implode( ', ', $above ) )
+				sprintf( __( 'This revert would give the user capabilities you don\'t have: %s.', 'role-gatekeeper' ), implode( ', ', $above ) )
 			);
 		}
 		return true;
@@ -537,7 +537,7 @@ final class Reverter {
 
 	private static function announce( string $type, int $entry_id, int $actor, string $target, array $before, array $after ): void {
 		do_action(
-			'rolewright_changed',
+			'rolegate_changed',
 			$type,
 			array(
 				'actor'     => $actor,

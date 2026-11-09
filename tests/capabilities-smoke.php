@@ -1,24 +1,24 @@
 <?php
 /**
- * Run: wp eval-file wp-content/plugins/rolewright/tests/capabilities-smoke.php
+ * Run: wp eval-file wp-content/plugins/role-gatekeeper/tests/capabilities-smoke.php
  */
 
-use Rolewright\Modules\Capabilities\Cap_Catalog;
-use Rolewright\Modules\Capabilities\Cap_Editor;
-use Rolewright\Modules\Capabilities\Cap_Service;
-use Rolewright\Modules\Capabilities\Cap_Sets;
-use Rolewright\Modules\Roles\Role_Service;
-use Rolewright\Modules\Roles\Role_Store;
-use Rolewright\Modules\Safety\Caps;
-use Rolewright\Modules\Safety\Enforcer;
+use Rolegate\Modules\Capabilities\Cap_Catalog;
+use Rolegate\Modules\Capabilities\Cap_Editor;
+use Rolegate\Modules\Capabilities\Cap_Service;
+use Rolegate\Modules\Capabilities\Cap_Sets;
+use Rolegate\Modules\Roles\Role_Service;
+use Rolegate\Modules\Roles\Role_Store;
+use Rolegate\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Enforcer;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
 }
 
-// Multisite: site administrators hold rolewright_* caps only when the network grants it; these checks are about role-based access, so grant it.
+// Multisite: site administrators hold rolegate_* caps only when the network grants it; these checks are about role-based access, so grant it.
 if ( is_multisite() ) {
-	add_filter( 'rolewright_multisite_site_admin_access', '__return_true', 20 );
+	add_filter( 'rolegate_multisite_site_admin_access', '__return_true', 20 );
 }
 
 require_once ABSPATH . 'wp-admin/includes/user.php';
@@ -38,7 +38,7 @@ $rw_ok   = function ( $cond, $label ) use ( &$rw_pass, &$rw_fail ) {
 
 $rw_events = array();
 add_action(
-	'rolewright_changed',
+	'rolegate_changed',
 	function ( $type, $data ) use ( &$rw_events ) {
 		$rw_events[] = array( $type, $data );
 	},
@@ -125,34 +125,34 @@ $rw_mgr_role = Role_Service::create( $rw_admin, 'RW Capmgr ' . $rw_suffix, array
 $rw_mgr      = $rw_make( 'rw_caps_mgr', $rw_mgr_role );
 wp_set_current_user( $rw_mgr );
 $res = Cap_Service::update_role( $rw_mgr, $rw_role, array( 'read', 'edit_posts', 'manage_options' ) );
-$rw_ok( is_wp_error( $res ) && 'rolewright_cap_not_held' === $res->get_error_code(), 'escalation: can\'t grant manage_options without holding it' );
+$rw_ok( is_wp_error( $res ) && 'rolegate_cap_not_held' === $res->get_error_code(), 'escalation: can\'t grant manage_options without holding it' );
 $res = Cap_Service::update_role( $rw_mgr, 'administrator', array( 'read' ) );
 $rw_ok( is_wp_error( $res ), 'escalation: can\'t edit the administrator role' );
 
 // Lockout and self-edit confirmation.
 $res = Cap_Service::update_role( $rw_mgr, $rw_mgr_role, array( 'read', Caps::MANAGE_CAPS, Caps::MANAGE_ROLES ) );
-$rw_ok( is_wp_error( $res ) && 'rolewright_confirm' === $res->get_error_code() && array( Caps::MANAGE ) === $res->get_error_data()['removed'], 'self-edit: removing a cap from own role asks for confirmation' );
+$rw_ok( is_wp_error( $res ) && 'rolegate_confirm' === $res->get_error_code() && array( Caps::MANAGE ) === $res->get_error_data()['removed'], 'self-edit: removing a cap from own role asks for confirmation' );
 // With the role hierarchy on, a user below the top can't edit their own role at all.
-$rw_hier    = \Rolewright\Core\Plugin::is_enabled( 'deny-hierarchy' );
+$rw_hier    = \Rolegate\Core\Plugin::is_enabled( 'deny-hierarchy' );
 $rw_refused = function ( $res, $code ) use ( $rw_hier ) {
-	return is_wp_error( $res ) && ( $code === $res->get_error_code() || ( $rw_hier && 'rolewright_role_above_position' === $res->get_error_code() ) );
+	return is_wp_error( $res ) && ( $code === $res->get_error_code() || ( $rw_hier && 'rolegate_role_above_position' === $res->get_error_code() ) );
 };
 $res = Cap_Service::update_role( $rw_mgr, $rw_mgr_role, array( 'read', Caps::MANAGE_CAPS, Caps::MANAGE_ROLES ), null, array(), true );
-$rw_ok( $rw_refused( $res, 'rolewright_lockout' ), 'lockout: confirmed removal of rolewright_manage is still refused' );
+$rw_ok( $rw_refused( $res, 'rolegate_lockout' ), 'lockout: confirmed removal of rolegate_manage is still refused' );
 $res = Cap_Service::update_role( $rw_mgr, $rw_mgr_role, array( Caps::MANAGE, Caps::MANAGE_CAPS, Caps::MANAGE_ROLES ), null, array(), true );
-$rw_ok( $rw_refused( $res, 'rolewright_lockout' ), 'lockout: removing read from own role refused' );
+$rw_ok( $rw_refused( $res, 'rolegate_lockout' ), 'lockout: removing read from own role refused' );
 $res = Cap_Service::update_role( $rw_mgr, $rw_mgr_role, array( 'read', Caps::MANAGE, Caps::MANAGE_CAPS, Caps::MANAGE_ROLES, 'upload_files' ) );
 $rw_ok( $rw_hier ? $rw_refused( $res, '' ) : is_array( $res ), 'self-edit: adding a cap to own role needs no confirmation (refused under the hierarchy)' );
 $res = Cap_Service::update_role( $rw_mgr, $rw_mgr_role, array( 'read', Caps::MANAGE, Caps::MANAGE_CAPS, Caps::MANAGE_ROLES ), null, array(), true );
 $rw_ok( $rw_hier ? $rw_refused( $res, '' ) : ( is_array( $res ) && array( 'upload_files' ) === $res['removed'] ), 'self-edit: confirmed harmless removal goes through (refused under the hierarchy)' );
 wp_set_current_user( $rw_admin );
 $res = Cap_Service::update_role( $rw_admin, 'administrator', array_diff( array_keys( array_filter( Role_Store::caps( 'administrator' ) ) ), array( Caps::MANAGE_ROLES ) ), null, array(), true );
-$rw_ok( is_wp_error( $res ) && 'rolewright_protected_role' === $res->get_error_code(), 'lockout: administrator can\'t lose rolewright_manage_roles' );
+$rw_ok( is_wp_error( $res ) && 'rolegate_protected_role' === $res->get_error_code(), 'lockout: administrator can\'t lose rolegate_manage_roles' );
 
 // Deleting custom caps.
 $cc = 'rw_reports_' . $rw_suffix;
 $rw_ok( is_wp_error( Cap_Service::delete_custom_cap( $rw_admin, 'edit_posts' ) ), 'delete cap: core cap refused' );
-$rw_ok( is_wp_error( Cap_Service::delete_custom_cap( $rw_admin, Caps::MANAGE ) ), 'delete cap: Rolewright cap refused' );
+$rw_ok( is_wp_error( Cap_Service::delete_custom_cap( $rw_admin, Caps::MANAGE ) ), 'delete cap: Role Gatekeeper cap refused' );
 get_role( 'editor' )->add_cap( $cc );
 $gone = Cap_Service::delete_custom_cap( $rw_admin, $cc );
 $rw_ok( is_array( $gone ) && in_array( $rw_role, $gone, true ) && in_array( 'editor', $gone, true ), 'delete cap: removed from every role holding it' );
@@ -183,7 +183,7 @@ $rw_ok( 'edit_post_tags' === $args['capabilities']['edit_terms'], 'filter: tag t
 $rw_ok( array( 'manage_privacy_options' ) === $sets->privacy_caps( array( 'manage_options' ), 'manage_privacy_options' ) || is_multisite(), 'filter: privacy cap maps to itself' );
 $rw_tx    = 0;
 $rw_count = function ( $t, $text, $domain ) use ( &$rw_tx ) {
-	if ( 'rolewright' === $domain ) {
+	if ( 'role-gatekeeper' === $domain ) {
 		++$rw_tx;
 	}
 	return $t;

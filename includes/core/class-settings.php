@@ -1,25 +1,25 @@
 <?php
-namespace Rolewright\Core;
+namespace Rolegate\Core;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Top-level "Rolewright" menu and the module on/off page. Modules attach their own
+ * Top-level "Role Gatekeeper" menu and the module on/off page. Modules attach their own
  * pages with add_submenu_page( Settings::MENU_SLUG, ... ) on admin_menu priority 10.
  */
 final class Settings {
-	const MENU_SLUG = 'rolewright';
-	const CAP       = 'rolewright_manage';
+	const MENU_SLUG = 'role-gatekeeper';
+	const CAP       = 'rolegate_manage';
 
 	public function init(): void {
 		add_action( 'admin_menu', array( $this, 'menu' ), 5 );
-		add_action( 'admin_post_rolewright_save_modules', array( $this, 'save' ) );
+		add_action( 'admin_post_rolegate_save_modules', array( $this, 'save' ) );
 	}
 
 	public function menu(): void {
 		add_menu_page(
-			__( 'Rolewright', 'rolewright' ),
-			__( 'Rolewright', 'rolewright' ),
+			__( 'Role Gatekeeper', 'role-gatekeeper' ),
+			__( 'Role Gatekeeper', 'role-gatekeeper' ),
 			self::CAP,
 			self::MENU_SLUG,
 			array( $this, 'render' ),
@@ -30,23 +30,23 @@ final class Settings {
 
 	public function render(): void {
 		if ( ! current_user_can( self::CAP ) ) {
-			wp_die( esc_html__( 'You do not have permission to view this page.', 'rolewright' ) );
+			wp_die( esc_html__( 'You do not have permission to view this page.', 'role-gatekeeper' ) );
 		}
 		$can_edit = self::can_change( get_current_user_id() );
-		echo '<div class="wrap"><h1>' . esc_html__( 'Rolewright', 'rolewright' ) . '</h1>';
+		echo '<div class="wrap"><h1>' . esc_html__( 'Role Gatekeeper', 'role-gatekeeper' ) . '</h1>';
 		// phpcs:disable WordPress.Security.NonceVerification -- display flags only.
 		if ( isset( $_GET['refused'] ) ) {
-			echo '<div class="notice notice-error"><p>' . esc_html__( 'Nothing was saved: a module you tried to switch off currently applies rules to your own account. Ask a super admin.', 'rolewright' ) . '</p></div>';
+			echo '<div class="notice notice-error"><p>' . esc_html__( 'Nothing was saved: a module you tried to switch off currently applies rules to your own account. Ask a super admin.', 'role-gatekeeper' ) . '</p></div>';
 		} elseif ( isset( $_GET['updated'] ) ) {
-			echo '<div class="notice notice-success"><p>' . esc_html__( 'Modules saved.', 'rolewright' ) . '</p></div>';
+			echo '<div class="notice notice-success"><p>' . esc_html__( 'Modules saved.', 'role-gatekeeper' ) . '</p></div>';
 		}
 		// phpcs:enable
 		if ( ! $can_edit ) {
-			echo '<p>' . esc_html__( 'Only an administrator who holds every administrator capability can switch modules on or off.', 'rolewright' ) . '</p>';
+			echo '<p>' . esc_html__( 'Only an administrator who holds every administrator capability can switch modules on or off.', 'role-gatekeeper' ) . '</p>';
 		}
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
-		echo '<input type="hidden" name="action" value="rolewright_save_modules" />';
-		wp_nonce_field( 'rolewright_save_modules' );
+		echo '<input type="hidden" name="action" value="rolegate_save_modules" />';
+		wp_nonce_field( 'rolegate_save_modules' );
 		echo '<table class="form-table" role="presentation"><tbody>';
 		foreach ( Plugin::modules() as $module ) {
 			$locked = ( 'safety' === $module->id() ) || ! $can_edit;
@@ -61,21 +61,21 @@ final class Settings {
 		}
 		echo '</tbody></table>';
 		if ( $can_edit ) {
-			submit_button( __( 'Save modules', 'rolewright' ) );
+			submit_button( __( 'Save modules', 'role-gatekeeper' ) );
 		}
 		echo '</form></div>';
 	}
 
 	/**
-	 * Plugin-wide settings need an administrator-level authority, not just rolewright_manage.
+	 * Plugin-wide settings need an administrator-level authority, not just rolegate_manage.
 	 */
 	public static function can_change( int $user_id ): bool {
-		return \Rolewright\Modules\Safety\Guard::is_site_authority( $user_id );
+		return \Rolegate\Modules\Safety\Guard::is_site_authority( $user_id );
 	}
 
 	/**
 	 * Modules from $turning_off whose rules currently apply to the user. Modules answer
-	 * through the rolewright_module_restricts_user filter. Super admins are never refused.
+	 * through the rolegate_module_restricts_user filter. Super admins are never refused.
 	 *
 	 * @param string[] $turning_off
 	 * @return string[]
@@ -86,7 +86,7 @@ final class Settings {
 		}
 		$out = array();
 		foreach ( $turning_off as $id ) {
-			if ( apply_filters( 'rolewright_module_restricts_user', false, (string) $id, $user_id ) ) {
+			if ( apply_filters( 'rolegate_module_restricts_user', false, (string) $id, $user_id ) ) {
 				$out[] = (string) $id;
 			}
 		}
@@ -95,14 +95,14 @@ final class Settings {
 
 	/**
 	 * Saves the module map for $actor after the authority and self-restriction checks,
-	 * and fires rolewright_changed (modules.updated).
+	 * and fires rolegate_changed (modules.updated).
 	 *
 	 * @param string[] $enabled_ids
 	 * @return true|\WP_Error
 	 */
 	public static function apply_modules( int $actor, array $enabled_ids ) {
 		if ( ! self::can_change( $actor ) ) {
-			return new \WP_Error( 'rolewright_not_authority', __( 'Only an administrator who holds every administrator capability can switch modules on or off.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_not_authority', __( 'Only an administrator who holds every administrator capability can switch modules on or off.', 'role-gatekeeper' ) );
 		}
 		$before = array();
 		$after  = array();
@@ -123,14 +123,14 @@ final class Settings {
 		);
 		$restricting      = self::restricting_modules( $actor, $turning_off );
 		if ( $restricting ) {
-			return new \WP_Error( 'rolewright_module_applies_to_actor', __( 'A module you tried to switch off currently applies rules to your own account.', 'rolewright' ), array( 'modules' => $restricting ) );
+			return new \WP_Error( 'rolegate_module_applies_to_actor', __( 'A module you tried to switch off currently applies rules to your own account.', 'role-gatekeeper' ), array( 'modules' => $restricting ) );
 		}
 		if ( $before === $after ) {
 			return true;
 		}
 		update_option( Plugin::OPTION_MODULES, $after, false );
 		do_action(
-			'rolewright_changed',
+			'rolegate_changed',
 			'modules.updated',
 			array(
 				'actor'  => $actor,
@@ -144,9 +144,9 @@ final class Settings {
 
 	public function save(): void {
 		if ( ! current_user_can( self::CAP ) || ! self::can_change( get_current_user_id() ) ) {
-			wp_die( esc_html__( 'You do not have permission to do that.', 'rolewright' ), '', array( 'response' => 403 ) );
+			wp_die( esc_html__( 'You do not have permission to do that.', 'role-gatekeeper' ), '', array( 'response' => 403 ) );
 		}
-		check_admin_referer( 'rolewright_save_modules' );
+		check_admin_referer( 'rolegate_save_modules' );
 		$posted = isset( $_POST['modules'] ) && is_array( $_POST['modules'] ) ? array_map( 'sanitize_key', array_keys( wp_unslash( $_POST['modules'] ) ) ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- only the keys are read, each through sanitize_key.
 		$result = self::apply_modules( get_current_user_id(), $posted );
 		$flag   = is_wp_error( $result ) ? 'refused' : 'updated';

@@ -1,17 +1,17 @@
 <?php
 /**
- * Run: wp eval-file wp-content/plugins/rolewright/tests/content-access-smoke.php
+ * Run: wp eval-file wp-content/plugins/role-gatekeeper/tests/content-access-smoke.php
  *
  * Front-end checks make real HTTP requests to the site. Inside wp-env the CLI container
- * reaches the web container as "wordpress", so set ROLEWRIGHT_TEST_BASE (and optionally
- * ROLEWRIGHT_TEST_HOST) when running somewhere else.
+ * reaches the web container as "wordpress", so set ROLEGATE_TEST_BASE (and optionally
+ * ROLEGATE_TEST_HOST) when running somewhere else.
  */
 
-use Rolewright\Modules\Content_Access\Access;
-use Rolewright\Modules\Content_Access\Menu_Visibility;
-use Rolewright\Modules\Content_Access\Post_Editor;
-use Rolewright\Modules\Content_Access\Query_Guard;
-use Rolewright\Modules\Content_Access\Visibility;
+use Rolegate\Modules\Content_Access\Access;
+use Rolegate\Modules\Content_Access\Menu_Visibility;
+use Rolegate\Modules\Content_Access\Post_Editor;
+use Rolegate\Modules\Content_Access\Query_Guard;
+use Rolegate\Modules\Content_Access\Visibility;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
@@ -32,8 +32,8 @@ $rw_ok   = function ( $cond, $label ) use ( &$rw_pass, &$rw_fail ) {
 	}
 };
 
-$base = getenv( 'ROLEWRIGHT_TEST_BASE' ) ? getenv( 'ROLEWRIGHT_TEST_BASE' ) : 'http://wordpress';
-$host = getenv( 'ROLEWRIGHT_TEST_HOST' ) ? getenv( 'ROLEWRIGHT_TEST_HOST' ) : (string) wp_parse_url( home_url(), PHP_URL_HOST ) . ( wp_parse_url( home_url(), PHP_URL_PORT ) ? ':' . wp_parse_url( home_url(), PHP_URL_PORT ) : '' );
+$base = getenv( 'ROLEGATE_TEST_BASE' ) ? getenv( 'ROLEGATE_TEST_BASE' ) : 'http://wordpress';
+$host = getenv( 'ROLEGATE_TEST_HOST' ) ? getenv( 'ROLEGATE_TEST_HOST' ) : (string) wp_parse_url( home_url(), PHP_URL_HOST ) . ( wp_parse_url( home_url(), PHP_URL_PORT ) ? ':' . wp_parse_url( home_url(), PHP_URL_PORT ) : '' );
 
 $sfx    = substr( md5( (string) microtime( true ) ), 0, 6 );
 $role   = 'rw_t_member_' . $sfx;
@@ -239,16 +239,16 @@ foreach ( $actors as $who => $uid ) {
 	$sc = function ( $s ) {
 		return trim( do_shortcode( $s ) );
 	};
-	$rw_ok( ( $right ? 'IN' : '' ) === $sc( '[rolewright_if roles="' . $role . ',nonexistent"]IN[/rolewright_if]' ), "[rolewright_if] for $who" );
-	$rw_ok( ( $uid ? 'LI' : '' ) === $sc( '[rolewright_logged_in]LI[/rolewright_logged_in]' ), "[rolewright_logged_in] for $who" );
-	$rw_ok( ( $uid ? '' : 'LO' ) === $sc( '[rolewright_logged_out]LO[/rolewright_logged_out]' ), "[rolewright_logged_out] for $who" );
-	$form = $sc( '[rolewright_login_form]' );
-	$rw_ok( $uid ? '' === $form : ( false !== strpos( $form, 'wp-login.php' ) && false !== strpos( $form, 'rolewright-login-form' ) ), "[rolewright_login_form] for $who" );
+	$rw_ok( ( $right ? 'IN' : '' ) === $sc( '[rolegate_if roles="' . $role . ',nonexistent"]IN[/rolegate_if]' ), "[rolegate_if] for $who" );
+	$rw_ok( ( $uid ? 'LI' : '' ) === $sc( '[rolegate_logged_in]LI[/rolegate_logged_in]' ), "[rolegate_logged_in] for $who" );
+	$rw_ok( ( $uid ? '' : 'LO' ) === $sc( '[rolegate_logged_out]LO[/rolegate_logged_out]' ), "[rolegate_logged_out] for $who" );
+	$form = $sc( '[rolegate_login_form]' );
+	$rw_ok( $uid ? '' === $form : ( false !== strpos( $form, 'wp-login.php' ) && false !== strpos( $form, 'rolegate-login-form' ) ), "[rolegate_login_form] for $who" );
 
 	$blocks = do_blocks(
-		'<!-- wp:paragraph {"rolewrightMode":"roles","rolewrightRoles":["' . $role . '"]} --><p>BR</p><!-- /wp:paragraph -->' .
-		'<!-- wp:paragraph {"rolewrightMode":"logged_out"} --><p>BO</p><!-- /wp:paragraph -->' .
-		'<!-- wp:paragraph {"rolewrightMode":"logged_in"} --><p>BI</p><!-- /wp:paragraph -->' .
+		'<!-- wp:paragraph {"rolegateMode":"roles","rolegateRoles":["' . $role . '"]} --><p>BR</p><!-- /wp:paragraph -->' .
+		'<!-- wp:paragraph {"rolegateMode":"logged_out"} --><p>BO</p><!-- /wp:paragraph -->' .
+		'<!-- wp:paragraph {"rolegateMode":"logged_in"} --><p>BI</p><!-- /wp:paragraph -->' .
 		'<!-- wp:paragraph --><p>BA</p><!-- /wp:paragraph -->'
 	);
 	$rw_ok( $right === ( false !== strpos( $blocks, 'BR' ) ), "block visibility by role for $who" );
@@ -257,7 +257,7 @@ foreach ( $actors as $who => $uid ) {
 	$rw_ok( false !== strpos( $blocks, 'BA' ), "block without rule always shown for $who" );
 
 	$widget = new WP_Widget_Text();
-	$shown  = apply_filters( 'widget_display_callback', array( 'rolewright_mode' => 'roles', 'rolewright_roles' => array( $role ) ), $widget, array() );
+	$shown  = apply_filters( 'widget_display_callback', array( 'rolegate_mode' => 'roles', 'rolegate_roles' => array( $role ) ), $widget, array() );
 	$rw_ok( $right === is_array( $shown ), "classic widget visibility by role for $who" );
 	$shown = apply_filters( 'widget_display_callback', array( 'title' => 'x' ), $widget, array() );
 	$rw_ok( is_array( $shown ), "classic widget without rule shown for $who" );
@@ -288,7 +288,7 @@ $rw_ok( false === strpos( $head, $secret ) && false === strpos( $head, 'og:title
 // Block renderer preview and saved visibility attributes.
 $p_edp = wp_insert_post( array( 'post_title' => 'editor own', 'post_status' => 'draft', 'post_author' => $u_editor ) );
 $p_aup = wp_insert_post( array( 'post_title' => 'author own', 'post_status' => 'draft', 'post_author' => $u_author ) );
-$pat   = wp_insert_post( array( 'post_type' => 'wp_block', 'post_title' => 'pattern ' . $sfx, 'post_status' => 'publish', 'post_content' => '<!-- wp:paragraph {"rolewrightMode":"roles","rolewrightRoles":["administrator"]} --><p>PATTERNSECRET</p><!-- /wp:paragraph -->' ) );
+$pat   = wp_insert_post( array( 'post_type' => 'wp_block', 'post_title' => 'pattern ' . $sfx, 'post_status' => 'publish', 'post_content' => '<!-- wp:paragraph {"rolegateMode":"roles","rolegateRoles":["administrator"]} --><p>PATTERNSECRET</p><!-- /wp:paragraph -->' ) );
 array_push( $posts, $p_edp, $p_aup, $pat );
 $render = function ( $name, $post_id, $attrs ) {
 	$r = new WP_REST_Request( 'GET', '/wp/v2/block-renderer/' . $name );
@@ -296,7 +296,7 @@ $render = function ( $name, $post_id, $attrs ) {
 	$res = rest_do_request( $r );
 	return array( $res->get_status(), wp_json_encode( $res->get_data() ) );
 };
-$hide = array( 'rolewrightMode' => 'roles', 'rolewrightRoles' => array( 'administrator' ) );
+$hide = array( 'rolegateMode' => 'roles', 'rolegateRoles' => array( 'administrator' ) );
 wp_set_current_user( $u_editor );
 list( $code, $json ) = $render( 'rwtest/secret', $p_edp, $hide );
 $rw_ok( 200 === $code && false !== strpos( $json, 'SECRETBLOCK' ), 'editor preview shows the block being edited despite its role rule (got ' . $code . ')' );
@@ -306,30 +306,30 @@ $rw_ok( method_exists( Visibility::class, 'preview_active' ) && ! Visibility::pr
 wp_set_current_user( $u_author );
 list( $code, $json ) = $render( 'rwtest/secret', $p_edp, $hide );
 $rw_ok( 200 !== $code && false === strpos( $json, 'SECRETBLOCK' ), 'author cannot render hidden block content for a post they cannot edit (got ' . $code . ')' );
-$sticky = do_blocks( '<!-- wp:paragraph {"rolewrightMode":"roles","rolewrightRoles":["administrator"]} --><p>STICKY</p><!-- /wp:paragraph -->' );
+$sticky = do_blocks( '<!-- wp:paragraph {"rolegateMode":"roles","rolegateRoles":["administrator"]} --><p>STICKY</p><!-- /wp:paragraph -->' );
 $rw_ok( false === strpos( $sticky, 'STICKY' ), 'block filtering applies again after a block-renderer request' );
 list( $code, $json ) = $render( 'rwtest/secret', $p_aup, $hide );
 $rw_ok( 200 === $code && false !== strpos( $json, 'SECRETBLOCK' ), 'author preview of a block in their own post still works (got ' . $code . ')' );
 
-$hidden_block = '<!-- wp:paragraph {"rolewrightMode":"roles","rolewrightRoles":["administrator"]} --><p>KEEP</p><!-- /wp:paragraph -->';
+$hidden_block = '<!-- wp:paragraph {"rolegateMode":"roles","rolegateRoles":["administrator"]} --><p>KEEP</p><!-- /wp:paragraph -->';
 wp_set_current_user( $u_editor );
 $sp = wp_insert_post( array( 'post_title' => 'attr save', 'post_status' => 'draft', 'post_content' => $hidden_block ) );
 $posts[] = $sp;
-$rw_ok( false === strpos( get_post( $sp )->post_content, 'rolewrightMode' ) && false !== strpos( get_post( $sp )->post_content, 'KEEP' ), 'visibility attributes stripped when a user without the access capability saves them' );
+$rw_ok( false === strpos( get_post( $sp )->post_content, 'rolegateMode' ) && false !== strpos( get_post( $sp )->post_content, 'KEEP' ), 'visibility attributes stripped when a user without the access capability saves them' );
 $r = new WP_REST_Request( 'POST', '/wp/v2/posts' );
 $r->set_body_params( array( 'title' => 'rest attr', 'status' => 'draft', 'content' => $hidden_block ) );
 $res = rest_do_request( $r );
 $rid = (int) ( $res->get_data()['id'] ?? 0 );
 $posts[] = $rid;
-$rw_ok( $rid && false === strpos( get_post( $rid )->post_content, 'rolewrightMode' ), 'visibility attributes stripped on a REST save by a user without the access capability (status ' . $res->get_status() . ' ' . ( $res->is_error() ? $res->get_data()['code'] : get_post( $rid )->post_content ) . ')' );
+$rw_ok( $rid && false === strpos( get_post( $rid )->post_content, 'rolegateMode' ), 'visibility attributes stripped on a REST save by a user without the access capability (status ' . $res->get_status() . ' ' . ( $res->is_error() ? $res->get_data()['code'] : get_post( $rid )->post_content ) . ')' );
 wp_set_current_user( $admin_id );
 $kp = wp_insert_post( array( 'post_title' => 'attr keep', 'post_status' => 'draft', 'post_author' => $u_editor, 'post_content' => $hidden_block ) );
 $posts[] = $kp;
-$rw_ok( false !== strpos( get_post( $kp )->post_content, 'rolewrightMode' ), 'a user with the access capability can set visibility attributes' );
+$rw_ok( false !== strpos( get_post( $kp )->post_content, 'rolegateMode' ), 'a user with the access capability can set visibility attributes' );
 wp_set_current_user( $u_editor );
-wp_update_post( array( 'ID' => $kp, 'post_content' => '<!-- wp:paragraph --><p>new intro</p><!-- /wp:paragraph -->' . str_replace( 'KEEP', 'KEEP edited', $hidden_block ) . '<!-- wp:paragraph {"rolewrightMode":"logged_in"} --><p>ADDED</p><!-- /wp:paragraph -->' ) );
+wp_update_post( array( 'ID' => $kp, 'post_content' => '<!-- wp:paragraph --><p>new intro</p><!-- /wp:paragraph -->' . str_replace( 'KEEP', 'KEEP edited', $hidden_block ) . '<!-- wp:paragraph {"rolegateMode":"logged_in"} --><p>ADDED</p><!-- /wp:paragraph -->' ) );
 $kc = get_post( $kp )->post_content;
-$rw_ok( false !== strpos( $kc, '"rolewrightRoles":["administrator"]} --><p>KEEP edited' ) && false === strpos( $kc, '"logged_in"' ) && false !== strpos( $kc, 'ADDED' ), 'existing visibility attributes preserved, new ones stripped, on an edit by a user without the capability' );
+$rw_ok( false !== strpos( $kc, '"rolegateRoles":["administrator"]} --><p>KEEP edited' ) && false === strpos( $kc, '"logged_in"' ) && false !== strpos( $kc, 'ADDED' ), 'existing visibility attributes preserved, new ones stripped, on an edit by a user without the capability' );
 wp_set_current_user( $admin_id );
 
 wp_set_current_user( $u_editor );
@@ -339,7 +339,7 @@ wp_set_current_user( $admin_id );
 
 $events = array();
 add_action(
-	'rolewright_changed',
+	'rolegate_changed',
 	function ( $type, $data ) use ( &$events ) {
 		$events[] = array( $type, $data );
 	},
@@ -349,27 +349,27 @@ add_action(
 
 $res = rest_do_request( ( function () use ( $p_new, $role ) {
 	$r = new WP_REST_Request( 'POST', '/wp/v2/posts/' . $p_new );
-	$r->set_body_params( array( 'meta' => array( '_rolewright_roles' => array( $role, 'not_a_role' ), '_rolewright_message' => 'Hi <script>alert(1)</script><b>x</b>' ) ) );
+	$r->set_body_params( array( 'meta' => array( '_rolegate_roles' => array( $role, 'not_a_role' ), '_rolegate_message' => 'Hi <script>alert(1)</script><b>x</b>' ) ) );
 	return $r;
 } )() );
 $after_rest = Access::rules( $p_new );
 $rw_ok( 200 === $res->get_status() && array( $role ) === $after_rest['roles'], 'block-editor save (REST meta) stores rules and drops unknown roles (status ' . $res->get_status() . ')' );
 $rw_ok( false === strpos( $after_rest['message'], '<script' ), 'message is stripped of script tags on save' );
-$rw_ok( 1 === count( $events ) && 'access.updated' === $events[0][0] && $p_new === $events[0][1]['target'] && array() === $events[0][1]['before']['roles'] && array( $role ) === $events[0][1]['after']['roles'] && $admin_id === $events[0][1]['actor'], 'rolewright_changed access.updated fired once for the REST save with before and after' );
+$rw_ok( 1 === count( $events ) && 'access.updated' === $events[0][0] && $p_new === $events[0][1]['target'] && array() === $events[0][1]['before']['roles'] && array( $role ) === $events[0][1]['after']['roles'] && $admin_id === $events[0][1]['actor'], 'rolegate_changed access.updated fired once for the REST save with before and after' );
 $rw_ok( false === strpos( Access::notice_html( $p_new ), '<script' ), 'denied notice html is escaped' );
 
 $events = array();
 $_POST  = array(
-	'_rolewright_access_nonce' => wp_create_nonce( Post_Editor::NONCE ),
-	'rolewright_roles'         => array(),
-	'rolewright_message'       => '',
+	'_rolegate_access_nonce' => wp_create_nonce( Post_Editor::NONCE ),
+	'rolegate_roles'         => array(),
+	'rolegate_message'       => '',
 );
 ( new Post_Editor() )->save_meta_box( $p_new, get_post( $p_new ) );
 $_POST = array();
 $rw_ok( ! Access::is_restricted( $p_new ) && 1 === count( $events ) && array( $role ) === $events[0][1]['before']['roles'], 'classic meta box save clears rules and fires access.updated with before' );
 
 $events = array();
-$_POST  = array( 'rolewright_roles' => array( $role ) );
+$_POST  = array( 'rolegate_roles' => array( $role ) );
 ( new Post_Editor() )->save_meta_box( $p_new, get_post( $p_new ) );
 $_POST = array();
 $rw_ok( ! Access::is_restricted( $p_new ) && ! $events, 'classic save without a nonce changes nothing' );
@@ -377,18 +377,18 @@ $rw_ok( ! Access::is_restricted( $p_new ) && ! $events, 'classic save without a 
 wp_set_current_user( $u_editor );
 $res = rest_do_request( ( function () use ( $p_new, $role ) {
 	$r = new WP_REST_Request( 'POST', '/wp/v2/posts/' . $p_new );
-	$r->set_body_params( array( 'meta' => array( '_rolewright_roles' => array( $role ) ) ) );
+	$r->set_body_params( array( 'meta' => array( '_rolegate_roles' => array( $role ) ) ) );
 	return $r;
 } )() );
 $rw_ok( ! Access::is_restricted( $p_new ), 'a user without the access capability cannot set rules over REST (status ' . $res->get_status() . ')' );
-$_POST = array( '_rolewright_access_nonce' => wp_create_nonce( Post_Editor::NONCE ), 'rolewright_roles' => array( $role ), 'rolewright_message' => '' );
+$_POST = array( '_rolegate_access_nonce' => wp_create_nonce( Post_Editor::NONCE ), 'rolegate_roles' => array( $role ), 'rolegate_message' => '' );
 ( new Post_Editor() )->save_meta_box( $p_new, get_post( $p_new ) );
 $_POST = array();
 $rw_ok( ! Access::is_restricted( $p_new ), 'a user without the access capability cannot set rules from the meta box' );
 wp_set_current_user( $admin_id );
 
 $events = array();
-$_POST  = array( 'rolewright_menu' => array( 999001 => array( 'nonce' => 'bad', 'mode' => 'logged_in' ) ) );
+$_POST  = array( 'rolegate_menu' => array( 999001 => array( 'nonce' => 'bad', 'mode' => 'logged_in' ) ) );
 ( new Menu_Visibility() )->save( 1, 999001 );
 $_POST = array();
 $rw_ok( ! $events && '' === (string) get_post_meta( 999001, Menu_Visibility::META_MODE, true ), 'menu item save refuses a bad nonce' );

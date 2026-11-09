@@ -1,7 +1,7 @@
 <?php
-namespace Rolewright\Modules\User_Roles;
+namespace Rolegate\Modules\User_Roles;
 
-use Rolewright\Core\Module;
+use Rolegate\Core\Module;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -11,11 +11,11 @@ final class User_Roles_Module extends Module {
 	}
 
 	public function title(): string {
-		return __( 'User roles', 'rolewright' );
+		return __( 'User roles', 'role-gatekeeper' );
 	}
 
 	public function description(): string {
-		return __( 'Several roles per user, per-user capabilities, bulk add and remove role, a Roles column and a filter for users without a role.', 'rolewright' );
+		return __( 'Several roles per user, per-user capabilities, bulk add and remove role, a Roles column and a filter for users without a role.', 'role-gatekeeper' );
 	}
 
 	public function init(): void {

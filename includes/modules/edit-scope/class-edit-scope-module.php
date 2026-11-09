@@ -1,7 +1,7 @@
 <?php
-namespace Rolewright\Modules\Edit_Scope;
+namespace Rolegate\Modules\Edit_Scope;
 
-use Rolewright\Core\Module;
+use Rolegate\Core\Module;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -11,11 +11,11 @@ final class Edit_Scope_Module extends Module {
 	}
 
 	public function title(): string {
-		return __( 'Edit scope', 'rolewright' );
+		return __( 'Edit scope', 'role-gatekeeper' );
 	}
 
 	public function description(): string {
-		return __( 'Limit what a role or user can edit by post ID, author or term, and which terms they can assign.', 'rolewright' );
+		return __( 'Limit what a role or user can edit by post ID, author or term, and which terms they can assign.', 'role-gatekeeper' );
 	}
 
 	public function default_enabled(): bool {
@@ -23,11 +23,11 @@ final class Edit_Scope_Module extends Module {
 	}
 
 	public function init(): void {
-		add_filter( 'rolewright_module_restricts_user', array( __CLASS__, 'restricts_user' ), 10, 3 );
+		add_filter( 'rolegate_module_restricts_user', array( __CLASS__, 'restricts_user' ), 10, 3 );
 		add_action( 'update_option_' . Rules::OPTION, array( Rules::class, 'flush' ) );
 		add_action( 'add_option_' . Rules::OPTION, array( Rules::class, 'flush' ) );
 		( new Scope_Enforcer() )->register();
-		add_filter( 'rolewright_portability_sections', array( Portability_Section::class, 'register' ) );
+		add_filter( 'rolegate_portability_sections', array( Portability_Section::class, 'register' ) );
 		if ( Gravity_Forms::available() ) {
 			( new Gravity_Forms() )->register();
 		}

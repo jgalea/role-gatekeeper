@@ -3,28 +3,28 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
-if ( ! defined( 'ROLEWRIGHT_DIR' ) ) {
-	define( 'ROLEWRIGHT_DIR', plugin_dir_path( __FILE__ ) );
+if ( ! defined( 'ROLEGATE_DIR' ) ) {
+	define( 'ROLEGATE_DIR', plugin_dir_path( __FILE__ ) );
 }
 
-require_once ROLEWRIGHT_DIR . 'includes/modules/audit/uninstall.php';
+require_once ROLEGATE_DIR . 'includes/modules/audit/uninstall.php';
 
 global $wpdb;
 
-$rolewright_patterns = array(
-	$wpdb->esc_like( 'rolewright_' ) . '%',
-	$wpdb->esc_like( '_transient_rolewright_' ) . '%',
-	$wpdb->esc_like( '_transient_timeout_rolewright_' ) . '%',
+$rolegate_patterns = array(
+	$wpdb->esc_like( 'rolegate_' ) . '%',
+	$wpdb->esc_like( '_transient_rolegate_' ) . '%',
+	$wpdb->esc_like( '_transient_timeout_rolegate_' ) . '%',
 );
 
-// Cleans one site: options, post meta and the rolewright_* caps on every role. Written
+// Cleans one site: options, post meta and the rolegate_* caps on every role. Written
 // straight to the tables so a missing table or another plugin's option filter can't stop it.
-$rolewright_clean_site = function () use ( $wpdb, $rolewright_patterns ) {
+$rolegate_clean_site = function () use ( $wpdb, $rolegate_patterns ) {
 	$suppress = $wpdb->suppress_errors( true );
-	foreach ( $rolewright_patterns as $pattern ) {
+	foreach ( $rolegate_patterns as $pattern ) {
 		$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s", $pattern ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 	}
-	$wpdb->query( "DELETE FROM {$wpdb->postmeta} WHERE meta_key LIKE '\\_rolewright\\_%'" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+	$wpdb->query( "DELETE FROM {$wpdb->postmeta} WHERE meta_key LIKE '\\_rolegate\\_%'" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 
 	$key   = $wpdb->get_blog_prefix() . 'user_roles';
 	$raw   = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", $key ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
@@ -36,7 +36,7 @@ $rolewright_clean_site = function () use ( $wpdb, $rolewright_patterns ) {
 				continue;
 			}
 			foreach ( array_keys( $data['capabilities'] ) as $cap ) {
-				if ( 0 === strpos( (string) $cap, 'rolewright_' ) ) {
+				if ( 0 === strpos( (string) $cap, 'rolegate_' ) ) {
 					unset( $roles[ $slug ]['capabilities'][ $cap ] );
 					$changed = true;
 				}
@@ -53,31 +53,31 @@ $rolewright_clean_site = function () use ( $wpdb, $rolewright_patterns ) {
 };
 
 if ( is_multisite() ) {
-	$rolewright_sites = get_sites(
+	$rolegate_sites = get_sites(
 		array(
 			'fields' => 'ids',
 			'number' => 0,
 		)
 	);
-	foreach ( $rolewright_sites as $rolewright_site ) {
-		switch_to_blog( (int) $rolewright_site );
+	foreach ( $rolegate_sites as $rolegate_site ) {
+		switch_to_blog( (int) $rolegate_site );
 		try {
-			$rolewright_clean_site();
+			$rolegate_clean_site();
 		} finally {
 			restore_current_blog();
 		}
 	}
-	foreach ( $rolewright_patterns as $rolewright_pattern ) {
-		$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->sitemeta} WHERE meta_key LIKE %s", $rolewright_pattern ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+	foreach ( $rolegate_patterns as $rolegate_pattern ) {
+		$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->sitemeta} WHERE meta_key LIKE %s", $rolegate_pattern ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 	}
-	unset( $rolewright_sites, $rolewright_site, $rolewright_pattern );
+	unset( $rolegate_sites, $rolegate_site, $rolegate_pattern );
 } else {
-	$rolewright_clean_site();
+	$rolegate_clean_site();
 }
 
-$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->usermeta} WHERE meta_key = %s", 'rolewright_rescue_token' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->usermeta} WHERE meta_key = %s", 'rolegate_rescue_token' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 if ( function_exists( 'wp_cache_flush_group' ) ) {
 	wp_cache_flush_group( 'user_meta' );
 }
 
-wp_clear_scheduled_hook( 'rolewright_audit_prune' );
+wp_clear_scheduled_hook( 'rolegate_audit_prune' );

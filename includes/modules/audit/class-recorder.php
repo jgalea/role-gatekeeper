@@ -1,5 +1,5 @@
 <?php
-namespace Rolewright\Modules\Audit;
+namespace Rolegate\Modules\Audit;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -162,7 +162,7 @@ final class Recorder {
 	private function ip_hash(): string {
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- hashed immediately.
 		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? (string) $_SERVER['REMOTE_ADDR'] : '';
-		$ip = (string) apply_filters( 'rolewright_rescue_client_ip', $ip );
+		$ip = (string) apply_filters( 'rolegate_rescue_client_ip', $ip );
 		return '' === $ip ? '' : hash_hmac( 'sha256', $ip, wp_salt( 'auth' ) );
 	}
 }

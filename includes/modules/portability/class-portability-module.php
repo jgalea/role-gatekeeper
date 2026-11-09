@@ -1,39 +1,39 @@
 <?php
-namespace Rolewright\Modules\Portability;
+namespace Rolegate\Modules\Portability;
 
-use Rolewright\Core\Module;
-use Rolewright\Core\Settings;
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Core\Module;
+use Rolegate\Core\Settings;
+use Rolegate\Modules\Safety\Caps;
 
 defined( 'ABSPATH' ) || exit;
 
 final class Portability_Module extends Module {
-	const SLUG        = 'rolewright-portability';
+	const SLUG        = 'role-gatekeeper-portability';
 	const PENDING_TTL = HOUR_IN_SECONDS;
-	const PENDING_KEY = 'rolewright_import_pending_';
-	const NOTICE_KEY  = 'rolewright_portability_notice_';
+	const PENDING_KEY = 'rolegate_import_pending_';
+	const NOTICE_KEY  = 'rolegate_portability_notice_';
 
 	public function id(): string {
 		return 'portability';
 	}
 
 	public function title(): string {
-		return __( 'Import and export', 'rolewright' );
+		return __( 'Import and export', 'role-gatekeeper' );
 	}
 
 	public function description(): string {
-		return __( 'Export roles to a JSON file and import them on another site, with a preview and confirmation before anything changes.', 'rolewright' );
+		return __( 'Export roles to a JSON file and import them on another site, with a preview and confirmation before anything changes.', 'role-gatekeeper' );
 	}
 
 	public function init(): void {
 		add_action( 'admin_menu', array( $this, 'menu' ) );
-		add_action( 'admin_post_rolewright_portability_export', array( $this, 'handle_export' ) );
-		add_action( 'admin_post_rolewright_portability_preview', array( $this, 'handle_preview' ) );
-		add_action( 'admin_post_rolewright_portability_apply', array( $this, 'handle_apply' ) );
+		add_action( 'admin_post_rolegate_portability_export', array( $this, 'handle_export' ) );
+		add_action( 'admin_post_rolegate_portability_preview', array( $this, 'handle_preview' ) );
+		add_action( 'admin_post_rolegate_portability_apply', array( $this, 'handle_apply' ) );
 	}
 
 	public function menu(): void {
-		add_submenu_page( Settings::MENU_SLUG, __( 'Import and export', 'rolewright' ), __( 'Import and export', 'rolewright' ), Caps::IMPORT, self::SLUG, array( $this, 'render' ) );
+		add_submenu_page( Settings::MENU_SLUG, __( 'Import and export', 'role-gatekeeper' ), __( 'Import and export', 'role-gatekeeper' ), Caps::IMPORT, self::SLUG, array( $this, 'render' ) );
 	}
 
 	private function page_url( array $args = array() ): string {
@@ -41,7 +41,7 @@ final class Portability_Module extends Module {
 	}
 
 	private function deny(): void {
-		wp_die( esc_html__( 'You do not have permission to do that.', 'rolewright' ), '', array( 'response' => 403 ) );
+		wp_die( esc_html__( 'You do not have permission to do that.', 'role-gatekeeper' ), '', array( 'response' => 403 ) );
 	}
 
 	private function notice( string $type, string $message ): void {
@@ -56,18 +56,18 @@ final class Portability_Module extends Module {
 		if ( ! current_user_can( Caps::IMPORT ) ) {
 			$this->deny();
 		}
-		check_admin_referer( 'rolewright_portability_export' );
+		check_admin_referer( 'rolegate_portability_export' );
 		$roles    = isset( $_POST['roles'] ) && is_array( $_POST['roles'] ) ? array_map( 'sanitize_key', wp_unslash( $_POST['roles'] ) ) : array();
 		$sections = isset( $_POST['sections'] ) && is_array( $_POST['sections'] ) ? array_map( 'sanitize_key', wp_unslash( $_POST['sections'] ) ) : array();
 		if ( ! $roles && ! $sections ) {
-			$this->notice( 'error', __( 'Pick at least one role or section to export.', 'rolewright' ) );
+			$this->notice( 'error', __( 'Pick at least one role or section to export.', 'role-gatekeeper' ) );
 			wp_safe_redirect( $this->page_url() );
 			exit;
 		}
 		$json = Exporter::to_json( Exporter::build( $roles, $sections, get_current_user_id() ) );
 		nocache_headers();
 		header( 'Content-Type: application/json; charset=utf-8' );
-		header( 'Content-Disposition: attachment; filename="rolewright-roles-' . gmdate( 'Y-m-d' ) . '.json"' );
+		header( 'Content-Disposition: attachment; filename="role-gatekeeper-roles-' . gmdate( 'Y-m-d' ) . '.json"' );
 		header( 'X-Content-Type-Options: nosniff' );
 		echo $json; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON download, not HTML.
 		exit;
@@ -77,24 +77,24 @@ final class Portability_Module extends Module {
 		if ( ! current_user_can( Caps::IMPORT ) ) {
 			$this->deny();
 		}
-		check_admin_referer( 'rolewright_portability_preview' );
+		check_admin_referer( 'rolegate_portability_preview' );
 		$source = isset( $_POST['source'] ) ? sanitize_key( wp_unslash( $_POST['source'] ) ) : 'file';
 		$mode   = isset( $_POST['mode'] ) && 'merge' === $_POST['mode'] ? 'merge' : 'replace';
 
 		if ( 'file' === $source ) {
 			$json = '';
 			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotValidated,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- uploaded file checked below.
-			$file = isset( $_FILES['rolewright_file'] ) && is_array( $_FILES['rolewright_file'] ) ? $_FILES['rolewright_file'] : null;
+			$file = isset( $_FILES['rolegate_file'] ) && is_array( $_FILES['rolegate_file'] ) ? $_FILES['rolegate_file'] : null;
 			if ( $file && isset( $file['tmp_name'], $file['size'], $file['error'] ) && UPLOAD_ERR_OK === (int) $file['error'] && is_uploaded_file( $file['tmp_name'] ) ) {
 				if ( (int) $file['size'] > Importer::max_bytes() ) {
-					$this->notice( 'error', __( 'The file is larger than the import size limit.', 'rolewright' ) );
+					$this->notice( 'error', __( 'The file is larger than the import size limit.', 'role-gatekeeper' ) );
 					wp_safe_redirect( $this->page_url() );
 					exit;
 				}
 				$json = (string) file_get_contents( $file['tmp_name'], false, null, 0, Importer::max_bytes() + 1 ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- local upload.
-			} elseif ( isset( $_POST['rolewright_json'] ) ) {
+			} elseif ( isset( $_POST['rolegate_json'] ) ) {
 				// JSON is validated field by field in Importer::parse; sanitize_text_field would corrupt it.
-				$json = (string) wp_unslash( $_POST['rolewright_json'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+				$json = (string) wp_unslash( $_POST['rolegate_json'] ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 			}
 			$payload = Importer::parse( $json );
 		} else {
@@ -124,15 +124,15 @@ final class Portability_Module extends Module {
 			$this->deny();
 		}
 		$token = isset( $_POST['token'] ) ? preg_replace( '/[^A-Za-z0-9]/', '', (string) wp_unslash( $_POST['token'] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- reduced to letters and digits by preg_replace.
-		check_admin_referer( 'rolewright_portability_apply_' . $token );
+		check_admin_referer( 'rolegate_portability_apply_' . $token );
 		$pending = '' === $token ? false : get_transient( $this->pending_key( $token ) );
 		if ( ! is_array( $pending ) || ! isset( $pending['payload'] ) ) {
-			$this->notice( 'error', __( 'That import preview has expired. Upload the file again.', 'rolewright' ) );
+			$this->notice( 'error', __( 'That import preview has expired. Upload the file again.', 'role-gatekeeper' ) );
 			wp_safe_redirect( $this->page_url() );
 			exit;
 		}
 		if ( empty( $_POST['reviewed'] ) ) {
-			$this->notice( 'error', __( 'Tick the box to confirm you reviewed the changes.', 'rolewright' ) );
+			$this->notice( 'error', __( 'Tick the box to confirm you reviewed the changes.', 'role-gatekeeper' ) );
 			wp_safe_redirect( $this->page_url( array( 'preview' => $token ) ) );
 			exit;
 		}
@@ -151,7 +151,7 @@ final class Portability_Module extends Module {
 		delete_transient( $this->pending_key( $token ) );
 		$message = sprintf(
 			/* translators: 1: number of roles, 2: backup id */
-			__( 'Imported %1$d role(s). The previous roles were saved as backup %2$s.', 'rolewright' ),
+			__( 'Imported %1$d role(s). The previous roles were saved as backup %2$s.', 'role-gatekeeper' ),
 			count( $result['roles'] ),
 			$result['backup_id']
 		);
@@ -167,7 +167,7 @@ final class Portability_Module extends Module {
 		if ( ! current_user_can( Caps::IMPORT ) ) {
 			$this->deny();
 		}
-		echo '<div class="wrap"><h1>' . esc_html__( 'Import and export', 'rolewright' ) . '</h1>';
+		echo '<div class="wrap"><h1>' . esc_html__( 'Import and export', 'role-gatekeeper' ) . '</h1>';
 		$notice = get_transient( self::NOTICE_KEY . get_current_user_id() );
 		if ( is_array( $notice ) ) {
 			delete_transient( self::NOTICE_KEY . get_current_user_id() );
@@ -182,7 +182,7 @@ final class Portability_Module extends Module {
 				echo '</div>';
 				return;
 			}
-			echo '<div class="notice notice-error"><p>' . esc_html__( 'That import preview has expired. Upload the file again.', 'rolewright' ) . '</p></div>';
+			echo '<div class="notice notice-error"><p>' . esc_html__( 'That import preview has expired. Upload the file again.', 'role-gatekeeper' ) . '</p></div>';
 		}
 		$this->render_export();
 		$this->render_import();
@@ -190,11 +190,11 @@ final class Portability_Module extends Module {
 	}
 
 	private function render_export(): void {
-		echo '<h2>' . esc_html__( 'Export', 'rolewright' ) . '</h2>';
+		echo '<h2>' . esc_html__( 'Export', 'role-gatekeeper' ) . '</h2>';
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
-		echo '<input type="hidden" name="action" value="rolewright_portability_export" />';
-		wp_nonce_field( 'rolewright_portability_export' );
-		echo '<fieldset><legend class="screen-reader-text">' . esc_html__( 'Roles to export', 'rolewright' ) . '</legend>';
+		echo '<input type="hidden" name="action" value="rolegate_portability_export" />';
+		wp_nonce_field( 'rolegate_portability_export' );
+		echo '<fieldset><legend class="screen-reader-text">' . esc_html__( 'Roles to export', 'role-gatekeeper' ) . '</legend>';
 		foreach ( Role_Store::all() as $slug => $def ) {
 			printf(
 				'<label style="display:block"><input type="checkbox" name="roles[]" value="%1$s" checked="checked" /> %2$s <code>%1$s</code></label>',
@@ -213,34 +213,34 @@ final class Portability_Module extends Module {
 				);
 			}
 		}
-		submit_button( __( 'Download JSON file', 'rolewright' ), 'secondary', 'rolewright-export' );
+		submit_button( __( 'Download JSON file', 'role-gatekeeper' ), 'secondary', 'rolegate-export' );
 		echo '</form>';
 	}
 
 	private function render_import(): void {
-		echo '<h2>' . esc_html__( 'Import', 'rolewright' ) . '</h2>';
-		echo '<p>' . esc_html__( 'Nothing changes until you confirm on the next screen. Protected roles and your own role are never overwritten.', 'rolewright' ) . '</p>';
+		echo '<h2>' . esc_html__( 'Import', 'role-gatekeeper' ) . '</h2>';
+		echo '<p>' . esc_html__( 'Nothing changes until you confirm on the next screen. Protected roles and your own role are never overwritten.', 'role-gatekeeper' ) . '</p>';
 		echo '<form method="post" enctype="multipart/form-data" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
-		echo '<input type="hidden" name="action" value="rolewright_portability_preview" />';
-		wp_nonce_field( 'rolewright_portability_preview' );
+		echo '<input type="hidden" name="action" value="rolegate_portability_preview" />';
+		wp_nonce_field( 'rolegate_portability_preview' );
 		echo '<table class="form-table" role="presentation"><tbody>';
-		echo '<tr><th scope="row">' . esc_html__( 'Source', 'rolewright' ) . '</th><td>';
-		echo '<label style="display:block"><input type="radio" name="source" value="file" checked="checked" /> ' . esc_html__( 'A Rolewright JSON file', 'rolewright' ) . '</label>';
+		echo '<tr><th scope="row">' . esc_html__( 'Source', 'role-gatekeeper' ) . '</th><td>';
+		echo '<label style="display:block"><input type="radio" name="source" value="file" checked="checked" /> ' . esc_html__( 'A Role Gatekeeper JSON file', 'role-gatekeeper' ) . '</label>';
 		foreach ( Sources::available() as $id => $label ) {
 			printf( '<label style="display:block"><input type="radio" name="source" value="%1$s" /> %2$s</label>', esc_attr( $id ), esc_html( $label ) );
 		}
 		echo '</td></tr>';
-		echo '<tr><th scope="row"><label for="rolewright-file">' . esc_html__( 'File', 'rolewright' ) . '</label></th><td>';
-		echo '<input type="file" id="rolewright-file" style="width:100%;max-width:30em;min-height:32px;box-sizing:border-box" name="rolewright_file" accept=".json,application/json" />';
+		echo '<tr><th scope="row"><label for="rolegate-file">' . esc_html__( 'File', 'role-gatekeeper' ) . '</label></th><td>';
+		echo '<input type="file" id="rolegate-file" style="width:100%;max-width:30em;min-height:32px;box-sizing:border-box" name="rolegate_file" accept=".json,application/json" />';
 		/* translators: %s: size limit */
-		echo '<p class="description">' . esc_html( sprintf( __( 'Up to %s.', 'rolewright' ), size_format( Importer::max_bytes() ) ) ) . '</p>';
-		echo '<p><label for="rolewright-json">' . esc_html__( 'Or paste the JSON:', 'rolewright' ) . '</label><br /><textarea id="rolewright-json" name="rolewright_json" rows="6" class="large-text code"></textarea></p>';
+		echo '<p class="description">' . esc_html( sprintf( __( 'Up to %s.', 'role-gatekeeper' ), size_format( Importer::max_bytes() ) ) ) . '</p>';
+		echo '<p><label for="rolegate-json">' . esc_html__( 'Or paste the JSON:', 'role-gatekeeper' ) . '</label><br /><textarea id="rolegate-json" name="rolegate_json" rows="6" class="large-text code"></textarea></p>';
 		echo '</td></tr>';
-		echo '<tr><th scope="row">' . esc_html__( 'Existing roles', 'rolewright' ) . '</th><td>';
-		echo '<label style="display:block"><input type="radio" name="mode" value="replace" checked="checked" /> ' . esc_html__( 'Replace their capabilities with the ones in the file', 'rolewright' ) . '</label>';
-		echo '<label style="display:block"><input type="radio" name="mode" value="merge" /> ' . esc_html__( 'Only add capabilities, keep the rest', 'rolewright' ) . '</label>';
+		echo '<tr><th scope="row">' . esc_html__( 'Existing roles', 'role-gatekeeper' ) . '</th><td>';
+		echo '<label style="display:block"><input type="radio" name="mode" value="replace" checked="checked" /> ' . esc_html__( 'Replace their capabilities with the ones in the file', 'role-gatekeeper' ) . '</label>';
+		echo '<label style="display:block"><input type="radio" name="mode" value="merge" /> ' . esc_html__( 'Only add capabilities, keep the rest', 'role-gatekeeper' ) . '</label>';
 		echo '</td></tr></tbody></table>';
-		submit_button( __( 'Preview import', 'rolewright' ), 'primary', 'rolewright-preview' );
+		submit_button( __( 'Preview import', 'role-gatekeeper' ), 'primary', 'rolegate-preview' );
 		echo '</form>';
 	}
 
@@ -262,15 +262,15 @@ final class Portability_Module extends Module {
 	private function render_preview( string $token, array $pending ): void {
 		$plan    = Importer::plan( $pending['payload'], get_current_user_id(), $pending['mode'] );
 		$actions = array(
-			'create'    => __( 'Create', 'rolewright' ),
-			'overwrite' => __( 'Overwrite', 'rolewright' ),
-			'unchanged' => __( 'No change', 'rolewright' ),
+			'create'    => __( 'Create', 'role-gatekeeper' ),
+			'overwrite' => __( 'Overwrite', 'role-gatekeeper' ),
+			'unchanged' => __( 'No change', 'role-gatekeeper' ),
 		);
-		echo '<h2>' . esc_html__( 'Review the import', 'rolewright' ) . '</h2>';
-		echo '<p>' . esc_html( 'merge' === $pending['mode'] ? __( 'Mode: only add capabilities to existing roles.', 'rolewright' ) : __( 'Mode: replace the capabilities of existing roles.', 'rolewright' ) ) . '</p>';
+		echo '<h2>' . esc_html__( 'Review the import', 'role-gatekeeper' ) . '</h2>';
+		echo '<p>' . esc_html( 'merge' === $pending['mode'] ? __( 'Mode: only add capabilities to existing roles.', 'role-gatekeeper' ) : __( 'Mode: replace the capabilities of existing roles.', 'role-gatekeeper' ) ) . '</p>';
 
 		if ( $plan['rejected'] ) {
-			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'These entries were skipped:', 'rolewright' ) . '</p><ul>';
+			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'These entries were skipped:', 'role-gatekeeper' ) . '</p><ul>';
 			foreach ( $plan['rejected'] as $line ) {
 				echo '<li>' . esc_html( $line ) . '</li>';
 			}
@@ -278,17 +278,17 @@ final class Portability_Module extends Module {
 		}
 
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
-		echo '<input type="hidden" name="action" value="rolewright_portability_apply" />';
+		echo '<input type="hidden" name="action" value="rolegate_portability_apply" />';
 		echo '<input type="hidden" name="token" value="' . esc_attr( $token ) . '" />';
-		wp_nonce_field( 'rolewright_portability_apply_' . $token );
+		wp_nonce_field( 'rolegate_portability_apply_' . $token );
 
 		echo '<div class="rw-scroll" style="overflow-x:auto"><table class="widefat striped"><thead><tr>';
-		foreach ( array( __( 'Import', 'rolewright' ), __( 'Role', 'rolewright' ), __( 'Action', 'rolewright' ), __( 'Added', 'rolewright' ), __( 'Removed', 'rolewright' ), __( 'New custom capabilities', 'rolewright' ), __( 'Critical capabilities', 'rolewright' ) ) as $head ) {
+		foreach ( array( __( 'Import', 'role-gatekeeper' ), __( 'Role', 'role-gatekeeper' ), __( 'Action', 'role-gatekeeper' ), __( 'Added', 'role-gatekeeper' ), __( 'Removed', 'role-gatekeeper' ), __( 'New custom capabilities', 'role-gatekeeper' ), __( 'Critical capabilities', 'role-gatekeeper' ) ) as $head ) {
 			echo '<th scope="col">' . esc_html( $head ) . '</th>';
 		}
 		echo '</tr></thead><tbody>';
 		if ( ! $plan['roles'] ) {
-			echo '<tr><td colspan="7">' . esc_html__( 'The file holds no valid roles.', 'rolewright' ) . '</td></tr>';
+			echo '<tr><td colspan="7">' . esc_html__( 'The file holds no valid roles.', 'role-gatekeeper' ) . '</td></tr>';
 		}
 		foreach ( $plan['roles'] as $slug => $row ) {
 			$can = ! $row['blocked'] && 'unchanged' !== $row['action'];
@@ -310,7 +310,7 @@ final class Portability_Module extends Module {
 					printf(
 						'<br /><label><input type="checkbox" name="confirm_critical[]" value="%1$s" /> %2$s</label>',
 						esc_attr( $slug ),
-						esc_html__( 'Grant these too. Unticked, they are left out.', 'rolewright' )
+						esc_html__( 'Grant these too. Unticked, they are left out.', 'role-gatekeeper' )
 					);
 				}
 			} else {
@@ -331,13 +331,13 @@ final class Portability_Module extends Module {
 				echo '<li>' . esc_html( $line ) . '</li>';
 			}
 			echo '</ul>';
-			printf( '<label><input type="checkbox" name="sections[]" value="%1$s" /> %2$s</label>', esc_attr( $id ), esc_html__( 'Import this section', 'rolewright' ) );
+			printf( '<label><input type="checkbox" name="sections[]" value="%1$s" /> %2$s</label>', esc_attr( $id ), esc_html__( 'Import this section', 'role-gatekeeper' ) );
 		}
 
-		echo '<p><label><input type="checkbox" name="reviewed" value="1" /> ' . esc_html__( 'I reviewed these changes. The current roles are backed up first.', 'rolewright' ) . '</label></p>';
+		echo '<p><label><input type="checkbox" name="reviewed" value="1" /> ' . esc_html__( 'I reviewed these changes. The current roles are backed up first.', 'role-gatekeeper' ) . '</label></p>';
 		echo '<p>';
-		submit_button( __( 'Apply import', 'rolewright' ), 'primary', 'rolewright-apply', false );
-		echo ' <a class="button" href="' . esc_url( $this->page_url() ) . '">' . esc_html__( 'Cancel', 'rolewright' ) . '</a></p>';
+		submit_button( __( 'Apply import', 'role-gatekeeper' ), 'primary', 'rolegate-apply', false );
+		echo ' <a class="button" href="' . esc_url( $this->page_url() ) . '">' . esc_html__( 'Cancel', 'role-gatekeeper' ) . '</a></p>';
 		echo '</form>';
 	}
 }

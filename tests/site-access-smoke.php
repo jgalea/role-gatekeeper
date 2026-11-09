@@ -1,16 +1,16 @@
 <?php
 /**
- * Run: wp eval-file wp-content/plugins/rolewright/tests/site-access-smoke.php
+ * Run: wp eval-file wp-content/plugins/role-gatekeeper/tests/site-access-smoke.php
  */
 
-use Rolewright\Modules\Safety\Caps;
-use Rolewright\Modules\Safety\Enforcer;
-use Rolewright\Modules\Safety\Rescue;
-use Rolewright\Modules\Site_Access\Admin_Gate;
-use Rolewright\Modules\Site_Access\Gate;
-use Rolewright\Modules\Site_Access\Redirects;
-use Rolewright\Modules\Site_Access\Site_Access_Module;
-use Rolewright\Modules\Site_Access\Site_Access_Settings;
+use Rolegate\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Enforcer;
+use Rolegate\Modules\Safety\Rescue;
+use Rolegate\Modules\Site_Access\Admin_Gate;
+use Rolegate\Modules\Site_Access\Gate;
+use Rolegate\Modules\Site_Access\Redirects;
+use Rolegate\Modules\Site_Access\Site_Access_Module;
+use Rolegate\Modules\Site_Access\Site_Access_Settings;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
@@ -85,7 +85,7 @@ try {
 
 	// Confirmation on enabling.
 	$err = Site_Access_Settings::sanitize( array( 'private_enabled' => '1' ), $defs, 1 );
-	$rw_ok( is_wp_error( $err ) && 'rolewright_confirm' === $err->get_error_code(), 'enabling private mode without confirmation is refused' );
+	$rw_ok( is_wp_error( $err ) && 'rolegate_confirm' === $err->get_error_code(), 'enabling private mode without confirmation is refused' );
 	$okc = Site_Access_Settings::sanitize( array( 'private_enabled' => '1', 'confirm_private' => '1' ), $defs, 1 );
 	$rw_ok( is_array( $okc ) && true === $okc['private_enabled'], 'enabling with confirmation is accepted' );
 	$again = Site_Access_Settings::sanitize( array( 'private_enabled' => '1' ), $on + $defs, 1 );
@@ -155,7 +155,7 @@ try {
 	wp_set_current_user( $admin_id );
 	$wp_rest_auth_cookie = true;
 	$res = apply_filters( 'rest_authentication_errors', null );
-	$rw_ok( is_wp_error( $res ) && 'rolewright_private_site' === $res->get_error_code() && 0 === get_current_user_id(), 'REST: valid cookie without a nonce is treated as anonymous and refused' );
+	$rw_ok( is_wp_error( $res ) && 'rolegate_private_site' === $res->get_error_code() && 0 === get_current_user_id(), 'REST: valid cookie without a nonce is treated as anonymous and refused' );
 	wp_set_current_user( $admin_id );
 	$wp_rest_auth_cookie = false;
 	$res = apply_filters( 'rest_authentication_errors', null );
@@ -169,10 +169,10 @@ try {
 	$exempt_rest = function () {
 		return array( '/wp-json/public/v1/ping' );
 	};
-	add_filter( 'rolewright_site_access_exempt_rest_routes', $exempt_rest );
+	add_filter( 'rolegate_site_access_exempt_rest_routes', $exempt_rest );
 	$GLOBALS['wp']->query_vars['rest_route'] = '/public/v1/ping';
 	$rw_ok( null === $gate->on_rest_auth( null ), 'REST: a route exempted by filter stays open' );
-	remove_filter( 'rolewright_site_access_exempt_rest_routes', $exempt_rest );
+	remove_filter( 'rolegate_site_access_exempt_rest_routes', $exempt_rest );
 	unset( $GLOBALS['wp']->query_vars['rest_route'] );
 
 	// Allow-list.
@@ -221,9 +221,9 @@ try {
 	$rw_ok( ! Admin_Gate::is_gated( get_userdata( $sub ), $defs ), 'admin gate: off means nobody is gated' );
 	$mgr = $rw_make( 'rw_sa_mgr', 'subscriber' );
 	get_userdata( $mgr )->add_cap( Caps::MANAGE );
-	// On multisite, unless site admins are granted Rolewright access, only super admins hold its caps, so the per-user grant is void and the user is gated like any other.
-	$rw_ms_locked = is_multisite() && ! apply_filters( 'rolewright_multisite_site_admin_access', false, get_userdata( $mgr ) );
-	$rw_ok( $rw_ms_locked === Admin_Gate::is_gated( get_userdata( $mgr ), $gated ), 'admin gate: a user with Rolewright manage access is never gated (multisite: only once site admins are granted access)' );
+	// On multisite, unless site admins are granted Role Gatekeeper access, only super admins hold its caps, so the per-user grant is void and the user is gated like any other.
+	$rw_ms_locked = is_multisite() && ! apply_filters( 'rolegate_multisite_site_admin_access', false, get_userdata( $mgr ) );
+	$rw_ok( $rw_ms_locked === Admin_Gate::is_gated( get_userdata( $mgr ), $gated ), 'admin gate: a user with Role Gatekeeper manage access is never gated (multisite: only once site admins are granted access)' );
 	$rw_ok( home_url( '/' ) === Admin_Gate::target( $gated ), 'admin gate: default target is the home page' );
 	foreach ( array( admin_url( 'index.php' ), wp_login_url(), 'https://evil.example/phish', '//evil.example', home_url( '/wp-admin/profile.php' ) ) as $bad ) {
 		$tgt = Admin_Gate::target( array_merge( $gated, array( 'admin_redirect' => $bad ) ) );
@@ -237,7 +237,7 @@ try {
 	$e3 = Site_Access_Settings::sanitize( array( 'admin_gate' => '1', 'admin_gate_cap' => 'rw_nobody_has_this' ), $defs, $admin_id );
 	$e4 = Site_Access_Settings::sanitize( array( 'admin_gate' => '1', 'admin_gate_cap' => 'edit_posts' ), $defs, $sub );
 	$rw_ok( is_wp_error( $e1 ) && is_wp_error( $e2 ), 'save: redirect URL into wp-admin or off-site is refused' );
-	$rw_ok( is_wp_error( $e3 ) && 'rolewright_self_lockout' === $e3->get_error_code(), 'save: choosing a capability you lack is refused' );
+	$rw_ok( is_wp_error( $e3 ) && 'rolegate_self_lockout' === $e3->get_error_code(), 'save: choosing a capability you lack is refused' );
 	$rw_ok( is_wp_error( $e4 ), 'save: a user who lacks the chosen capability cannot set it' );
 
 	// Toolbar.
@@ -259,11 +259,11 @@ try {
 	$listen = function ( $type, $data ) use ( &$events ) {
 		$events[] = array( $type, $data );
 	};
-	add_action( 'rolewright_changed', $listen, 10, 2 );
+	add_action( 'rolegate_changed', $listen, 10, 2 );
 	$rw_set( array() );
 	Site_Access_Settings::save( array_merge( $defs, array( 'private_enabled' => true ) ), $admin_id );
-	remove_action( 'rolewright_changed', $listen, 10 );
-	$rw_ok( 1 === count( $events ) && 'access.updated' === $events[0][0] && $admin_id === $events[0][1]['actor'] && false === $events[0][1]['before']['private_enabled'] && true === $events[0][1]['after']['private_enabled'], 'rolewright_changed fires access.updated with actor, before and after' );
+	remove_action( 'rolegate_changed', $listen, 10 );
+	$rw_ok( 1 === count( $events ) && 'access.updated' === $events[0][0] && $admin_id === $events[0][1]['actor'] && false === $events[0][1]['before']['private_enabled'] && true === $events[0][1]['after']['private_enabled'], 'rolegate_changed fires access.updated with actor, before and after' );
 
 	// Locked-out administrator with private mode on: the rescue route stays reachable.
 	$rw_set( array( 'private_enabled' => true, 'admin_gate' => true, 'admin_gate_cap' => 'rw_nobody_has_this' ) );
@@ -277,31 +277,31 @@ try {
 	);
 	clean_user_cache( $admin_id );
 	$adm = get_userdata( $admin_id );
-	$rw_ok( ! $adm->has_cap( Caps::MANAGE ), 'lockout: administrator has lost the Rolewright caps' );
+	$rw_ok( ! $adm->has_cap( Caps::MANAGE ), 'lockout: administrator has lost the Role Gatekeeper caps' );
 	$locked_settings = Site_Access_Settings::get();
 	$rw_ok( Gate::LOGIN === Gate::decide( $rw_req(), $locked_settings ), 'lockout: anonymous visitors still go to the login page' );
-	$rw_ok( Gate::ALLOW === Gate::decide( $rw_req( array( 'script' => 'wp-login.php', 'path' => '/wp-login.php', 'query_keys' => array( 'action' ) ) ), $locked_settings ), 'lockout: wp-login.php?action=rolewright_rescue is reachable' );
+	$rw_ok( Gate::ALLOW === Gate::decide( $rw_req( array( 'script' => 'wp-login.php', 'path' => '/wp-login.php', 'query_keys' => array( 'action' ) ) ), $locked_settings ), 'lockout: wp-login.php?action=rolegate_rescue is reachable' );
 	$rw_ok( ! Admin_Gate::is_gated( $adm, $locked_settings ), 'lockout: the locked-out administrator is not redirected away from wp-admin' );
 	$rw_ok( false !== has_action( 'login_footer' ) && has_action( 'login_form_' . Rescue::ACTION_REQUEST ), 'lockout: rescue hooks are registered' );
 	$ip = '198.51.100.' . wp_rand( 2, 250 );
-	delete_transient( 'rolewright_rl_' . md5( 'ip|' . $ip ) );
-	delete_transient( 'rolewright_rl_' . md5( 'acct|' . $admin_id ) );
-	delete_transient( 'rolewright_rl_' . md5( 'use|' . $ip ) );
+	delete_transient( 'rolegate_rl_' . md5( 'ip|' . $ip ) );
+	delete_transient( 'rolegate_rl_' . md5( 'acct|' . $admin_id ) );
+	delete_transient( 'rolegate_rl_' . md5( 'use|' . $ip ) );
 	$rw_ok( true === Rescue::request( $adm->user_email, $ip ), 'lockout: rescue mail goes out while private mode is on' );
 	$token = ( $rw_mails && preg_match( '/token=([a-f0-9]{64})/', (string) end( $rw_mails )['message'], $m ) ) ? $m[1] : '';
-	$rw_ok( true === Rescue::consume( $admin_id, $token, $ip ), 'lockout: rescue link restores the Rolewright caps' );
+	$rw_ok( true === Rescue::consume( $admin_id, $token, $ip ), 'lockout: rescue link restores the Role Gatekeeper caps' );
 	clean_user_cache( $admin_id );
 	// On multisite the restored role cap is what to check: site admins only use it once they are granted access.
-	$rw_ok( is_multisite() ? get_role( 'administrator' )->has_cap( Caps::MANAGE ) : get_userdata( $admin_id )->has_cap( Caps::MANAGE ), 'lockout: administrator can manage Rolewright again' );
-	delete_transient( 'rolewright_rl_' . md5( 'ip|' . $ip ) );
-	delete_transient( 'rolewright_rl_' . md5( 'use|' . $ip ) );
-	delete_transient( 'rolewright_rl_' . md5( 'acct|' . $admin_id ) );
+	$rw_ok( is_multisite() ? get_role( 'administrator' )->has_cap( Caps::MANAGE ) : get_userdata( $admin_id )->has_cap( Caps::MANAGE ), 'lockout: administrator can manage Role Gatekeeper again' );
+	delete_transient( 'rolegate_rl_' . md5( 'ip|' . $ip ) );
+	delete_transient( 'rolegate_rl_' . md5( 'use|' . $ip ) );
+	delete_transient( 'rolegate_rl_' . md5( 'acct|' . $admin_id ) );
 
 	// Settings page access.
 	wp_set_current_user( $sub );
 	$rw_ok( ! current_user_can( Caps::MANAGE_ACCESS ), 'page: a subscriber lacks the access-management capability' );
 	wp_set_current_user( $admin_id );
-	$rw_ok( ( is_multisite() && ! apply_filters( 'rolewright_multisite_site_admin_access', false, wp_get_current_user() ) ) !== current_user_can( Caps::MANAGE_ACCESS ), 'page: an administrator holds it (multisite: only once site admins are granted access)' );
+	$rw_ok( ( is_multisite() && ! apply_filters( 'rolegate_multisite_site_admin_access', false, wp_get_current_user() ) ) !== current_user_can( Caps::MANAGE_ACCESS ), 'page: an administrator holds it (multisite: only once site admins are granted access)' );
 	wp_set_current_user( 0 );
 } finally {
 	remove_filter( 'pre_wp_mail', $rw_capture_mail, 10 );
@@ -313,7 +313,7 @@ try {
 			require_once ABSPATH . 'wp-admin/includes/user.php';
 			wp_delete_user( $uid );
 		}
-		delete_transient( 'rolewright_rl_' . md5( 'acct|' . $uid ) );
+		delete_transient( 'rolegate_rl_' . md5( 'acct|' . $uid ) );
 	}
 	if ( null === $rw_orig ) {
 		delete_option( Site_Access_Settings::OPTION );

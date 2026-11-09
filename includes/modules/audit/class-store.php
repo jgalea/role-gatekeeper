@@ -1,19 +1,19 @@
 <?php
-namespace Rolewright\Modules\Audit;
+namespace Rolegate\Modules\Audit;
 
 defined( 'ABSPATH' ) || exit;
 
 final class Store {
 	const SCHEMA_VERSION = '1';
-	const OPTION_SCHEMA  = 'rolewright_audit_schema';
-	const CRON_HOOK      = 'rolewright_audit_prune';
+	const OPTION_SCHEMA  = 'rolegate_audit_schema';
+	const CRON_HOOK      = 'rolegate_audit_prune';
 
 	/** @var array<string,bool> Table name => exists, for the current request. */
 	private static $exists = array();
 
 	public static function table(): string {
 		global $wpdb;
-		return $wpdb->prefix . 'rolewright_audit';
+		return $wpdb->prefix . 'rolegate_audit';
 	}
 
 	public static function install(): void {
@@ -58,7 +58,7 @@ final class Store {
 		if ( ! function_exists( 'is_plugin_active_for_network' ) ) {
 			require_once ABSPATH . 'wp-admin/includes/plugin.php';
 		}
-		if ( ! is_plugin_active_for_network( plugin_basename( ROLEWRIGHT_FILE ) ) ) {
+		if ( ! is_plugin_active_for_network( plugin_basename( ROLEGATE_FILE ) ) ) {
 			return;
 		}
 		switch_to_blog( (int) $site->blog_id );

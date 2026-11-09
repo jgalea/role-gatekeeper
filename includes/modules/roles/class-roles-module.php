@@ -1,26 +1,26 @@
 <?php
-namespace Rolewright\Modules\Roles;
+namespace Rolegate\Modules\Roles;
 
-use Rolewright\Core\Module;
-use Rolewright\Core\Settings;
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Core\Module;
+use Rolegate\Core\Settings;
+use Rolegate\Modules\Safety\Caps;
 
 defined( 'ABSPATH' ) || exit;
 
 final class Roles_Module extends Module {
-	const SLUG   = 'rolewright-roles';
-	const ACTION = 'rolewright_roles';
+	const SLUG   = 'role-gatekeeper-roles';
+	const ACTION = 'rolegate_roles';
 
 	public function id(): string {
 		return 'roles';
 	}
 
 	public function title(): string {
-		return __( 'Role manager', 'rolewright' );
+		return __( 'Role manager', 'role-gatekeeper' );
 	}
 
 	public function description(): string {
-		return __( 'Add, rename, clone and delete roles, set the default registration roles, and reset roles to WordPress defaults.', 'rolewright' );
+		return __( 'Add, rename, clone and delete roles, set the default registration roles, and reset roles to WordPress defaults.', 'role-gatekeeper' );
 	}
 
 	public function init(): void {
@@ -34,8 +34,8 @@ final class Roles_Module extends Module {
 	public function menu(): void {
 		add_submenu_page(
 			Settings::MENU_SLUG,
-			__( 'Roles', 'rolewright' ),
-			__( 'Roles', 'rolewright' ),
+			__( 'Roles', 'role-gatekeeper' ),
+			__( 'Roles', 'role-gatekeeper' ),
 			Caps::MANAGE_ROLES,
 			self::SLUG,
 			array( new Role_List(), 'render' )
@@ -48,7 +48,7 @@ final class Roles_Module extends Module {
 
 	public function handle(): void {
 		if ( ! current_user_can( Caps::MANAGE_ROLES ) ) {
-			wp_die( esc_html__( 'You do not have permission to do that.', 'rolewright' ), '', array( 'response' => 403 ) );
+			wp_die( esc_html__( 'You do not have permission to do that.', 'role-gatekeeper' ), '', array( 'response' => 403 ) );
 		}
 		check_admin_referer( self::ACTION );
 
@@ -66,7 +66,7 @@ final class Roles_Module extends Module {
 					$err = $res;
 				} else {
 					/* translators: %s: role name */
-					$msg = sprintf( __( 'Role "%s" added.', 'rolewright' ), $name );
+					$msg = sprintf( __( 'Role "%s" added.', 'role-gatekeeper' ), $name );
 				}
 				break;
 
@@ -76,7 +76,7 @@ final class Roles_Module extends Module {
 					$err = $res;
 				} else {
 					/* translators: %s: role name */
-					$msg = sprintf( __( 'Role "%s" created with the same capabilities.', 'rolewright' ), $name );
+					$msg = sprintf( __( 'Role "%s" created with the same capabilities.', 'role-gatekeeper' ), $name );
 				}
 				break;
 
@@ -85,7 +85,7 @@ final class Roles_Module extends Module {
 				if ( is_wp_error( $res ) ) {
 					$err = $res;
 				} else {
-					$msg = __( 'Role renamed.', 'rolewright' );
+					$msg = __( 'Role renamed.', 'role-gatekeeper' );
 				}
 				break;
 
@@ -94,23 +94,23 @@ final class Roles_Module extends Module {
 				if ( is_wp_error( $res ) ) {
 					$err = $res;
 				} else {
-					$msg = __( 'Role deleted.', 'rolewright' );
+					$msg = __( 'Role deleted.', 'role-gatekeeper' );
 				}
 				break;
 
 			case 'bulk_delete':
 				$roles = isset( $_POST['roles'] ) && is_array( $_POST['roles'] ) ? array_map( 'sanitize_key', wp_unslash( $_POST['roles'] ) ) : array();
 				if ( ! $roles ) {
-					$err = new \WP_Error( 'rolewright_nothing', __( 'Select at least one role.', 'rolewright' ) );
+					$err = new \WP_Error( 'rolegate_nothing', __( 'Select at least one role.', 'role-gatekeeper' ) );
 					break;
 				}
 				$out = Role_Service::delete_unused( $actor, $roles );
 				$msg = $out['deleted']
 					/* translators: %d: number of roles */
-					? sprintf( _n( '%d role deleted.', '%d roles deleted.', count( $out['deleted'] ), 'rolewright' ), count( $out['deleted'] ) )
+					? sprintf( _n( '%d role deleted.', '%d roles deleted.', count( $out['deleted'] ), 'role-gatekeeper' ), count( $out['deleted'] ) )
 					: '';
 				if ( $out['errors'] ) {
-					$err = new \WP_Error( 'rolewright_bulk', implode( ' ', array_values( $out['errors'] ) ) );
+					$err = new \WP_Error( 'rolegate_bulk', implode( ' ', array_values( $out['errors'] ) ) );
 				}
 				break;
 
@@ -120,25 +120,25 @@ final class Roles_Module extends Module {
 				if ( is_wp_error( $res ) ) {
 					$err = $res;
 				} else {
-					$msg = __( 'Default registration roles saved.', 'rolewright' );
+					$msg = __( 'Default registration roles saved.', 'role-gatekeeper' );
 				}
 				break;
 
 			case 'reset':
 				if ( empty( $_POST['confirm_reset'] ) ) {
-					$err = new \WP_Error( 'rolewright_confirm', __( 'Tick the confirmation box to reset the roles.', 'rolewright' ) );
+					$err = new \WP_Error( 'rolegate_confirm', __( 'Tick the confirmation box to reset the roles.', 'role-gatekeeper' ) );
 					break;
 				}
 				$res = Role_Service::reset( $actor );
 				if ( is_wp_error( $res ) ) {
 					$err = $res;
 				} else {
-					$msg = __( 'Core roles are back to WordPress defaults. The previous roles were saved as a backup.', 'rolewright' );
+					$msg = __( 'Core roles are back to WordPress defaults. The previous roles were saved as a backup.', 'role-gatekeeper' );
 				}
 				break;
 
 			default:
-				$err = new \WP_Error( 'rolewright_unknown', __( 'Unknown action.', 'rolewright' ) );
+				$err = new \WP_Error( 'rolegate_unknown', __( 'Unknown action.', 'role-gatekeeper' ) );
 		}
 
 		$notices = array();
@@ -148,7 +148,7 @@ final class Roles_Module extends Module {
 		if ( $err ) {
 			$notices[] = array( 'error', $err->get_error_message() );
 		}
-		set_transient( 'rolewright_roles_notice_' . $actor, $notices, 60 );
+		set_transient( 'rolegate_roles_notice_' . $actor, $notices, 60 );
 		wp_safe_redirect( self::page_url() );
 		exit;
 	}

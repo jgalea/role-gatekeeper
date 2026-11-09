@@ -1,5 +1,5 @@
 <?php
-namespace Rolewright\Modules\Content_Access;
+namespace Rolegate\Modules\Content_Access;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -37,7 +37,7 @@ final class Query_Guard {
 	}
 
 	public static function masked_title(): string {
-		return __( 'Restricted content', 'rolewright' );
+		return __( 'Restricted content', 'role-gatekeeper' );
 	}
 
 	public function guard_oembed_id( $post_id, $url = '' ) {
@@ -129,7 +129,7 @@ final class Query_Guard {
 		if ( $query->is_main_query() && $query->is_singular() ) {
 			return;
 		}
-		if ( ! apply_filters( 'rolewright_exclude_hidden_posts', true, $query ) ) {
+		if ( ! apply_filters( 'rolegate_exclude_hidden_posts', true, $query ) ) {
 			return;
 		}
 		$hidden = Access::hidden_ids();
@@ -192,7 +192,7 @@ final class Query_Guard {
 				continue;
 			}
 			$mask                 = clone $post;
-			$mask->post_title     = __( 'Restricted content', 'rolewright' );
+			$mask->post_title     = __( 'Restricted content', 'role-gatekeeper' );
 			$mask->post_content   = Access::notice_html( (int) $post->ID );
 			$mask->post_excerpt   = '';
 			$mask->comment_status = 'closed';

@@ -1,8 +1,8 @@
 <?php
-namespace Rolewright\Modules\Deny_Hierarchy;
+namespace Rolegate\Modules\Deny_Hierarchy;
 
-use Rolewright\Modules\Safety\Caps;
-use Rolewright\Modules\Safety\Guard;
+use Rolegate\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Guard;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -13,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
  * roles, and doesn't see users of higher roles in the Users list or REST.
  */
 final class Hierarchy {
-	const OPTION       = 'rolewright_role_positions';
+	const OPTION       = 'rolegate_role_positions';
 	const TOP          = 100;
 	const MAX_EDITABLE = 99;
 
@@ -21,8 +21,8 @@ final class Hierarchy {
 	private static $positions = null;
 
 	public static function register(): void {
-		add_filter( 'rolewright_can_assign_role', array( __CLASS__, 'filter_can_assign_role' ), 10, 4 );
-		add_filter( 'rolewright_can_act_on_user', array( __CLASS__, 'filter_can_act_on_user' ), 10, 3 );
+		add_filter( 'rolegate_can_assign_role', array( __CLASS__, 'filter_can_assign_role' ), 10, 4 );
+		add_filter( 'rolegate_can_act_on_user', array( __CLASS__, 'filter_can_act_on_user' ), 10, 3 );
 		add_action( 'pre_get_users', array( __CLASS__, 'hide_users_in_list' ) );
 		add_filter( 'rest_user_query', array( __CLASS__, 'hide_users_in_rest' ), 10, 2 );
 		add_filter( 'views_users', array( __CLASS__, 'filter_user_views' ) );
@@ -59,7 +59,7 @@ final class Hierarchy {
 	/**
 	 * Position for a role with nothing stored: ten times its highest legacy user level, so
 	 * core roles rank Editor 70, Author 20, Contributor 10, Subscriber 0. A role that
-	 * manages users or Rolewright roles ranks at least 90, so turning the module on doesn't
+	 * manages users or Role Gatekeeper roles ranks at least 90, so turning the module on doesn't
 	 * stop an existing manager role from assigning or editing the roles it could before.
 	 */
 	public static function default_position( string $role ): int {
@@ -152,8 +152,8 @@ final class Hierarchy {
 			return true;
 		}
 		return new \WP_Error(
-			'rolewright_role_above_position',
-			__( 'That role is at or above your own position in the role hierarchy.', 'rolewright' ),
+			'rolegate_role_above_position',
+			__( 'That role is at or above your own position in the role hierarchy.', 'role-gatekeeper' ),
 			array( 'status' => 403 )
 		);
 	}
@@ -208,8 +208,8 @@ final class Hierarchy {
 			return true;
 		}
 		return new \WP_Error(
-			'rolewright_role_above_position',
-			__( 'That change would put the role at or above your own position in the role hierarchy.', 'rolewright' ),
+			'rolegate_role_above_position',
+			__( 'That change would put the role at or above your own position in the role hierarchy.', 'role-gatekeeper' ),
 			array( 'status' => 403 )
 		);
 	}
@@ -346,29 +346,29 @@ final class Hierarchy {
 		foreach ( $changes as $role => $pos ) {
 			$role = (string) $role;
 			if ( ! get_role( $role ) ) {
-				return new \WP_Error( 'rolewright_no_role', __( 'That role does not exist.', 'rolewright' ) );
+				return new \WP_Error( 'rolegate_no_role', __( 'That role does not exist.', 'role-gatekeeper' ) );
 			}
 			if ( ! is_numeric( $pos ) || (int) $pos != $pos ) { // phpcs:ignore Universal.Operators.StrictComparisons.LooseNotEqual -- accepts "5" and 5, refuses "5.5".
-				return new \WP_Error( 'rolewright_bad_position', __( 'Positions must be whole numbers.', 'rolewright' ) );
+				return new \WP_Error( 'rolegate_bad_position', __( 'Positions must be whole numbers.', 'role-gatekeeper' ) );
 			}
 			$pos = (int) $pos;
 			if ( 'administrator' === $role ) {
 				if ( self::TOP !== $pos ) {
-					return new \WP_Error( 'rolewright_protected_role', __( 'The Administrator role always sits at the top of the hierarchy.', 'rolewright' ) );
+					return new \WP_Error( 'rolegate_protected_role', __( 'The Administrator role always sits at the top of the hierarchy.', 'role-gatekeeper' ) );
 				}
 				continue;
 			}
 			if ( $pos < 0 || $pos > self::MAX_EDITABLE ) {
 				/* translators: %d: highest allowed position */
-				return new \WP_Error( 'rolewright_bad_position', sprintf( __( 'Positions run from 0 to %d.', 'rolewright' ), self::MAX_EDITABLE ) );
+				return new \WP_Error( 'rolegate_bad_position', sprintf( __( 'Positions run from 0 to %d.', 'role-gatekeeper' ), self::MAX_EDITABLE ) );
 			}
 			if ( self::role_position( $role ) === $pos ) {
 				continue;
 			}
 			if ( ! $top && ( self::role_position( $role ) >= $mine || $pos >= $mine ) ) {
 				return new \WP_Error(
-					'rolewright_role_above_position',
-					__( 'You can only move roles below your own position, and only to positions below it.', 'rolewright' ),
+					'rolegate_role_above_position',
+					__( 'You can only move roles below your own position, and only to positions below it.', 'role-gatekeeper' ),
 					array( 'status' => 403 )
 				);
 			}
@@ -381,7 +381,7 @@ final class Hierarchy {
 		update_option( self::OPTION, $after, true );
 		self::reset_cache();
 		do_action(
-			'rolewright_changed',
+			'rolegate_changed',
 			'access.updated',
 			array(
 				'actor'  => $actor_id,

@@ -1,7 +1,7 @@
 <?php
-namespace Rolewright\Modules\Automation;
+namespace Rolegate\Modules\Automation;
 
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Caps;
 
 defined( 'ABSPATH' ) || exit;
 

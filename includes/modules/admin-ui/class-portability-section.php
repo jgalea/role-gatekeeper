@@ -1,7 +1,7 @@
 <?php
-namespace Rolewright\Modules\Admin_Ui;
+namespace Rolegate\Modules\Admin_Ui;
 
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Caps;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -14,7 +14,7 @@ final class Portability_Section {
 	public static function register( $sections ) {
 		$sections             = is_array( $sections ) ? $sections : array();
 		$sections['admin-ui'] = array(
-			'label'   => __( 'Admin screen restrictions', 'rolewright' ),
+			'label'   => __( 'Admin screen restrictions', 'role-gatekeeper' ),
 			'cap'     => Caps::MANAGE_ACCESS,
 			'export'  => array( __CLASS__, 'export' ),
 			'preview' => array( __CLASS__, 'preview' ),
@@ -44,7 +44,7 @@ final class Portability_Section {
 	 */
 	private static function entries( $data ) {
 		if ( ! is_array( $data ) || ( isset( $data['roles'] ) && ! is_array( $data['roles'] ) ) || ( isset( $data['users'] ) && ! is_array( $data['users'] ) ) ) {
-			return new \WP_Error( 'rolewright_bad_section', __( 'The admin restrictions section is not in the expected format.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_bad_section', __( 'The admin restrictions section is not in the expected format.', 'role-gatekeeper' ) );
 		}
 		$out = array();
 		foreach ( (array) ( $data['roles'] ?? array() ) as $role => $rule ) {
@@ -77,7 +77,7 @@ final class Portability_Section {
 		foreach ( $entries as $entry ) {
 			if ( '' === $entry['target'] ) {
 				/* translators: %s: user login */
-				$lines[] = sprintf( __( 'User %s: no user with that login here, skipped.', 'rolewright' ), $entry['label'] );
+				$lines[] = sprintf( __( 'User %s: no user with that login here, skipped.', 'role-gatekeeper' ), $entry['label'] );
 				continue;
 			}
 			$ok = Rules::validate( Rules::sanitize( $entry['rule'] ) );
@@ -86,9 +86,9 @@ final class Portability_Section {
 			}
 			$lines[] = 'role' === $entry['scope']
 				/* translators: %s: role slug */
-				? sprintf( __( 'Restrictions for role %s', 'rolewright' ), $entry['label'] )
+				? sprintf( __( 'Restrictions for role %s', 'role-gatekeeper' ), $entry['label'] )
 				/* translators: %s: user login */
-				: sprintf( __( 'Restrictions for user %s', 'rolewright' ), $entry['label'] );
+				: sprintf( __( 'Restrictions for user %s', 'role-gatekeeper' ), $entry['label'] );
 		}
 		return $lines;
 	}

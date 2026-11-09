@@ -4,7 +4,7 @@
 	if ( ! form ) {
 		return;
 	}
-	var strings = window.rolewrightCaps || {};
+	var strings = window.rolegateCaps || {};
 	var search = document.getElementById( 'rw-search' );
 	var showDep = document.getElementById( 'rw-show-deprecated' );
 	var boxes = form.querySelectorAll( 'input[name="caps[]"]' );

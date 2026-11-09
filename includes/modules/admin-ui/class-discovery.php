@@ -1,5 +1,5 @@
 <?php
-namespace Rolewright\Modules\Admin_Ui;
+namespace Rolegate\Modules\Admin_Ui;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -8,7 +8,7 @@ defined( 'ABSPATH' ) || exit;
  * Only ids and titles are kept; rules store slugs alone.
  */
 final class Discovery {
-	const OPTION = 'rolewright_admin_ui_seen';
+	const OPTION = 'rolegate_admin_ui_seen';
 
 	/** @var array{menu:array,submenu:array} */
 	private static $snapshot = array(

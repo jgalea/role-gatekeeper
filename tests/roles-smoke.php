@@ -1,20 +1,20 @@
 <?php
 /**
- * Run: wp eval-file wp-content/plugins/rolewright/tests/roles-smoke.php
+ * Run: wp eval-file wp-content/plugins/role-gatekeeper/tests/roles-smoke.php
  */
 
-use Rolewright\Modules\Roles\Role_List;
-use Rolewright\Modules\Roles\Role_Service;
-use Rolewright\Modules\Roles\Role_Store;
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Modules\Roles\Role_List;
+use Rolegate\Modules\Roles\Role_Service;
+use Rolegate\Modules\Roles\Role_Store;
+use Rolegate\Modules\Safety\Caps;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
 }
 
-// Multisite: site administrators hold rolewright_* caps only when the network grants it; these checks are about role-based access, so grant it.
+// Multisite: site administrators hold rolegate_* caps only when the network grants it; these checks are about role-based access, so grant it.
 if ( is_multisite() ) {
-	add_filter( 'rolewright_multisite_site_admin_access', '__return_true', 20 );
+	add_filter( 'rolegate_multisite_site_admin_access', '__return_true', 20 );
 }
 
 require_once ABSPATH . 'wp-admin/includes/user.php';
@@ -34,7 +34,7 @@ $rw_ok   = function ( $cond, $label ) use ( &$rw_pass, &$rw_fail ) {
 
 $rw_events = array();
 add_action(
-	'rolewright_changed',
+	'rolegate_changed',
 	function ( $type, $data ) use ( &$rw_events ) {
 		$rw_events[] = array( $type, $data );
 	},
@@ -143,7 +143,7 @@ $backups_before   = count( Role_Service::backups() );
 $res              = Role_Service::reset( $rw_admin );
 $rw_ok( true === $res, 'reset: ok' );
 $rw_ok( ! get_role( 'editor' )->has_cap( 'rw_plugin_added_' . $rw_suffix ), 'reset: plugin-added cap removed from editor' );
-$rw_ok( get_role( 'administrator' )->has_cap( Caps::MANAGE_ROLES ) && get_role( 'administrator' )->has_cap( 'manage_options' ), 'reset: administrator keeps core and Rolewright caps' );
+$rw_ok( get_role( 'administrator' )->has_cap( Caps::MANAGE_ROLES ) && get_role( 'administrator' )->has_cap( 'manage_options' ), 'reset: administrator keeps core and Role Gatekeeper caps' );
 $rw_ok( get_role( 'editor' )->has_cap( 'edit_others_posts' ) && ! get_role( 'subscriber' )->has_cap( 'edit_posts' ), 'reset: core roles match WordPress defaults' );
 $rw_ok( get_role( $rw_src ) && Role_Store::caps( $rw_src ) === $rw_custom_before, 'reset: custom roles are kept' );
 $bk = Role_Service::backups();
@@ -179,25 +179,25 @@ get_role( 'editor' )->add_cap( Caps::MANAGE_ROLES );
 get_role( 'editor' )->remove_cap( 'moderate_comments' );
 wp_set_current_user( $core_mgr );
 $res = Role_Service::reset( $core_mgr );
-$rw_ok( is_wp_error( $res ) && 'rolewright_role_above_actor' === $res->get_error_code(), 'reset: delegated manager without critical caps refused (' . ( is_wp_error( $res ) ? $res->get_error_code() : 'ok' ) . ')' );
+$rw_ok( is_wp_error( $res ) && 'rolegate_role_above_actor' === $res->get_error_code(), 'reset: delegated manager without critical caps refused (' . ( is_wp_error( $res ) ? $res->get_error_code() : 'ok' ) . ')' );
 $rw_ok( get_role( 'editor' )->has_cap( Caps::MANAGE_ROLES ) && ! get_role( 'editor' )->has_cap( 'moderate_comments' ), 'reset: refused reset changed no role' );
 $rw_ok( count( Role_Service::backups() ) === $bk_n, 'reset: refused reset leaves no stray backup' );
 
 // An actor who holds everything only through a core role would be locked out: refused before writing.
 wp_set_current_user( $rw_admin );
 $rw_ed_saved = Role_Store::caps( 'editor' );
-\Rolewright\Modules\Safety\Enforcer::as_system(
+\Rolegate\Modules\Safety\Enforcer::as_system(
 	function () {
 		Role_Store::set_caps( 'editor', Role_Store::caps( 'administrator' ) );
 	}
 );
 wp_set_current_user( $core_mgr );
 $res = Role_Service::reset( $core_mgr );
-$rw_ok( is_wp_error( $res ) && in_array( $res->get_error_code(), \Rolewright\Core\Plugin::is_enabled( 'deny-hierarchy' ) ? array( 'rolewright_lockout', 'rolewright_role_above_position' ) : array( 'rolewright_lockout' ), true ), 'reset: refused when the actor would lose access (' . ( is_wp_error( $res ) ? $res->get_error_code() : 'ok' ) . ')' );
+$rw_ok( is_wp_error( $res ) && in_array( $res->get_error_code(), \Rolegate\Core\Plugin::is_enabled( 'deny-hierarchy' ) ? array( 'rolegate_lockout', 'rolegate_role_above_position' ) : array( 'rolegate_lockout' ), true ), 'reset: refused when the actor would lose access (' . ( is_wp_error( $res ) ? $res->get_error_code() : 'ok' ) . ')' );
 $rw_ok( get_role( 'editor' )->has_cap( 'manage_options' ) && get_role( 'editor' )->has_cap( Caps::MANAGE_ROLES ), 'reset: roles unchanged after the lockout refusal' );
 $rw_ok( count( Role_Service::backups() ) === $bk_n, 'reset: lockout refusal leaves no stray backup' );
 wp_set_current_user( $rw_admin );
-\Rolewright\Modules\Safety\Enforcer::as_system(
+\Rolegate\Modules\Safety\Enforcer::as_system(
 	function () use ( $rw_ed_saved ) {
 		Role_Store::set_caps( 'editor', $rw_ed_saved );
 	}

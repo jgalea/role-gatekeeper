@@ -1,7 +1,7 @@
 <?php
-namespace Rolewright\Modules\Edit_Scope;
+namespace Rolegate\Modules\Edit_Scope;
 
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Caps;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -15,7 +15,7 @@ final class Portability_Section {
 	public static function register( $sections ) {
 		$sections               = is_array( $sections ) ? $sections : array();
 		$sections['edit-scope'] = array(
-			'label'   => __( 'Edit scope rules', 'rolewright' ),
+			'label'   => __( 'Edit scope rules', 'role-gatekeeper' ),
 			'cap'     => Caps::MANAGE_ACCESS,
 			'export'  => array( __CLASS__, 'export' ),
 			'preview' => array( __CLASS__, 'preview' ),
@@ -49,7 +49,7 @@ final class Portability_Section {
 	 */
 	private static function parse( $data ) {
 		if ( ! is_array( $data ) || ! isset( $data['rules'] ) || ! is_array( $data['rules'] ) ) {
-			return new \WP_Error( 'rolewright_bad_section', __( 'The edit scope section is not in the expected format.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_bad_section', __( 'The edit scope section is not in the expected format.', 'role-gatekeeper' ) );
 		}
 		$out = array(
 			'rules'         => array(),
@@ -58,7 +58,7 @@ final class Portability_Section {
 		);
 		foreach ( $data['rules'] as $rule ) {
 			if ( ! is_array( $rule ) ) {
-				return new \WP_Error( 'rolewright_bad_section', __( 'The edit scope section is not in the expected format.', 'rolewright' ) );
+				return new \WP_Error( 'rolegate_bad_section', __( 'The edit scope section is not in the expected format.', 'role-gatekeeper' ) );
 			}
 			if ( 'user' === ( $rule['subject_type'] ?? '' ) ) {
 				$user = get_user_by( 'login', (string) ( $rule['subject'] ?? '' ) );
@@ -81,11 +81,11 @@ final class Portability_Section {
 		}
 		$lines = array(
 			/* translators: 1: number of rules in the file, 2: number of rules on this site */
-			sprintf( __( '%1$d rules replace the %2$d rules on this site.', 'rolewright' ), count( $parsed['rules'] ), count( Rules::all() ) ),
+			sprintf( __( '%1$d rules replace the %2$d rules on this site.', 'role-gatekeeper' ), count( $parsed['rules'] ), count( Rules::all() ) ),
 		);
 		foreach ( $parsed['skipped'] as $login ) {
 			/* translators: %s: user login */
-			$lines[] = sprintf( __( 'Rule for user %s: no user with that login here, skipped.', 'rolewright' ), $login );
+			$lines[] = sprintf( __( 'Rule for user %s: no user with that login here, skipped.', 'role-gatekeeper' ), $login );
 		}
 		return $lines;
 	}
@@ -93,7 +93,7 @@ final class Portability_Section {
 	/** @return array|\WP_Error the previous rules and settings */
 	public static function import( $data, int $actor ) {
 		if ( ! user_can( $actor, Caps::MANAGE_ACCESS ) ) {
-			return new \WP_Error( 'rolewright_forbidden', __( 'You do not have permission to change access rules.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_forbidden', __( 'You do not have permission to change access rules.', 'role-gatekeeper' ) );
 		}
 		$parsed = self::parse( $data );
 		if ( is_wp_error( $parsed ) ) {

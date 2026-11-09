@@ -1,8 +1,8 @@
 <?php
-namespace Rolewright\Modules\User_Roles;
+namespace Rolegate\Modules\User_Roles;
 
-use Rolewright\Modules\Safety\Caps;
-use Rolewright\Modules\Safety\Guard;
+use Rolegate\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Guard;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -31,8 +31,8 @@ final class Profile {
 
 	private static function posted_nonce_ok( int $target ): bool {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput -- verified on the next line.
-		$nonce = isset( $_POST['rolewright_user_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['rolewright_user_nonce'] ) ) : '';
-		return (bool) wp_verify_nonce( $nonce, 'rolewright_user_' . $target );
+		$nonce = isset( $_POST['rolegate_user_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['rolegate_user_nonce'] ) ) : '';
+		return (bool) wp_verify_nonce( $nonce, 'rolegate_user_' . $target );
 	}
 
 	/**
@@ -55,7 +55,7 @@ final class Profile {
 		if ( ! $can_roles && ! $can_caps ) {
 			return;
 		}
-		wp_nonce_field( 'rolewright_user_' . $user->ID, 'rolewright_user_nonce' );
+		wp_nonce_field( 'rolegate_user_' . $user->ID, 'rolegate_user_nonce' );
 
 		if ( $can_roles ) {
 			$held       = Users::raw_roles( $user->ID );
@@ -63,15 +63,15 @@ final class Profile {
 			$assignable = Users::assignable_roles( $actor, $user->ID );
 			$names      = wp_roles()->role_names;
 			$locked     = array_diff( $held, $assignable );
-			echo '<h2>' . esc_html__( 'Additional roles', 'rolewright' ) . '</h2>';
-			echo '<input type="hidden" name="rolewright_user_roles_present" value="1" />';
-			echo '<table class="form-table" role="presentation"><tr><th scope="row">' . esc_html__( 'Roles', 'rolewright' ) . '</th><td>';
+			echo '<h2>' . esc_html__( 'Additional roles', 'role-gatekeeper' ) . '</h2>';
+			echo '<input type="hidden" name="rolegate_user_roles_present" value="1" />';
+			echo '<table class="form-table" role="presentation"><tr><th scope="row">' . esc_html__( 'Roles', 'role-gatekeeper' ) . '</th><td>';
 			foreach ( $assignable as $role ) {
 				if ( $role === $primary ) {
 					continue;
 				}
 				printf(
-					'<label style="display:block;padding:6px 0"><input type="checkbox" name="rolewright_user_roles[]" value="%1$s" %2$s /> %3$s</label>',
+					'<label style="display:block;padding:6px 0"><input type="checkbox" name="rolegate_user_roles[]" value="%1$s" %2$s /> %3$s</label>',
 					esc_attr( $role ),
 					checked( in_array( $role, $held, true ), true, false ),
 					esc_html( translate_user_role( $names[ $role ] ?? $role ) )
@@ -81,7 +81,7 @@ final class Profile {
 				echo '<p class="description">' . esc_html(
 					sprintf(
 						/* translators: %s: role names */
-						__( 'Also holds, and you can\'t change: %s', 'rolewright' ),
+						__( 'Also holds, and you can\'t change: %s', 'role-gatekeeper' ),
 						implode(
 							', ',
 							array_map(
@@ -94,7 +94,7 @@ final class Profile {
 					)
 				) . '</p>';
 			}
-			echo '<p class="description">' . esc_html__( 'The role chosen under Role above stays the primary role. Tick the roles this user should hold as well.', 'rolewright' ) . '</p>';
+			echo '<p class="description">' . esc_html__( 'The role chosen under Role above stays the primary role. Tick the roles this user should hold as well.', 'role-gatekeeper' ) . '</p>';
 			echo '</td></tr></table>';
 		}
 
@@ -119,26 +119,26 @@ final class Profile {
 		$from_roles = Guard::caps_from_roles( Users::raw_roles( $user->ID ), $roles_caps );
 		ksort( $all );
 
-		echo '<h2>' . esc_html__( 'Capabilities granted to this user', 'rolewright' ) . '</h2>';
-		echo '<input type="hidden" name="rolewright_user_caps_present" value="1" />';
-		echo '<table class="form-table" role="presentation"><tr><th scope="row">' . esc_html__( 'Capabilities', 'rolewright' ) . '</th><td>';
+		echo '<h2>' . esc_html__( 'Capabilities granted to this user', 'role-gatekeeper' ) . '</h2>';
+		echo '<input type="hidden" name="rolegate_user_caps_present" value="1" />';
+		echo '<table class="form-table" role="presentation"><tr><th scope="row">' . esc_html__( 'Capabilities', 'role-gatekeeper' ) . '</th><td>';
 		echo '<div style="max-height:280px;overflow:auto;border:1px solid #c3c4c7;padding:8px;columns:3 220px">';
 		foreach ( array_keys( $all ) as $cap ) {
 			$is_direct = isset( $direct[ $cap ] );
 			$grantable = $is_direct || Guard::can_grant_cap( $actor, $cap );
 			printf(
-				'<label style="display:block;break-inside:avoid;padding:6px 0"><input type="checkbox" name="rolewright_user_caps[]" value="%1$s" %2$s %3$s /> %4$s%5$s</label>',
+				'<label style="display:block;break-inside:avoid;padding:6px 0"><input type="checkbox" name="rolegate_user_caps[]" value="%1$s" %2$s %3$s /> %4$s%5$s</label>',
 				esc_attr( $cap ),
 				checked( $is_direct, true, false ),
 				disabled( ! $grantable || ( $is_direct && ! Guard::can_grant_cap( $actor, $cap ) ), true, false ),
 				esc_html( $cap ),
-				! empty( $from_roles[ $cap ] ) ? ' <span class="description">' . esc_html__( '(from role)', 'rolewright' ) . '</span>' : ''
+				! empty( $from_roles[ $cap ] ) ? ' <span class="description">' . esc_html__( '(from role)', 'role-gatekeeper' ) . '</span>' : ''
 			);
 		}
 		echo '</div>';
-		echo '<p><label for="rolewright_user_cap_new">' . esc_html__( 'Add capabilities not listed', 'rolewright' ) . '</label><br />';
-		echo '<input type="text" class="regular-text" id="rolewright_user_cap_new" name="rolewright_user_cap_new" value="" /></p>';
-		echo '<p class="description">' . esc_html__( 'Separate names with spaces or commas. You can only grant capabilities you hold yourself, unless you can manage capabilities.', 'rolewright' ) . '</p>';
+		echo '<p><label for="rolegate_user_cap_new">' . esc_html__( 'Add capabilities not listed', 'role-gatekeeper' ) . '</label><br />';
+		echo '<input type="text" class="regular-text" id="rolegate_user_cap_new" name="rolegate_user_cap_new" value="" /></p>';
+		echo '<p class="description">' . esc_html__( 'Separate names with spaces or commas. You can only grant capabilities you hold yourself, unless you can manage capabilities.', 'role-gatekeeper' ) . '</p>';
 		echo '</td></tr></table>';
 	}
 
@@ -152,12 +152,12 @@ final class Profile {
 			return;
 		}
 		$names = wp_roles()->role_names;
-		wp_nonce_field( 'rolewright_user_0', 'rolewright_user_nonce' );
-		echo '<input type="hidden" name="rolewright_user_roles_present" value="1" />';
-		echo '<table class="form-table" role="presentation"><tr><th scope="row">' . esc_html__( 'Additional roles', 'rolewright' ) . '</th><td>';
+		wp_nonce_field( 'rolegate_user_0', 'rolegate_user_nonce' );
+		echo '<input type="hidden" name="rolegate_user_roles_present" value="1" />';
+		echo '<table class="form-table" role="presentation"><tr><th scope="row">' . esc_html__( 'Additional roles', 'role-gatekeeper' ) . '</th><td>';
 		foreach ( $assignable as $role ) {
 			printf(
-				'<label style="display:block;padding:6px 0"><input type="checkbox" name="rolewright_user_roles[]" value="%1$s" /> %2$s</label>',
+				'<label style="display:block;padding:6px 0"><input type="checkbox" name="rolegate_user_roles[]" value="%1$s" /> %2$s</label>',
 				esc_attr( $role ),
 				esc_html( translate_user_role( $names[ $role ] ?? $role ) )
 			);
@@ -177,7 +177,7 @@ final class Profile {
 	public function validate( $errors, $update, $user ): void {
 		$actor = get_current_user_id();
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- presence marker only; the nonce is verified below.
-		if ( ! $actor || ( empty( $_POST['rolewright_user_roles_present'] ) && empty( $_POST['rolewright_user_caps_present'] ) ) ) {
+		if ( ! $actor || ( empty( $_POST['rolegate_user_roles_present'] ) && empty( $_POST['rolegate_user_caps_present'] ) ) ) {
 			return;
 		}
 		$target = $update ? (int) $user->ID : 0;
@@ -185,30 +185,30 @@ final class Profile {
 			return;
 		}
 		if ( ! self::posted_nonce_ok( $target ) ) {
-			$errors->add( 'rolewright_nonce', __( 'The roles section of this form has expired. Reload the page and try again.', 'rolewright' ) );
+			$errors->add( 'rolegate_nonce', __( 'The roles section of this form has expired. Reload the page and try again.', 'role-gatekeeper' ) );
 			return;
 		}
 		$key  = $update ? (string) $target : 'new';
 		$plan = array();
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
-		if ( ! empty( $_POST['rolewright_user_roles_present'] ) && isset( $user->role ) ) {
-			$extras = array_values( array_diff( self::posted_list( 'rolewright_user_roles' ), array( (string) $user->role ) ) );
+		if ( ! empty( $_POST['rolegate_user_roles_present'] ) && isset( $user->role ) ) {
+			$extras = array_values( array_diff( self::posted_list( 'rolegate_user_roles' ), array( (string) $user->role ) ) );
 			$ok     = Users::check_roles_change( $actor, $target, $extras, array() );
 			if ( is_wp_error( $ok ) ) {
 				$errors->add( $ok->get_error_code(), $ok->get_error_message() );
 			} elseif ( array_diff( $extras, Users::assignable_roles( $actor, $target ) ) ) {
-				$errors->add( 'rolewright_role_not_allowed', __( 'You can\'t give one of the chosen roles.', 'rolewright' ) );
+				$errors->add( 'rolegate_role_not_allowed', __( 'You can\'t give one of the chosen roles.', 'role-gatekeeper' ) );
 			} else {
 				$plan['extras'] = $extras;
 			}
 		}
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
-		if ( $update && ! empty( $_POST['rolewright_user_caps_present'] ) && user_can( $actor, Caps::MANAGE_USERS ) ) {
-			$posted = self::posted_list( 'rolewright_user_caps' );
+		if ( $update && ! empty( $_POST['rolegate_user_caps_present'] ) && user_can( $actor, Caps::MANAGE_USERS ) ) {
+			$posted = self::posted_list( 'rolegate_user_caps' );
 			// phpcs:ignore WordPress.Security.NonceVerification.Missing
-			$typed = isset( $_POST['rolewright_user_cap_new'] ) ? preg_split( '/[\s,]+/', sanitize_text_field( wp_unslash( $_POST['rolewright_user_cap_new'] ) ), -1, PREG_SPLIT_NO_EMPTY ) : array();
+			$typed = isset( $_POST['rolegate_user_cap_new'] ) ? preg_split( '/[\s,]+/', sanitize_text_field( wp_unslash( $_POST['rolegate_user_cap_new'] ) ), -1, PREG_SPLIT_NO_EMPTY ) : array();
 			$want  = array_values( array_unique( array_merge( $posted, $typed ) ) );
 			$have  = array_keys( Users::direct_caps( $target ) );
 			$check = Users::check_caps_change( $actor, $target, array_diff( $want, $have ), array_diff( $have, $want ) );

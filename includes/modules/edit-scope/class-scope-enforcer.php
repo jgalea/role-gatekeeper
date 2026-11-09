@@ -1,5 +1,5 @@
 <?php
-namespace Rolewright\Modules\Edit_Scope;
+namespace Rolegate\Modules\Edit_Scope;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -104,7 +104,7 @@ final class Scope_Enforcer {
 		$old    = ! empty( $prepared->ID ) ? get_post( (int) $prepared->ID ) : null;
 		$status = isset( $prepared->post_status ) ? (string) $prepared->post_status : '';
 		if ( ! self::author_change_allowed( $uid, $old instanceof \WP_Post ? $old : null, (int) $prepared->post_author, $status ) ) {
-			return new \WP_Error( 'rolewright_edit_scope_blocked', self::blocked_message(), array( 'status' => 403 ) );
+			return new \WP_Error( 'rolegate_edit_scope_blocked', self::blocked_message(), array( 'status' => 403 ) );
 		}
 		return $prepared;
 	}
@@ -144,8 +144,8 @@ final class Scope_Enforcer {
 
 	public static function blocked_message(): string {
 		return (string) apply_filters(
-			'rolewright_edit_scope_message',
-			__( 'Your account is not allowed to edit this item. Ask a site administrator if you need access.', 'rolewright' )
+			'rolegate_edit_scope_message',
+			__( 'Your account is not allowed to edit this item. Ask a site administrator if you need access.', 'role-gatekeeper' )
 		);
 	}
 
@@ -187,7 +187,7 @@ final class Scope_Enforcer {
 
 	public function pre_get_posts( $query ): void {
 		global $pagenow;
-		if ( ! is_admin() || ! $query->is_main_query() || 'edit.php' !== $pagenow || $query->get( 'rolewright_scope_skip' ) || ! Rules::hide_in_lists() ) {
+		if ( ! is_admin() || ! $query->is_main_query() || 'edit.php' !== $pagenow || $query->get( 'rolegate_scope_skip' ) || ! Rules::hide_in_lists() ) {
 			return;
 		}
 		$uid = get_current_user_id();
@@ -228,7 +228,7 @@ final class Scope_Enforcer {
 		if ( $id && ! Evaluator::post_allowed( get_current_user_id(), $id ) ) {
 			wp_die(
 				esc_html( self::blocked_message() ),
-				esc_html__( 'Not allowed', 'rolewright' ),
+				esc_html__( 'Not allowed', 'role-gatekeeper' ),
 				array(
 					'response'  => 403,
 					'back_link' => true,
@@ -247,8 +247,8 @@ final class Scope_Enforcer {
 			return;
 		}
 		$text = Rules::hide_in_lists()
-			? __( 'Some items are hidden because your account can only edit part of this site.', 'rolewright' )
-			: __( 'Some items are read-only because your account can only edit part of this site.', 'rolewright' );
+			? __( 'Some items are hidden because your account can only edit part of this site.', 'role-gatekeeper' )
+			: __( 'Some items are read-only because your account can only edit part of this site.', 'role-gatekeeper' );
 		echo '<div class="notice notice-info"><p>' . esc_html( $text ) . '</p></div>';
 	}
 
@@ -265,7 +265,7 @@ final class Scope_Enforcer {
 	public function filter_term_lists( $args, $taxonomies ) {
 		global $pagenow;
 		$uid = get_current_user_id();
-		if ( ! $uid || ! empty( $args['rolewright_scope_skip'] ) ) {
+		if ( ! $uid || ! empty( $args['rolegate_scope_skip'] ) ) {
 			return $args;
 		}
 		$in_editor = is_admin() && in_array( $pagenow, array( 'post.php', 'post-new.php', 'admin-ajax.php' ), true );
@@ -295,11 +295,11 @@ final class Scope_Enforcer {
 		if ( $old_tt_ids ) {
 			$old = get_terms(
 				array(
-					'taxonomy'              => $taxonomy,
-					'term_taxonomy_id'      => array_map( 'intval', (array) $old_tt_ids ),
-					'hide_empty'            => false,
-					'fields'                => 'ids',
-					'rolewright_scope_skip' => true,
+					'taxonomy'            => $taxonomy,
+					'term_taxonomy_id'    => array_map( 'intval', (array) $old_tt_ids ),
+					'hide_empty'          => false,
+					'fields'              => 'ids',
+					'rolegate_scope_skip' => true,
 				)
 			);
 			$old = is_wp_error( $old ) ? array() : array_map( 'intval', $old );

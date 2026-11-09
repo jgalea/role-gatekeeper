@@ -1,5 +1,5 @@
 <?php
-namespace Rolewright\Modules\Safety;
+namespace Rolegate\Modules\Safety;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -8,13 +8,13 @@ defined( 'ABSPATH' ) || exit;
  * admins pass through is_super_admin().
  */
 final class Caps {
-	const MANAGE        = 'rolewright_manage';
-	const MANAGE_ROLES  = 'rolewright_manage_roles';
-	const MANAGE_CAPS   = 'rolewright_manage_caps';
-	const MANAGE_USERS  = 'rolewright_manage_users';
-	const MANAGE_ACCESS = 'rolewright_manage_access';
-	const IMPORT        = 'rolewright_import';
-	const VIEW_AUDIT    = 'rolewright_view_audit';
+	const MANAGE        = 'rolegate_manage';
+	const MANAGE_ROLES  = 'rolegate_manage_roles';
+	const MANAGE_CAPS   = 'rolegate_manage_caps';
+	const MANAGE_USERS  = 'rolegate_manage_users';
+	const MANAGE_ACCESS = 'rolegate_manage_access';
+	const IMPORT        = 'rolegate_import';
+	const VIEW_AUDIT    = 'rolegate_view_audit';
 
 	/** @var bool */
 	private static $healed = false;
@@ -34,7 +34,7 @@ final class Caps {
 
 	/**
 	 * Caps that, on multisite, only super admins may use unless
-	 * `rolewright_multisite_site_admin_access` returns true.
+	 * `rolegate_multisite_site_admin_access` returns true.
 	 *
 	 * @return string[]
 	 */
@@ -106,7 +106,7 @@ final class Caps {
 				}
 			}
 		}
-		if ( is_multisite() && ! is_super_admin( $user->ID ) && ! apply_filters( 'rolewright_multisite_site_admin_access', false, $user ) ) {
+		if ( is_multisite() && ! is_super_admin( $user->ID ) && ! apply_filters( 'rolegate_multisite_site_admin_access', false, $user ) ) {
 			foreach ( self::network_restricted() as $cap ) {
 				$allcaps[ $cap ] = false;
 			}

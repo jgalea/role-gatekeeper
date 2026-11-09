@@ -1,5 +1,5 @@
 <?php
-namespace Rolewright\Modules\Automation;
+namespace Rolegate\Modules\Automation;
 
 defined( 'ABSPATH' ) || exit;
 

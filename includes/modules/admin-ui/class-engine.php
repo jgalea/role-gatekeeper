@@ -1,5 +1,5 @@
 <?php
-namespace Rolewright\Modules\Admin_Ui;
+namespace Rolegate\Modules\Admin_Ui;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -11,32 +11,32 @@ final class Engine {
 	public static function block_defs(): array {
 		return array(
 			'widgets'       => array(
-				'label' => __( 'Widgets screen and widget editing', 'rolewright' ),
+				'label' => __( 'Widgets screen and widget editing', 'role-gatekeeper' ),
 				'pages' => array( 'widgets.php' ),
 				'rest'  => array( '/wp/v2/widgets', '/wp/v2/sidebars', '/wp/v2/widget-types' ),
 			),
 			'nav_menus'     => array(
-				'label' => __( 'Navigation menu editing', 'rolewright' ),
+				'label' => __( 'Navigation menu editing', 'role-gatekeeper' ),
 				'pages' => array( 'nav-menus.php' ),
 				'rest'  => array( '/wp/v2/menus', '/wp/v2/menu-items', '/wp/v2/navigation' ),
 			),
 			'theme_browser' => array(
-				'label' => __( 'Theme browser and theme installer', 'rolewright' ),
+				'label' => __( 'Theme browser and theme installer', 'role-gatekeeper' ),
 				'pages' => array( 'themes.php', 'theme-install.php' ),
 				'rest'  => array(),
 			),
 			'customizer'    => array(
-				'label' => __( 'Customizer', 'rolewright' ),
+				'label' => __( 'Customizer', 'role-gatekeeper' ),
 				'pages' => array( 'customize.php' ),
 				'rest'  => array(),
 			),
 			'file_editors'  => array(
-				'label' => __( 'Theme and plugin file editors', 'rolewright' ),
+				'label' => __( 'Theme and plugin file editors', 'role-gatekeeper' ),
 				'pages' => array( 'theme-editor.php', 'plugin-editor.php' ),
 				'rest'  => array(),
 			),
 			'site_editor'   => array(
-				'label' => __( 'Site editor', 'rolewright' ),
+				'label' => __( 'Site editor', 'role-gatekeeper' ),
 				'pages' => array( 'site-editor.php' ),
 				'rest'  => array(),
 			),
@@ -141,7 +141,7 @@ final class Engine {
 		return false === $pos ? $slug : substr( $slug, 0, $pos );
 	}
 
-	/** Keys that no rule may block. $can_manage covers the whole Rolewright menu. */
+	/** Keys that no rule may block. $can_manage covers the whole Role Gatekeeper menu. */
 	public static function is_exempt_key( string $key, bool $can_manage ): bool {
 		$slug = false !== strpos( $key, '|' ) ? substr( $key, strpos( $key, '|' ) + 1 ) : $key;
 		if ( 'profile.php' === self::page_of_slug( $slug ) ) {
@@ -149,7 +149,7 @@ final class Engine {
 		}
 		if ( $can_manage ) {
 			$parent = false !== strpos( $key, '|' ) ? substr( $key, 0, strpos( $key, '|' ) ) : $key;
-			return 'rolewright' === $parent || 0 === strpos( $slug, 'rolewright-' );
+			return 'role-gatekeeper' === $parent || 0 === strpos( $slug, 'role-gatekeeper-' );
 		}
 		return false;
 	}

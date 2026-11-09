@@ -1,11 +1,11 @@
 <?php
 /**
- * Needs a multisite install. Run: wp eval-file wp-content/plugins/rolewright/tests/user-roles-multisite-smoke.php
+ * Needs a multisite install. Run: wp eval-file wp-content/plugins/role-gatekeeper/tests/user-roles-multisite-smoke.php
  */
 
-use Rolewright\Modules\User_Roles\Profile;
-use Rolewright\Modules\User_Roles\Users;
-use Rolewright\Modules\User_Roles\Users_List;
+use Rolegate\Modules\User_Roles\Profile;
+use Rolegate\Modules\User_Roles\Users;
+use Rolegate\Modules\User_Roles\Users_List;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
@@ -77,7 +77,7 @@ try {
 
 	// Users::check_roles_change / change_roles.
 	$res = Users::check_roles_change( $site_admin, $outsider, array( 'author' ), array() );
-	$rw_ok( is_wp_error( $res ) && 'rolewright_not_site_member' === $res->get_error_code(), 'roles: site admin cannot change a user outside this site' );
+	$rw_ok( is_wp_error( $res ) && 'rolegate_not_site_member' === $res->get_error_code(), 'roles: site admin cannot change a user outside this site' );
 	$res = Users::change_roles( $site_admin, $outsider, array( 'author' ), array() );
 	$rw_ok( is_wp_error( $res ) && ! $rw_member( $outsider ), 'roles: change_roles refuses and the outsider is not added to this site' );
 	$res = Users::change_roles( $site_admin, $member, array( 'author' ), array() );
@@ -89,9 +89,9 @@ try {
 	wp_set_current_user( $site_admin );
 	$_POST    = array( '_wpnonce' => wp_create_nonce( 'bulk-users' ) );
 	$_REQUEST = $_POST;
-	$out      = $list->handle_bulk( admin_url( 'users.php' ), 'rolewright_add:contributor', array( $outsider, $member ) );
+	$out      = $list->handle_bulk( admin_url( 'users.php' ), 'rolegate_add:contributor', array( $outsider, $member ) );
 	parse_str( (string) wp_parse_url( $out, PHP_URL_QUERY ), $q );
-	$rw_ok( '1' === ( $q['rolewright_done'] ?? '' ) && '1' === ( $q['rolewright_skip'] ?? '' ) && ! $rw_member( $outsider ), 'bulk: outsider skipped, member changed' );
+	$rw_ok( '1' === ( $q['rolegate_done'] ?? '' ) && '1' === ( $q['rolegate_skip'] ?? '' ) && ! $rw_member( $outsider ), 'bulk: outsider skipped, member changed' );
 	$rw_ok( in_array( 'contributor', get_userdata( $member )->roles, true ), 'bulk control: member got the role' );
 	Users::change_roles( $site_admin, $member, array(), array( 'contributor' ) );
 
@@ -99,35 +99,35 @@ try {
 	$grant = function () {
 		return true;
 	};
-	add_filter( 'rolewright_multisite_site_admin_access', $grant );
+	add_filter( 'rolegate_multisite_site_admin_access', $grant );
 	$res = Users::check_caps_change( $site_admin, $outsider, array( 'read' ), array() );
-	$rw_ok( is_wp_error( $res ) && 'rolewright_not_site_member' === $res->get_error_code(), 'caps: per-user capability change on an outsider is refused (' . ( is_wp_error( $res ) ? $res->get_error_code() : 'allowed' ) . ')' );
+	$rw_ok( is_wp_error( $res ) && 'rolegate_not_site_member' === $res->get_error_code(), 'caps: per-user capability change on an outsider is refused (' . ( is_wp_error( $res ) ? $res->get_error_code() : 'allowed' ) . ')' );
 	$res = Users::change_caps( $site_admin, $outsider, array( 'read' ), array() );
 	$rw_ok( is_wp_error( $res ) && ! $rw_member( $outsider ), 'caps: change_caps refuses and adds nothing' );
-	remove_filter( 'rolewright_multisite_site_admin_access', $grant );
+	remove_filter( 'rolegate_multisite_site_admin_access', $grant );
 
 	// Profile save path.
 	$profile = new Profile();
 	$_POST   = array(
-		'rolewright_user_roles_present' => '1',
-		'rolewright_user_roles'         => array( 'author' ),
-		'rolewright_user_nonce'         => wp_create_nonce( 'rolewright_user_' . $outsider ),
+		'rolegate_user_roles_present' => '1',
+		'rolegate_user_roles'         => array( 'author' ),
+		'rolegate_user_nonce'         => wp_create_nonce( 'rolegate_user_' . $outsider ),
 	);
 	$errors = new WP_Error();
 	$profile->validate( $errors, true, (object) array( 'ID' => $outsider, 'role' => 'subscriber' ) );
-	$rw_ok( in_array( 'rolewright_not_site_member', $errors->get_error_codes(), true ), 'profile: saving extra roles for an outsider is refused' );
+	$rw_ok( in_array( 'rolegate_not_site_member', $errors->get_error_codes(), true ), 'profile: saving extra roles for an outsider is refused' );
 	ob_start();
 	$profile->render_profile( get_userdata( $outsider ) );
 	$html = (string) ob_get_clean();
 	$rw_ok( '' === $html, 'profile: no roles or caps section is shown for an outsider' );
 	$_POST = array(
-		'rolewright_user_roles_present' => '1',
-		'rolewright_user_roles'         => array( 'author' ),
-		'rolewright_user_nonce'         => wp_create_nonce( 'rolewright_user_' . $member ),
+		'rolegate_user_roles_present' => '1',
+		'rolegate_user_roles'         => array( 'author' ),
+		'rolegate_user_nonce'         => wp_create_nonce( 'rolegate_user_' . $member ),
 	);
 	$errors = new WP_Error();
 	$profile->validate( $errors, true, (object) array( 'ID' => $member, 'role' => 'subscriber' ) );
-	$rw_ok( ! in_array( 'rolewright_not_site_member', $errors->get_error_codes(), true ), 'profile control: a member is not refused for membership' );
+	$rw_ok( ! in_array( 'rolegate_not_site_member', $errors->get_error_codes(), true ), 'profile control: a member is not refused for membership' );
 
 	// Super admin is exempt.
 	wp_set_current_user( $super );

@@ -1,7 +1,7 @@
 <?php
-namespace Rolewright\Modules\Edit_Scope;
+namespace Rolegate\Modules\Edit_Scope;
 
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Caps;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -74,7 +74,7 @@ final class Evaluator {
 
 	private static function is_own( int $user_id, \WP_Post $post, array $rule ): bool {
 		return (int) $post->post_author === $user_id
-			&& (bool) apply_filters( 'rolewright_edit_scope_own_posts', true, $user_id, $post, $rule );
+			&& (bool) apply_filters( 'rolegate_edit_scope_own_posts', true, $user_id, $post, $rule );
 	}
 
 	private static function matches_post( array $rule, \WP_Post $post, int $user_id ): bool {
@@ -150,7 +150,7 @@ final class Evaluator {
 		if ( $allowed && $has_allow && ! $hit_allow ) {
 			$allowed = false;
 		}
-		return (bool) apply_filters( 'rolewright_edit_scope_post_allowed', $allowed, $user_id, $post, $rules );
+		return (bool) apply_filters( 'rolegate_edit_scope_post_allowed', $allowed, $user_id, $post, $rules );
 	}
 
 	/** @return int[] */
@@ -166,7 +166,7 @@ final class Evaluator {
 					'orderby'                => 'none',
 					'suppress_filters'       => true, // phpcs:ignore WordPressVIPMinimum.Performance.WPQueryParams.SuppressFilters_suppress_filters -- these ids become the scope's exclusion list, so other plugins' query filters (language, access) must not shrink the set.
 					'ignore_sticky_posts'    => true,
-					'rolewright_scope_skip'  => true,
+					'rolegate_scope_skip'    => true,
 					'update_post_meta_cache' => false,
 				),
 				$args
@@ -288,10 +288,10 @@ final class Evaluator {
 		}
 		$all = get_terms(
 			array(
-				'taxonomy'              => $taxonomy,
-				'hide_empty'            => false,
-				'fields'                => 'ids',
-				'rolewright_scope_skip' => true,
+				'taxonomy'            => $taxonomy,
+				'hide_empty'          => false,
+				'fields'              => 'ids',
+				'rolegate_scope_skip' => true,
 			)
 		);
 		if ( is_wp_error( $all ) ) {

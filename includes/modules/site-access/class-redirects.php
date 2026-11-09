@@ -1,5 +1,5 @@
 <?php
-namespace Rolewright\Modules\Site_Access;
+namespace Rolegate\Modules\Site_Access;
 
 defined( 'ABSPATH' ) || exit;
 

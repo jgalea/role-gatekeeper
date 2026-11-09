@@ -1,21 +1,21 @@
 <?php
 /**
- * Run: wp eval-file wp-content/plugins/rolewright/tests/portability-smoke.php
+ * Run: wp eval-file wp-content/plugins/role-gatekeeper/tests/portability-smoke.php
  */
 
-use Rolewright\Modules\Portability\Backups;
-use Rolewright\Modules\Portability\Exporter;
-use Rolewright\Modules\Portability\Importer;
-use Rolewright\Modules\Portability\Role_Store;
-use Rolewright\Modules\Portability\Sources;
+use Rolegate\Modules\Portability\Backups;
+use Rolegate\Modules\Portability\Exporter;
+use Rolegate\Modules\Portability\Importer;
+use Rolegate\Modules\Portability\Role_Store;
+use Rolegate\Modules\Portability\Sources;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
 }
 
-// Multisite: site administrators hold rolewright_* caps only when the network grants it; these checks are about role-based access, so grant it.
+// Multisite: site administrators hold rolegate_* caps only when the network grants it; these checks are about role-based access, so grant it.
 if ( is_multisite() ) {
-	add_filter( 'rolewright_multisite_site_admin_access', '__return_true', 20 );
+	add_filter( 'rolegate_multisite_site_admin_access', '__return_true', 20 );
 }
 
 $rw_pass = 0;
@@ -57,7 +57,7 @@ $rw_file = function ( array $roles, array $extra = array() ) {
 	return (string) wp_json_encode(
 		array_merge(
 			array(
-				'format'  => 'rolewright',
+				'format'  => 'rolegate',
 				'version' => 1,
 				'roles'   => $roles,
 			),
@@ -67,7 +67,7 @@ $rw_file = function ( array $roles, array $extra = array() ) {
 };
 $rw_events = array();
 add_action(
-	'rolewright_changed',
+	'rolegate_changed',
 	function ( $type, $data ) use ( &$rw_events ) {
 		$rw_events[] = array( $type, $data );
 	},
@@ -77,52 +77,52 @@ add_action(
 
 $rw_role_importer = 'rw_t_importer_' . $rw_suffix;
 $rw_roles[]       = $rw_role_importer;
-add_role( $rw_role_importer, 'RW importer', array( 'read' => true, 'edit_posts' => true, 'rolewright_manage' => true, 'rolewright_import' => true, 'rolewright_manage_roles' => true, 'rolewright_manage_caps' => true ) );
+add_role( $rw_role_importer, 'RW importer', array( 'read' => true, 'edit_posts' => true, 'rolegate_manage' => true, 'rolegate_import' => true, 'rolegate_manage_roles' => true, 'rolegate_manage_caps' => true ) );
 
 $rw_admin    = $rw_make( 'rw_admin', 'administrator' );
 $rw_importer = $rw_make( 'rw_importer', $rw_role_importer );
 $rw_editor   = $rw_make( 'rw_editor', 'editor' );
 
 try {
-	$rw_ok( isset( \Rolewright\Core\Plugin::modules()['portability'] ), 'module discovered' );
-	$rw_ok( false !== has_action( 'admin_post_rolewright_portability_apply' ), 'apply handler registered' );
+	$rw_ok( isset( \Rolegate\Core\Plugin::modules()['portability'] ), 'module discovered' );
+	$rw_ok( false !== has_action( 'admin_post_rolegate_portability_apply' ), 'apply handler registered' );
 
 	// Export.
 	$rw_payload = Exporter::build( array( 'editor', 'no_such_role' ), array(), $rw_admin );
-	$rw_ok( 'rolewright' === $rw_payload['format'] && 1 === $rw_payload['version'], 'export has format and version' );
+	$rw_ok( 'rolegate' === $rw_payload['format'] && 1 === $rw_payload['version'], 'export has format and version' );
 	$rw_ok( array( 'editor' ) === array_keys( $rw_payload['roles'] ), 'export holds only existing selected roles' );
 	$rw_ok( Role_Store::same_caps( $rw_payload['roles']['editor']['capabilities'], get_role( 'editor' )->capabilities ), 'export caps match the live role' );
 
 	// Malformed and hostile input.
-	$rw_err = Importer::parse( '{"format":"rolewright","version":1,"roles":{' );
-	$rw_ok( is_wp_error( $rw_err ) && 'rolewright_import_json' === $rw_err->get_error_code(), 'malformed JSON rejected' );
+	$rw_err = Importer::parse( '{"format":"rolegate","version":1,"roles":{' );
+	$rw_ok( is_wp_error( $rw_err ) && 'rolegate_import_json' === $rw_err->get_error_code(), 'malformed JSON rejected' );
 	$rw_err = Importer::parse( '' );
 	$rw_ok( is_wp_error( $rw_err ), 'empty input rejected' );
 	$rw_big = $rw_file( array( 'rw_big' => array( 'capabilities' => array( 'read' => true ) ) ), array( 'pad' => str_repeat( 'a', 600000 ) ) );
 	$rw_err = Importer::parse( $rw_big );
-	$rw_ok( is_wp_error( $rw_err ) && 'rolewright_import_too_large' === $rw_err->get_error_code(), 'giant payload rejected by size' );
+	$rw_ok( is_wp_error( $rw_err ) && 'rolegate_import_too_large' === $rw_err->get_error_code(), 'giant payload rejected by size' );
 	$rw_many = array();
 	for ( $i = 0; $i < 101; $i++ ) {
 		$rw_many[ 'rw_many_' . $i ] = array( 'capabilities' => array( 'read' => true ) );
 	}
 	$rw_err = Importer::parse( $rw_file( $rw_many ) );
-	$rw_ok( is_wp_error( $rw_err ) && 'rolewright_import_too_many' === $rw_err->get_error_code(), 'too many roles rejected' );
+	$rw_ok( is_wp_error( $rw_err ) && 'rolegate_import_too_many' === $rw_err->get_error_code(), 'too many roles rejected' );
 	$rw_caps_many = array();
 	for ( $i = 0; $i < 1001; $i++ ) {
 		$rw_caps_many[ 'rw_c_' . $i ] = true;
 	}
 	$rw_err = Importer::parse( $rw_file( array( 'rw_x' => array( 'capabilities' => $rw_caps_many ) ) ) );
-	$rw_ok( is_wp_error( $rw_err ) && 'rolewright_import_too_many_caps' === $rw_err->get_error_code(), 'too many caps rejected' );
+	$rw_ok( is_wp_error( $rw_err ) && 'rolegate_import_too_many_caps' === $rw_err->get_error_code(), 'too many caps rejected' );
 	$rw_err = Importer::parse( str_repeat( '[', 50 ) . str_repeat( ']', 50 ) );
-	$rw_ok( is_wp_error( $rw_err ) && 'rolewright_import_json' === $rw_err->get_error_code(), 'deep nesting rejected' );
+	$rw_ok( is_wp_error( $rw_err ) && 'rolegate_import_json' === $rw_err->get_error_code(), 'deep nesting rejected' );
 	$rw_err = Importer::parse( '{"format":"other","version":1,"roles":{}}' );
-	$rw_ok( is_wp_error( $rw_err ) && 'rolewright_import_format' === $rw_err->get_error_code(), 'foreign format rejected' );
-	$rw_err = Importer::parse( '{"format":"rolewright","version":99,"roles":{}}' );
-	$rw_ok( is_wp_error( $rw_err ) && 'rolewright_import_version' === $rw_err->get_error_code(), 'future version rejected' );
-	$rw_err = Importer::parse( '{"format":"rolewright","version":"1","roles":{}}' );
+	$rw_ok( is_wp_error( $rw_err ) && 'rolegate_import_format' === $rw_err->get_error_code(), 'foreign format rejected' );
+	$rw_err = Importer::parse( '{"format":"rolegate","version":99,"roles":{}}' );
+	$rw_ok( is_wp_error( $rw_err ) && 'rolegate_import_version' === $rw_err->get_error_code(), 'future version rejected' );
+	$rw_err = Importer::parse( '{"format":"rolegate","version":"1","roles":{}}' );
 	$rw_ok( is_wp_error( $rw_err ), 'string version rejected' );
-	$rw_err = Importer::parse( '{"format":"rolewright","version":1,"roles":"x"}' );
-	$rw_ok( is_wp_error( $rw_err ) && 'rolewright_import_schema' === $rw_err->get_error_code(), 'roles not an object rejected' );
+	$rw_err = Importer::parse( '{"format":"rolegate","version":1,"roles":"x"}' );
+	$rw_ok( is_wp_error( $rw_err ) && 'rolegate_import_schema' === $rw_err->get_error_code(), 'roles not an object rejected' );
 
 	$rw_dirty = Importer::parse(
 		$rw_file(
@@ -190,13 +190,13 @@ try {
 
 	$rw_html = 'rw_t_html_' . $rw_suffix;
 	$rw_roles[] = $rw_html;
-	$rw_ph   = Importer::parse( $rw_file( array( $rw_html => array( 'capabilities' => array( 'read' => true, 'unfiltered_html' => true, 'rolewright_manage_roles' => true ) ) ) ) );
+	$rw_ph   = Importer::parse( $rw_file( array( $rw_html => array( 'capabilities' => array( 'read' => true, 'unfiltered_html' => true, 'rolegate_manage_roles' => true ) ) ) ) );
 	$rw_plan = Importer::plan( $rw_ph, $rw_importer );
-	$rw_ok( in_array( 'unfiltered_html', $rw_plan['roles'][ $rw_html ]['critical'], true ) && in_array( 'rolewright_manage_roles', $rw_plan['roles'][ $rw_html ]['critical'], true ), 'preview flags critical caps (unfiltered_html, rolewright_*)' );
+	$rw_ok( in_array( 'unfiltered_html', $rw_plan['roles'][ $rw_html ]['critical'], true ) && in_array( 'rolegate_manage_roles', $rw_plan['roles'][ $rw_html ]['critical'], true ), 'preview flags critical caps (unfiltered_html, rolegate_*)' );
 	$rw_res = Importer::apply( $rw_ph, $rw_importer, array( 'roles' => array( $rw_html ), 'confirm_critical' => array( $rw_html ) ) );
 	$rw_ok( is_wp_error( $rw_res ) && null === get_role( $rw_html ), 'confirmed unfiltered_html refused for an actor who lacks it' );
 	$rw_res = Importer::apply( $rw_ph, $rw_importer, array( 'roles' => array( $rw_html ) ) );
-	$rw_ok( is_array( $rw_res ) && get_role( $rw_html ) && ! get_role( $rw_html )->has_cap( 'unfiltered_html' ) && ! get_role( $rw_html )->has_cap( 'rolewright_manage_roles' ), 'unconfirmed critical caps are stripped' );
+	$rw_ok( is_array( $rw_res ) && get_role( $rw_html ) && ! get_role( $rw_html )->has_cap( 'unfiltered_html' ) && ! get_role( $rw_html )->has_cap( 'rolegate_manage_roles' ), 'unconfirmed critical caps are stripped' );
 
 	$rw_res = Importer::apply( array( 'roles' => array( 'rw_t_tamper' => array( 'name' => 'T', 'capabilities' => array( 'read' => true, 'manage options' => true ) ) ), 'sections' => array() ), $rw_importer, array( 'roles' => array( 'rw_t_tamper' ) ) );
 	$rw_roles[] = 'rw_t_tamper';
@@ -204,7 +204,7 @@ try {
 
 	wp_set_current_user( $rw_editor );
 	$rw_res = Importer::apply( $rw_p, $rw_editor, array( 'roles' => array( $rw_new ) ) );
-	$rw_ok( is_wp_error( $rw_res ) && 'rolewright_forbidden' === $rw_res->get_error_code(), 'actor without rolewright_import refused' );
+	$rw_ok( is_wp_error( $rw_res ) && 'rolegate_forbidden' === $rw_res->get_error_code(), 'actor without rolegate_import refused' );
 
 	// Admin confirms a critical cap they hold.
 	wp_set_current_user( $rw_admin );
@@ -225,7 +225,7 @@ try {
 	$rw_section_hook  = function ( $sections ) use ( &$rw_section_store ) {
 		$sections['rwtest'] = array(
 			'label'   => 'Test rules',
-			'cap'     => 'rolewright_manage_access',
+			'cap'     => 'rolegate_manage_access',
 			'export'  => function () use ( &$rw_section_store ) {
 				return $rw_section_store;
 			},
@@ -240,7 +240,7 @@ try {
 		);
 		return $sections;
 	};
-	add_filter( 'rolewright_portability_sections', $rw_section_hook );
+	add_filter( 'rolegate_portability_sections', $rw_section_hook );
 	$rw_out = Exporter::build( array(), array( 'rwtest' ), $rw_admin );
 	$rw_ok( isset( $rw_out['sections']['rwtest'] ) && array( 'rule' => 1 ) === $rw_out['sections']['rwtest'], 'registered section exported' );
 	$rw_out2 = Exporter::build( array(), array( 'rwtest' ), $rw_editor );
@@ -252,7 +252,7 @@ try {
 	$rw_res    = Importer::apply( $rw_ps, $rw_admin, array( 'sections' => array( 'rwtest' ) ) );
 	$rw_ok( is_array( $rw_res ) && array( 'rule' => 2, 'x' => 3 ) === $rw_section_store, 'section imported' );
 	$rw_ok( $rw_events && array( 'rule' => 1 ) === $rw_events[0][1]['before']['sections']['rwtest'], 'section before state in the event' );
-	remove_filter( 'rolewright_portability_sections', $rw_section_hook );
+	remove_filter( 'rolegate_portability_sections', $rw_section_hook );
 
 	// Handlers: capability and nonce.
 	$rw_die = function () {
@@ -265,7 +265,7 @@ try {
 	wp_set_current_user( $rw_editor );
 	$rw_threw = false;
 	try {
-		do_action( 'admin_post_rolewright_portability_apply' );
+		do_action( 'admin_post_rolegate_portability_apply' );
 	} catch ( \RuntimeException $e ) {
 		$rw_threw = true;
 	}
@@ -275,7 +275,7 @@ try {
 	$_REQUEST       = $_POST;
 	$rw_threw       = false;
 	try {
-		do_action( 'admin_post_rolewright_portability_apply' );
+		do_action( 'admin_post_rolegate_portability_apply' );
 	} catch ( \RuntimeException $e ) {
 		$rw_threw = true;
 	}

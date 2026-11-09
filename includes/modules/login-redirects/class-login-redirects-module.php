@@ -1,7 +1,7 @@
 <?php
-namespace Rolewright\Modules\Login_Redirects;
+namespace Rolegate\Modules\Login_Redirects;
 
-use Rolewright\Core\Module;
+use Rolegate\Core\Module;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -11,11 +11,11 @@ final class Login_Redirects_Module extends Module {
 	}
 
 	public function title(): string {
-		return __( 'Login redirects', 'rolewright' );
+		return __( 'Login redirects', 'role-gatekeeper' );
 	}
 
 	public function description(): string {
-		return __( 'Send each role to its own page after login and after logout.', 'rolewright' );
+		return __( 'Send each role to its own page after login and after logout.', 'role-gatekeeper' );
 	}
 
 	public function default_enabled(): bool {

@@ -1,9 +1,9 @@
 <?php
-namespace Rolewright\Modules\Automation;
+namespace Rolegate\Modules\Automation;
 
-use Rolewright\Modules\Safety\Caps;
-use Rolewright\Modules\Safety\Guard;
-use Rolewright\Modules\User_Roles\Users;
+use Rolegate\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Guard;
+use Rolegate\Modules\User_Roles\Users;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -72,26 +72,26 @@ final class Gate {
 	 */
 	private static function as_shell( callable $fn ) {
 		$drop = function ( $veto ) {
-			if ( $veto instanceof \WP_Error && 'rolewright_role_above_position' === $veto->get_error_code() ) {
+			if ( $veto instanceof \WP_Error && 'rolegate_role_above_position' === $veto->get_error_code() ) {
 				return null;
 			}
 			return $veto;
 		};
-		add_filter( 'rolewright_role_change_veto', $drop, PHP_INT_MAX );
+		add_filter( 'rolegate_role_change_veto', $drop, PHP_INT_MAX );
 		try {
 			return $fn();
 		} finally {
-			remove_filter( 'rolewright_role_change_veto', $drop, PHP_INT_MAX );
+			remove_filter( 'rolegate_role_change_veto', $drop, PHP_INT_MAX );
 		}
 	}
 
 	/** @return true|\WP_Error */
 	public static function assign_role( int $actor, string $role, int $target ) {
 		if ( ! get_role( $role ) ) {
-			return new \WP_Error( 'rolewright_no_role', __( 'That role does not exist.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_no_role', __( 'That role does not exist.', 'role-gatekeeper' ) );
 		}
 		if ( $actor > 0 && ! Guard::can_assign_role( $actor, $role, $target ) ) {
-			return new \WP_Error( 'rolewright_cannot_assign', __( 'You can\'t assign that role to this user.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_cannot_assign', __( 'You can\'t assign that role to this user.', 'role-gatekeeper' ) );
 		}
 		return true;
 	}
@@ -116,7 +116,7 @@ final class Gate {
 	/** @return true|\WP_Error */
 	public static function act_on_user( int $actor, int $target ) {
 		if ( $actor > 0 && ! Guard::can_act_on_user( $actor, $target ) ) {
-			return new \WP_Error( 'rolewright_user_above_actor', __( 'You can\'t change a user who holds capabilities you don\'t have.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_user_above_actor', __( 'You can\'t change a user who holds capabilities you don\'t have.', 'role-gatekeeper' ) );
 		}
 		return true;
 	}
@@ -124,13 +124,13 @@ final class Gate {
 	/** @return true|\WP_Error */
 	public static function grant_cap( int $actor, string $cap ) {
 		if ( false === Guard::sanitize_cap_name( $cap ) && ! Guard::cap_exists( $cap ) ) {
-			return new \WP_Error( 'rolewright_invalid_cap', __( 'That is not a valid capability name.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_invalid_cap', __( 'That is not a valid capability name.', 'role-gatekeeper' ) );
 		}
 		if ( $actor > 0 && ! Guard::can_grant_cap( $actor, $cap ) ) {
 			return new \WP_Error(
-				'rolewright_cap_not_held',
+				'rolegate_cap_not_held',
 				/* translators: %s: capability name */
-				sprintf( __( 'You can\'t grant a capability you don\'t hold yourself: %s.', 'rolewright' ), $cap )
+				sprintf( __( 'You can\'t grant a capability you don\'t hold yourself: %s.', 'role-gatekeeper' ), $cap )
 			);
 		}
 		return true;
@@ -138,7 +138,7 @@ final class Gate {
 
 	/**
 	 * A change to the actor's own roles or per-user caps must leave them with read and
-	 * Rolewright access.
+	 * Role Gatekeeper access.
 	 *
 	 * @param string[]           $roles_after
 	 * @param array<string,bool> $user_caps_after
@@ -154,7 +154,7 @@ final class Gate {
 		}
 		$reasons = array_diff( Guard::lockout_reasons( $roles_after, $user_caps_after, $roles_caps ), array( 'no_manager_role' ) );
 		if ( $reasons ) {
-			return new \WP_Error( 'rolewright_lockout', __( 'This change would lock you out of your own account or of Rolewright.', 'rolewright' ), array( 'reasons' => array_values( $reasons ) ) );
+			return new \WP_Error( 'rolegate_lockout', __( 'This change would lock you out of your own account or of Role Gatekeeper.', 'role-gatekeeper' ), array( 'reasons' => array_values( $reasons ) ) );
 		}
 		return true;
 	}
@@ -181,14 +181,14 @@ final class Gate {
 	/** @return \WP_Error|null Error when the change is risky and the caller did not confirm it. */
 	public static function confirm_error( bool $confirmed, string $role, array $caps ): ?\WP_Error {
 		if ( ! $confirmed && self::is_risky( $role, $caps ) ) {
-			return new \WP_Error( 'rolewright_confirm_required', __( 'This change touches a protected role or a capability that can take over the site. Send confirm=true to proceed.', 'rolewright' ), array( 'status' => 409 ) );
+			return new \WP_Error( 'rolegate_confirm_required', __( 'This change touches a protected role or a capability that can take over the site. Send confirm=true to proceed.', 'role-gatekeeper' ), array( 'status' => 409 ) );
 		}
 		return null;
 	}
 
 	/** @param true|\WP_Error $result */
 	private static function drop_actor_checks( $result ) {
-		if ( is_wp_error( $result ) && in_array( $result->get_error_code(), array( 'rolewright_role_above_actor', 'rolewright_cap_not_held' ), true ) ) {
+		if ( is_wp_error( $result ) && in_array( $result->get_error_code(), array( 'rolegate_role_above_actor', 'rolegate_cap_not_held' ), true ) ) {
 			return true;
 		}
 		return $result;
@@ -215,6 +215,6 @@ final class Gate {
 				return true;
 			}
 		}
-		return new \WP_Error( 'rolewright_lockout', __( 'This change would leave no role that can manage roles (rolewright_manage_roles).', 'rolewright' ), array( 'reasons' => array( 'no_manager_role' ) ) );
+		return new \WP_Error( 'rolegate_lockout', __( 'This change would leave no role that can manage roles (rolegate_manage_roles).', 'role-gatekeeper' ), array( 'reasons' => array( 'no_manager_role' ) ) );
 	}
 }

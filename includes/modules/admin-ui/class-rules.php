@@ -1,14 +1,14 @@
 <?php
-namespace Rolewright\Modules\Admin_Ui;
+namespace Rolegate\Modules\Admin_Ui;
 
-use Rolewright\Modules\Safety\Caps;
-use Rolewright\Modules\Safety\Guard;
+use Rolegate\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Guard;
 use WP_Error;
 
 defined( 'ABSPATH' ) || exit;
 
 final class Rules {
-	const OPTION = 'rolewright_admin_ui_rules';
+	const OPTION = 'rolegate_admin_ui_rules';
 
 	/** @var array<string,?array> */
 	private static $cache = array();
@@ -103,7 +103,7 @@ final class Rules {
 		ksort( $rule['metaboxes'] );
 
 		$plugins                   = isset( $raw['plugins'] ) && is_array( $raw['plugins'] ) ? $raw['plugins'] : array();
-		$own                       = plugin_basename( ROLEWRIGHT_FILE );
+		$own                       = plugin_basename( ROLEGATE_FILE );
 		$rule['plugins']['model']  = isset( $plugins['model'] ) && 'allow' === $plugins['model'] ? 'allow' : 'deny';
 		$rule['plugins']['locked'] = self::plugin_list( $plugins['locked'] ?? array(), $own );
 		$rule['plugins']['hidden'] = self::plugin_list( $plugins['hidden'] ?? array(), $own );
@@ -115,7 +115,7 @@ final class Rules {
 
 	public static function is_manager_role( array $caps ): bool {
 		foreach ( Guard::normalize_caps( $caps ) as $cap => $grant ) {
-			if ( $grant && 0 === strpos( $cap, 'rolewright_manage_' ) ) {
+			if ( $grant && 0 === strpos( $cap, 'rolegate_manage_' ) ) {
 				return true;
 			}
 		}
@@ -138,13 +138,13 @@ final class Rules {
 			}
 		}
 		if ( $bad ) {
-			return new WP_Error( 'rolewright_exempt_item', sprintf( /* translators: %s: item names */ __( 'These items can never be blocked: %s. Everyone keeps their profile page.', 'rolewright' ), implode( ', ', $bad ) ) );
+			return new WP_Error( 'rolegate_exempt_item', sprintf( /* translators: %s: item names */ __( 'These items can never be blocked: %s. Everyone keeps their profile page.', 'role-gatekeeper' ), implode( ', ', $bad ) ) );
 		}
 		return true;
 	}
 
 	/**
-	 * Check that the proposed rule set leaves the actor able to reach Rolewright and their profile.
+	 * Check that the proposed rule set leaves the actor able to reach Role Gatekeeper and their profile.
 	 *
 	 * @return string[] Reason codes; empty when safe.
 	 */
@@ -160,8 +160,8 @@ final class Rules {
 		$can_manage = user_can( $actor_id, Caps::MANAGE );
 		$reasons    = array();
 		$must       = array(
-			array( 'rolewright', null ),
-			array( 'rolewright|rolewright-admin-ui', 'rolewright' ),
+			array( 'role-gatekeeper', null ),
+			array( 'role-gatekeeper|role-gatekeeper-admin-ui', 'role-gatekeeper' ),
 			array( 'profile.php', null ),
 		);
 		foreach ( $must as $pair ) {
@@ -195,39 +195,39 @@ final class Rules {
 	 */
 	public static function save( int $actor_id, string $scope, string $target, $raw ) {
 		if ( ! user_can( $actor_id, Caps::MANAGE_ACCESS ) ) {
-			return new WP_Error( 'rolewright_forbidden', __( 'You do not have permission to change access rules.', 'rolewright' ) );
+			return new WP_Error( 'rolegate_forbidden', __( 'You do not have permission to change access rules.', 'role-gatekeeper' ) );
 		}
 		if ( 'role' === $scope ) {
 			$target = sanitize_key( $target );
 			if ( 'administrator' === $target ) {
-				return new WP_Error( 'rolewright_protected_role', __( 'The Administrator role cannot be restricted.', 'rolewright' ) );
+				return new WP_Error( 'rolegate_protected_role', __( 'The Administrator role cannot be restricted.', 'role-gatekeeper' ) );
 			}
 			$role_obj = get_role( $target );
 			if ( ! $role_obj ) {
-				return new WP_Error( 'rolewright_no_role', __( 'That role does not exist.', 'rolewright' ) );
+				return new WP_Error( 'rolegate_no_role', __( 'That role does not exist.', 'role-gatekeeper' ) );
 			}
 			$role_caps = (array) $role_obj->capabilities;
 			if ( ! is_super_admin( $actor_id ) && Guard::missing( Guard::critical_subset( $role_caps ), Guard::user_caps( $actor_id ) ) ) {
-				return new WP_Error( 'rolewright_role_above_actor', __( 'You cannot change rules for a role that holds capabilities you lack.', 'rolewright' ) );
+				return new WP_Error( 'rolegate_role_above_actor', __( 'You cannot change rules for a role that holds capabilities you lack.', 'role-gatekeeper' ) );
 			}
 			if ( self::is_manager_role( $role_caps ) && ! Engine::is_empty( self::sanitize( $raw ) ) ) {
-				return new WP_Error( 'rolewright_manager_role', __( 'Roles that can manage Rolewright cannot be restricted.', 'rolewright' ) );
+				return new WP_Error( 'rolegate_manager_role', __( 'Roles that can manage Role Gatekeeper cannot be restricted.', 'role-gatekeeper' ) );
 			}
 		} elseif ( 'user' === $scope ) {
 			$uid  = absint( $target );
 			$user = $uid ? get_userdata( $uid ) : false;
 			if ( ! $user ) {
-				return new WP_Error( 'rolewright_no_user', __( 'That user does not exist.', 'rolewright' ) );
+				return new WP_Error( 'rolegate_no_user', __( 'That user does not exist.', 'role-gatekeeper' ) );
 			}
 			if ( is_super_admin( $uid ) || in_array( 'administrator', (array) $user->roles, true ) ) {
-				return new WP_Error( 'rolewright_protected_user', __( 'Administrators cannot be restricted.', 'rolewright' ) );
+				return new WP_Error( 'rolegate_protected_user', __( 'Administrators cannot be restricted.', 'role-gatekeeper' ) );
 			}
 			if ( $uid !== $actor_id && ! Guard::can_act_on_user( $actor_id, $uid ) ) {
-				return new WP_Error( 'rolewright_user_above_actor', __( 'You cannot change a user who holds capabilities you lack.', 'rolewright' ) );
+				return new WP_Error( 'rolegate_user_above_actor', __( 'You cannot change a user who holds capabilities you lack.', 'role-gatekeeper' ) );
 			}
 			$target = (string) $uid;
 		} else {
-			return new WP_Error( 'rolewright_bad_scope', __( 'Unknown target type.', 'rolewright' ) );
+			return new WP_Error( 'rolegate_bad_scope', __( 'Unknown target type.', 'role-gatekeeper' ) );
 		}
 
 		$rule = self::sanitize( $raw );
@@ -251,8 +251,8 @@ final class Rules {
 		$reasons = self::lockout_reasons( $actor_id, $after );
 		if ( $reasons ) {
 			return new WP_Error(
-				'rolewright_lockout',
-				__( 'This change would leave you without access to Rolewright or your profile, so it was not saved.', 'rolewright' ),
+				'rolegate_lockout',
+				__( 'This change would leave you without access to Role Gatekeeper or your profile, so it was not saved.', 'role-gatekeeper' ),
 				array( 'reasons' => $reasons )
 			);
 		}
@@ -263,7 +263,7 @@ final class Rules {
 		update_option( self::OPTION, $after, true );
 		self::flush_cache();
 		do_action(
-			'rolewright_changed',
+			'rolegate_changed',
 			'access.updated',
 			array(
 				'actor'  => $actor_id,

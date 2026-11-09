@@ -1,15 +1,15 @@
 <?php
-namespace Rolewright\Modules\Capabilities;
+namespace Rolegate\Modules\Capabilities;
 
-use Rolewright\Core\Module;
-use Rolewright\Core\Settings;
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Core\Module;
+use Rolegate\Core\Settings;
+use Rolegate\Modules\Safety\Caps;
 
 defined( 'ABSPATH' ) || exit;
 
 final class Capabilities_Module extends Module {
-	const SLUG  = 'rolewright-capabilities';
-	const NONCE = 'rolewright_caps';
+	const SLUG  = 'role-gatekeeper-capabilities';
+	const NONCE = 'rolegate_caps';
 
 	/** @var Cap_Editor */
 	private $editor;
@@ -19,11 +19,11 @@ final class Capabilities_Module extends Module {
 	}
 
 	public function title(): string {
-		return __( 'Capability editor', 'rolewright' );
+		return __( 'Capability editor', 'role-gatekeeper' );
 	}
 
 	public function description(): string {
-		return __( 'Edit the capabilities of each role, add custom capabilities, and turn on extra capability sets.', 'rolewright' );
+		return __( 'Edit the capabilities of each role, add custom capabilities, and turn on extra capability sets.', 'role-gatekeeper' );
 	}
 
 	public function init(): void {
@@ -38,8 +38,8 @@ final class Capabilities_Module extends Module {
 	public function menu(): void {
 		$hook = add_submenu_page(
 			Settings::MENU_SLUG,
-			__( 'Capabilities', 'rolewright' ),
-			__( 'Capabilities', 'rolewright' ),
+			__( 'Capabilities', 'role-gatekeeper' ),
+			__( 'Capabilities', 'role-gatekeeper' ),
 			Caps::MANAGE_CAPS,
 			self::SLUG,
 			array( $this->editor, 'render' )
@@ -54,14 +54,14 @@ final class Capabilities_Module extends Module {
 		if ( false === strpos( (string) $hook_suffix, self::SLUG ) ) {
 			return;
 		}
-		wp_enqueue_style( 'rolewright-capabilities', ROLEWRIGHT_URL . 'assets/capabilities/capabilities.css', array(), ROLEWRIGHT_VERSION );
-		wp_enqueue_script( 'rolewright-capabilities', ROLEWRIGHT_URL . 'assets/capabilities/capabilities.js', array(), ROLEWRIGHT_VERSION, true );
+		wp_enqueue_style( 'rolegate-capabilities', ROLEGATE_URL . 'assets/capabilities/capabilities.css', array(), ROLEGATE_VERSION );
+		wp_enqueue_script( 'rolegate-capabilities', ROLEGATE_URL . 'assets/capabilities/capabilities.js', array(), ROLEGATE_VERSION, true );
 		wp_localize_script(
-			'rolewright-capabilities',
-			'rolewrightCaps',
+			'rolegate-capabilities',
+			'rolegateCaps',
 			array(
-				'confirmSelf' => __( 'You are removing capabilities from a role you hold yourself. Continue?', 'rolewright' ),
-				'confirmDel'  => __( 'Delete this custom capability from every role?', 'rolewright' ),
+				'confirmSelf' => __( 'You are removing capabilities from a role you hold yourself. Continue?', 'role-gatekeeper' ),
+				'confirmDel'  => __( 'Delete this custom capability from every role?', 'role-gatekeeper' ),
 			)
 		);
 	}

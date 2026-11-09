@@ -1,14 +1,14 @@
 <?php
-namespace Rolewright\Modules\Content_Access;
+namespace Rolegate\Modules\Content_Access;
 
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Caps;
 
 defined( 'ABSPATH' ) || exit;
 
 final class Menu_Visibility {
-	const META_MODE  = '_rolewright_menu_mode';
-	const META_ROLES = '_rolewright_menu_roles';
-	const NONCE      = 'rolewright_menu_item';
+	const META_MODE  = '_rolegate_menu_mode';
+	const META_ROLES = '_rolegate_menu_roles';
+	const NONCE      = 'rolegate_menu_item';
 
 	public function register(): void {
 		add_action( 'wp_nav_menu_item_custom_fields', array( $this, 'fields' ), 10, 2 );
@@ -24,14 +24,14 @@ final class Menu_Visibility {
 		$mode    = Access::sanitize_mode( get_post_meta( $item_id, self::META_MODE, true ) );
 		$roles   = get_post_meta( $item_id, self::META_ROLES, true );
 		$roles   = is_array( $roles ) ? $roles : array();
-		$name    = 'rolewright_menu[' . $item_id . ']';
+		$name    = 'rolegate_menu[' . $item_id . ']';
 		$modes   = array(
-			'all'        => __( 'Everyone', 'rolewright' ),
-			'logged_in'  => __( 'Logged-in users', 'rolewright' ),
-			'logged_out' => __( 'Logged-out visitors', 'rolewright' ),
-			'roles'      => __( 'Selected roles', 'rolewright' ),
+			'all'        => __( 'Everyone', 'role-gatekeeper' ),
+			'logged_in'  => __( 'Logged-in users', 'role-gatekeeper' ),
+			'logged_out' => __( 'Logged-out visitors', 'role-gatekeeper' ),
+			'roles'      => __( 'Selected roles', 'role-gatekeeper' ),
 		);
-		echo '<fieldset class="field-rolewright description-wide"><legend>' . esc_html__( 'Show to', 'rolewright' ) . '</legend>';
+		echo '<fieldset class="field-rolegate description-wide"><legend>' . esc_html__( 'Show to', 'role-gatekeeper' ) . '</legend>';
 		echo '<input type="hidden" name="' . esc_attr( $name ) . '[nonce]" value="' . esc_attr( wp_create_nonce( self::NONCE ) ) . '" />';
 		echo '<select name="' . esc_attr( $name ) . '[mode]">';
 		foreach ( $modes as $value => $label ) {
@@ -52,7 +52,7 @@ final class Menu_Visibility {
 
 	public function save( $menu_id, $item_id ): void {
 		$item_id = (int) $item_id;
-		$posted  = isset( $_POST['rolewright_menu'][ $item_id ] ) ? wp_unslash( $_POST['rolewright_menu'][ $item_id ] ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		$posted  = isset( $_POST['rolegate_menu'][ $item_id ] ) ? wp_unslash( $_POST['rolegate_menu'][ $item_id ] ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		if ( ! is_array( $posted ) || ! isset( $posted['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( $posted['nonce'] ), self::NONCE ) ) {
 			return;
 		}

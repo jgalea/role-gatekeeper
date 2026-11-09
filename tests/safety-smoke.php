@@ -1,12 +1,12 @@
 <?php
 /**
- * Run: wp eval-file wp-content/plugins/rolewright/tests/safety-smoke.php
+ * Run: wp eval-file wp-content/plugins/role-gatekeeper/tests/safety-smoke.php
  */
 
-use Rolewright\Modules\Safety\Caps;
-use Rolewright\Modules\Safety\Enforcer;
-use Rolewright\Modules\Safety\Guard;
-use Rolewright\Modules\Safety\Rescue;
+use Rolegate\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Enforcer;
+use Rolegate\Modules\Safety\Guard;
+use Rolegate\Modules\Safety\Rescue;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
@@ -78,31 +78,31 @@ try {
 	// Caps.
 	Caps::grant_to_administrator();
 	$admin_role = get_role( 'administrator' );
-	$rw_ok( ! Guard::missing( Caps::all(), $admin_role->capabilities ), 'administrator role holds every rolewright cap' );
-	$rw_ok( \Rolewright\Core\Settings::CAP === Caps::MANAGE, 'Caps::MANAGE matches Settings::CAP' );
+	$rw_ok( ! Guard::missing( Caps::all(), $admin_role->capabilities ), 'administrator role holds every rolegate cap' );
+	$rw_ok( \Rolegate\Core\Settings::CAP === Caps::MANAGE, 'Caps::MANAGE matches Settings::CAP' );
 	$leaked = false;
 	foreach ( wp_roles()->roles as $name => $data ) {
 		if ( 'administrator' !== $name && array_intersect( Caps::all(), array_keys( array_filter( (array) $data['capabilities'] ) ) ) ) {
 			$leaked = true;
 		}
 	}
-	$rw_ok( ! $leaked, 'no other role carries rolewright caps' );
+	$rw_ok( ! $leaked, 'no other role carries rolegate caps' );
 	Enforcer::as_system(
 		function () use ( $admin_role ) {
 			$admin_role->remove_cap( Caps::MANAGE );
 		}
 	);
-	$rw_ok( ! get_role( 'administrator' )->has_cap( Caps::MANAGE ), 'setup: rolewright_manage removed from administrator' );
+	$rw_ok( ! get_role( 'administrator' )->has_cap( Caps::MANAGE ), 'setup: rolegate_manage removed from administrator' );
 	Caps::grant_to_administrator();
-	$rw_ok( get_role( 'administrator' )->has_cap( Caps::MANAGE ), 'self-heal re-adds rolewright_manage' );
-	$rw_net_gated = is_multisite() && \Rolewright\Core\Plugin::is_enabled( 'multisite' ) && ! apply_filters( 'rolewright_multisite_site_admin_access', false, get_userdata( $admin ) );
-	$rw_ok( $rw_net_gated ? ! user_can( $admin, Caps::MANAGE ) : ( user_can( $admin, Caps::MANAGE ) && ( is_multisite() || user_can( $admin, Caps::MANAGE_ROLES ) ) ), 'administrator user can rolewright_manage (and _roles on single site); with the multisite module on, a site administrator needs the network grant' );
-	$rw_ok( ! user_can( $promoter, Caps::MANAGE ), 'promoter cannot rolewright_manage' );
+	$rw_ok( get_role( 'administrator' )->has_cap( Caps::MANAGE ), 'self-heal re-adds rolegate_manage' );
+	$rw_net_gated = is_multisite() && \Rolegate\Core\Plugin::is_enabled( 'multisite' ) && ! apply_filters( 'rolegate_multisite_site_admin_access', false, get_userdata( $admin ) );
+	$rw_ok( $rw_net_gated ? ! user_can( $admin, Caps::MANAGE ) : ( user_can( $admin, Caps::MANAGE ) && ( is_multisite() || user_can( $admin, Caps::MANAGE_ROLES ) ) ), 'administrator user can rolegate_manage (and _roles on single site); with the multisite module on, a site administrator needs the network grant' );
+	$rw_ok( ! user_can( $promoter, Caps::MANAGE ), 'promoter cannot rolegate_manage' );
 
 	// Guard basics.
 	$crit = Guard::critical_caps();
-	$rw_ok( ! Guard::missing( array( 'manage_options', 'promote_users', 'edit_users', 'install_plugins', 'unfiltered_html', 'manage_network', 'manage_network_users', 'rolewright_manage', 'rolewright_view_audit' ), $crit ), 'critical_caps has the required set' );
-	$rw_ok( Guard::is_critical_cap( 'manage_network_foo' ) && Guard::is_critical_cap( 'rolewright_anything' ) && ! Guard::is_critical_cap( 'edit_posts' ), 'is_critical_cap prefix rules' );
+	$rw_ok( ! Guard::missing( array( 'manage_options', 'promote_users', 'edit_users', 'install_plugins', 'unfiltered_html', 'manage_network', 'manage_network_users', 'rolegate_manage', 'rolegate_view_audit' ), $crit ), 'critical_caps has the required set' );
+	$rw_ok( Guard::is_critical_cap( 'manage_network_foo' ) && Guard::is_critical_cap( 'rolegate_anything' ) && ! Guard::is_critical_cap( 'edit_posts' ), 'is_critical_cap prefix rules' );
 	$rw_ok( Guard::is_protected_role( 'administrator' ) && Guard::is_protected_role( (string) get_option( 'default_role' ) ) && ! Guard::is_protected_role( 'editor' ), 'protected roles' );
 
 	$rw_ok( 'edit_widgets_x' === Guard::sanitize_cap_name( ' Edit_Widgets_X ' ), 'sanitize_cap_name lowercases and trims' );
@@ -124,9 +124,9 @@ try {
 	$rw_ok( Guard::can_assign_role( $admin, 'administrator', $victim ), 'administrator can assign administrator' );
 	$rw_ok( ! Guard::can_act_on_user( $promoter, $admin ) && Guard::can_act_on_user( $admin, $promoter ), 'can_act_on_user respects critical-cap level' );
 	$rw_ok( ! Guard::can_grant_cap( $promoter, 'manage_options' ), 'promoter cannot grant manage_options' );
-	$rw_ok( ! Guard::can_grant_cap( $promoter, 'rolewright_manage' ), 'promoter cannot grant rolewright_manage' );
+	$rw_ok( ! Guard::can_grant_cap( $promoter, 'rolegate_manage' ), 'promoter cannot grant rolegate_manage' );
 	$rw_ok( Guard::can_grant_cap( $promoter, 'list_users' ), 'promoter can grant a cap they hold' );
-	$rw_ok( ! Guard::can_grant_cap( $promoter, 'rw_custom_' . $rw_suffix ), 'promoter cannot grant a cap they lack without rolewright_manage_caps' );
+	$rw_ok( ! Guard::can_grant_cap( $promoter, 'rw_custom_' . $rw_suffix ), 'promoter cannot grant a cap they lack without rolegate_manage_caps' );
 	$rw_ok( Guard::can_grant_cap( $admin, 'rw_custom_' . $rw_suffix ), 'administrator can grant a new custom cap' );
 
 	// wp-admin paths as the promoter.
@@ -235,7 +235,7 @@ try {
 
 	$guard_req = new WP_REST_Request( 'POST', '/WP/V2/' . $rw_mixed_users . '/' . $victim );
 	$guard_req->set_param( 'roles', array( 'administrator' ) );
-	$guard_out = ( new Rolewright\Modules\Safety\Enforcer() )->rest_guard( null, array(), $guard_req );
+	$guard_out = ( new Rolegate\Modules\Safety\Enforcer() )->rest_guard( null, array(), $guard_req );
 	$rw_ok( is_wp_error( $guard_out ), 'REST guard itself refuses an upper-case users route' );
 
 	$old_default = get_option( 'default_role' );
@@ -248,7 +248,7 @@ try {
 	$rw_ok( ! get_role( $rw_role )->has_cap( 'manage_options' ), 'roles backstop: promoter cannot add manage_options to own role' );
 	$rw_ok( true !== Guard::assert_can_modify_role( $promoter, $rw_role, array_merge( get_role( $rw_role )->capabilities, array( 'manage_options' => true ) ) ), 'assert_can_modify_role refuses self-grant of manage_options' );
 	$err = Guard::assert_can_modify_role( $promoter, 'editor', array( 'read' => true ) );
-	$rw_ok( is_wp_error( $err ) && 'rolewright_role_above_actor' === $err->get_error_code(), 'assert_can_modify_role refuses changes to a role above the actor' );
+	$rw_ok( is_wp_error( $err ) && 'rolegate_role_above_actor' === $err->get_error_code(), 'assert_can_modify_role refuses changes to a role above the actor' );
 
 	// Administrator as actor.
 	wp_set_current_user( $admin );
@@ -266,21 +266,21 @@ try {
 	unset( $no_read['read'] );
 	$no_roles = $admin_caps;
 	unset( $no_roles[ Caps::MANAGE_ROLES ] );
-	$rw_ok( Guard::would_lock_out( $admin, array( 'administrator' => $no_manage ) ), 'lockout: removing rolewright_manage from own role' );
+	$rw_ok( Guard::would_lock_out( $admin, array( 'administrator' => $no_manage ) ), 'lockout: removing rolegate_manage from own role' );
 	$rw_ok( Guard::would_lock_out( $admin, array( 'administrator' => $no_read ) ), 'lockout: removing read from own role' );
-	$rw_ok( Guard::would_lock_out( $admin, array( 'administrator' => $no_roles ) ), 'lockout: no role left with rolewright_manage_roles' );
+	$rw_ok( Guard::would_lock_out( $admin, array( 'administrator' => $no_roles ) ), 'lockout: no role left with rolegate_manage_roles' );
 	$rw_ok( Guard::would_lock_out( $admin, array( 'administrator' => null ) ), 'lockout: deleting own role' );
 	$rw_ok( ! Guard::would_lock_out( $admin, array( 'editor' => array( 'read' => true ) ) ), 'no lockout: editing another role' );
 	$rw_ok( Guard::lockout_reasons( array( 'r' ), array(), array( 'r' => array( 'read' => true ) ) ) === array( 'manage', 'no_manager_role' ), 'lockout_reasons pure function' );
 
 	$err = Guard::assert_can_modify_role( $admin, 'administrator', $no_manage );
-	$rw_ok( is_wp_error( $err ) && 'rolewright_protected_role' === $err->get_error_code(), 'assert_can_modify_role: administrator keeps rolewright caps' );
+	$rw_ok( is_wp_error( $err ) && 'rolegate_protected_role' === $err->get_error_code(), 'assert_can_modify_role: administrator keeps rolegate caps' );
 	$no_opts = $admin_caps;
 	unset( $no_opts['manage_options'] );
 	$err = Guard::assert_can_modify_role( $admin, 'administrator', $no_opts );
-	$rw_ok( is_wp_error( $err ) && 'rolewright_protected_role' === $err->get_error_code(), 'assert_can_modify_role: administrator keeps manage_options' );
+	$rw_ok( is_wp_error( $err ) && 'rolegate_protected_role' === $err->get_error_code(), 'assert_can_modify_role: administrator keeps manage_options' );
 	$err = Guard::assert_can_modify_role( $admin, 'editor', array_merge( get_role( 'editor' )->capabilities, array( 'Bad Cap!' => true ) ) );
-	$rw_ok( is_wp_error( $err ) && 'rolewright_invalid_cap' === $err->get_error_code(), 'assert_can_modify_role: invalid cap name' );
+	$rw_ok( is_wp_error( $err ) && 'rolegate_invalid_cap' === $err->get_error_code(), 'assert_can_modify_role: invalid cap name' );
 	$rw_ok( true === Guard::assert_can_modify_role( $admin, 'editor', array_merge( get_role( 'editor' )->capabilities, array( 'rw_custom_' . $rw_suffix => true ) ) ), 'assert_can_modify_role: administrator adds a custom cap to editor' );
 	$rw_ok( is_wp_error( Guard::assert_can_delete_role( $admin, 'administrator' ) ) && is_wp_error( Guard::assert_can_delete_role( $admin, (string) get_option( 'default_role' ) ) ), 'assert_can_delete_role: protected roles' );
 	$rw_ok( is_wp_error( Guard::assert_can_rename_role( $admin, 'administrator' ) ), 'assert_can_rename_role: administrator' );
@@ -298,7 +298,7 @@ try {
 			}
 		}
 	);
-	$rw_ok( ! get_role( 'administrator' )->has_cap( Caps::MANAGE ), 'setup: administrator locked out of Rolewright' );
+	$rw_ok( ! get_role( 'administrator' )->has_cap( Caps::MANAGE ), 'setup: administrator locked out of Role Gatekeeper' );
 	$ip_a     = '203.0.113.' . wp_rand( 1, 250 );
 	$ip_b     = '198.51.100.' . wp_rand( 1, 250 );
 	$ip_c     = '192.0.2.' . wp_rand( 1, 250 );
@@ -318,7 +318,7 @@ try {
 	$rw_ok( $stored['expires'] - time() <= 900 && $stored['expires'] - time() > 880, 'rescue: 15 minute expiry' );
 	$rw_ok( is_wp_error( Rescue::consume( $admin, str_repeat( 'a', 64 ), $ip_b ) ), 'rescue: wrong token refused' );
 	$rw_ok( true === Rescue::consume( $admin, $token, $ip_b ), 'rescue: valid token accepted' );
-	$rw_ok( get_role( 'administrator' )->has_cap( Caps::MANAGE ) && ! Guard::missing( Caps::all(), get_role( 'administrator' )->capabilities ), 'rescue: rolewright caps restored to administrator' );
+	$rw_ok( get_role( 'administrator' )->has_cap( Caps::MANAGE ) && ! Guard::missing( Caps::all(), get_role( 'administrator' )->capabilities ), 'rescue: rolegate caps restored to administrator' );
 	$rw_ok( 0 === get_current_user_id(), 'rescue: does not log anyone in' );
 	$rw_ok( is_wp_error( Rescue::consume( $admin, $token, $ip_b ) ), 'rescue: token works once' );
 
@@ -340,7 +340,7 @@ try {
 	$rw_ok( count( $rw_mails ) === $before + 1, 'rescue: per-IP limit of 3 per hour' );
 
 	if ( is_multisite() ) {
-		$rw_ok( ! user_can( $admin, Caps::MANAGE_ROLES ), 'multisite: site admin cannot use rolewright_manage_roles by default' );
+		$rw_ok( ! user_can( $admin, Caps::MANAGE_ROLES ), 'multisite: site admin cannot use rolegate_manage_roles by default' );
 	} else {
 		echo "SKIP multisite checks (single site)\n";
 	}
@@ -359,10 +359,10 @@ if ( is_multisite() ) {
 }
 $ip_d     = '198.18.0.' . wp_rand( 1, 250 );
 $rw_ips[] = $ip_d;
-delete_transient( 'rolewright_rl_' . md5( 'acct|' . $admin ) );
+delete_transient( 'rolegate_rl_' . md5( 'acct|' . $admin ) );
 delete_user_meta( $admin, Rescue::META );
-add_filter( 'rolewright_rescue_defer_mail', '__return_true' );
-add_filter( 'rolewright_rescue_can_detach', '__return_false' );
+add_filter( 'rolegate_rescue_defer_mail', '__return_true' );
+add_filter( 'rolegate_rescue_can_detach', '__return_false' );
 $rw_mails = array();
 add_filter( 'pre_wp_mail', $rw_capture_mail, 10, 2 );
 Rescue::request( get_userdata( $admin )->user_email, $ip_d );
@@ -377,8 +377,8 @@ $rw_ok( 1 === count( $rw_mails ), 'rescue: the decoy event sends nothing' );
 wp_clear_scheduled_hook( Rescue::HOOK_DELIVER, array( 0 ) );
 remove_filter( 'pre_wp_mail', $rw_capture_mail, 10 );
 wp_clear_scheduled_hook( Rescue::HOOK_DELIVER, array( $admin ) );
-remove_filter( 'rolewright_rescue_defer_mail', '__return_true' );
-remove_filter( 'rolewright_rescue_can_detach', '__return_false' );
+remove_filter( 'rolegate_rescue_defer_mail', '__return_true' );
+remove_filter( 'rolegate_rescue_can_detach', '__return_false' );
 delete_user_meta( $admin, Rescue::META );
 foreach ( array_unique( $rw_users ) as $uid ) {
 	if ( is_multisite() ) {
@@ -396,11 +396,11 @@ Enforcer::as_system(
 Caps::grant_to_administrator();
 foreach ( $rw_ips as $ip ) {
 	foreach ( array( 'ip|', 'use|' ) as $p ) {
-		delete_transient( 'rolewright_rl_' . md5( $p . $ip ) );
+		delete_transient( 'rolegate_rl_' . md5( $p . $ip ) );
 	}
 }
 foreach ( array_unique( $rw_users ) as $uid ) {
-	delete_transient( 'rolewright_rl_' . md5( 'acct|' . $uid ) );
+	delete_transient( 'rolegate_rl_' . md5( 'acct|' . $uid ) );
 }
 $rw_ok( get_role( 'administrator' )->has_cap( 'manage_options' ) && get_role( 'administrator' )->has_cap( Caps::MANAGE ), 'cleanup: administrator role intact' );
 $rw_ok( ! get_role( $rw_role ) && ! get_user_by( 'login', 'rw_admin_' . $rw_suffix ), 'cleanup: temp role and users removed' );

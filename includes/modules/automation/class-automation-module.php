@@ -1,23 +1,23 @@
 <?php
-namespace Rolewright\Modules\Automation;
+namespace Rolegate\Modules\Automation;
 
-use Rolewright\Core\Module;
+use Rolegate\Core\Module;
 
 defined( 'ABSPATH' ) || exit;
 
 class Automation_Module extends Module {
-	const OPTION_SETTINGS = 'rolewright_automation';
+	const OPTION_SETTINGS = 'rolegate_automation';
 
 	public function id(): string {
 		return 'automation';
 	}
 
 	public function title(): string {
-		return __( 'WP-CLI, REST and Abilities', 'rolewright' );
+		return __( 'WP-CLI, REST and Abilities', 'role-gatekeeper' );
 	}
 
 	public function description(): string {
-		return __( 'Manage roles from the command line, a REST API and the WordPress Abilities API. Read-only unless you switch writes on.', 'rolewright' );
+		return __( 'Manage roles from the command line, a REST API and the WordPress Abilities API. Read-only unless you switch writes on.', 'role-gatekeeper' );
 	}
 
 	public function default_enabled(): bool {
@@ -26,11 +26,11 @@ class Automation_Module extends Module {
 
 	public function init(): void {
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
-			\WP_CLI::add_command( 'rolewright role', Cli_Role::class );
-			\WP_CLI::add_command( 'rolewright cap', Cli_Cap::class );
-			\WP_CLI::add_command( 'rolewright user', Cli_User::class );
-			\WP_CLI::add_command( 'rolewright export', array( Cli_Transfer::class, 'export' ) );
-			\WP_CLI::add_command( 'rolewright import', array( Cli_Transfer::class, 'import' ) );
+			\WP_CLI::add_command( 'rolegate role', Cli_Role::class );
+			\WP_CLI::add_command( 'rolegate cap', Cli_Cap::class );
+			\WP_CLI::add_command( 'rolegate user', Cli_User::class );
+			\WP_CLI::add_command( 'rolegate export', array( Cli_Transfer::class, 'export' ) );
+			\WP_CLI::add_command( 'rolegate import', array( Cli_Transfer::class, 'import' ) );
 		}
 		add_action( 'rest_api_init', array( new Rest_Routes(), 'register' ) );
 		$abilities = new Abilities();

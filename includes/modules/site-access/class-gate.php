@@ -1,5 +1,5 @@
 <?php
-namespace Rolewright\Modules\Site_Access;
+namespace Rolegate\Modules\Site_Access;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -262,7 +262,7 @@ final class Gate {
 			'query_keys'     => array_values( array_unique( array_merge( array_map( 'strval', array_keys( $_GET ) ), array_map( 'strval', array_keys( $_POST ) ) ) ) ), // phpcs:ignore WordPress.Security.NonceVerification
 			'query_mismatch' => ! $is_rest && self::resolved_query_differs(),
 			'xmlrpc_on'      => (bool) apply_filters( 'xmlrpc_enabled', true ), // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core hook, read to learn whether XML-RPC is on.
-			'exempt_paths'   => array_filter( array_map( array( __CLASS__, 'normalize_path' ), (array) apply_filters( 'rolewright_site_access_exempt_paths', array() ) ) ),
+			'exempt_paths'   => array_filter( array_map( array( __CLASS__, 'normalize_path' ), (array) apply_filters( 'rolegate_site_access_exempt_paths', array() ) ) ),
 		);
 	}
 
@@ -272,7 +272,7 @@ final class Gate {
 			return;
 		}
 		$req = self::context( false );
-		if ( apply_filters( 'rolewright_site_access_is_login_request', false, $req ) ) {
+		if ( apply_filters( 'rolegate_site_access_is_login_request', false, $req ) ) {
 			return;
 		}
 		$decision = self::decide( $req, $settings );
@@ -285,10 +285,10 @@ final class Gate {
 			$port   = wp_parse_url( home_url( '/' ), PHP_URL_PORT );
 			$uri    = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '/'; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
 			$back   = $origin . ( $port ? ':' . $port : '' ) . $uri;
-			wp_safe_redirect( wp_login_url( $back ), 302, 'Rolewright' );
+			wp_safe_redirect( wp_login_url( $back ), 302, 'Role Gatekeeper' );
 			exit;
 		}
-		wp_die( esc_html__( 'You need to be logged in to see this site.', 'rolewright' ), '', array( 'response' => 403 ) );
+		wp_die( esc_html__( 'You need to be logged in to see this site.', 'role-gatekeeper' ), '', array( 'response' => 403 ) );
 	}
 
 	/**
@@ -332,17 +332,17 @@ final class Gate {
 		$req                 = self::context( true );
 		$req['path']         = self::normalize_path( '/' . rest_get_url_prefix() . '/' . ltrim( $route, '/' ) );
 		$req['query_keys']   = array();
-		$req['exempt_paths'] = array_filter( array_map( array( __CLASS__, 'normalize_path' ), (array) apply_filters( 'rolewright_site_access_exempt_rest_routes', array() ) ) );
+		$req['exempt_paths'] = array_filter( array_map( array( __CLASS__, 'normalize_path' ), (array) apply_filters( 'rolegate_site_access_exempt_rest_routes', array() ) ) );
 		if ( self::ALLOW === self::decide( $req, $settings ) ) {
 			return null;
 		}
-		return new \WP_Error( 'rolewright_private_site', __( 'You need to be logged in to use this site.', 'rolewright' ), array( 'status' => 401 ) );
+		return new \WP_Error( 'rolegate_private_site', __( 'You need to be logged in to use this site.', 'role-gatekeeper' ), array( 'status' => 401 ) );
 	}
 
 	/** Used by the settings page to mention what the gate won't touch. */
 	public static function exempt_summary(): array {
 		return array(
-			'wp-login.php (login, password reset, the Rolewright rescue link)',
+			'wp-login.php (login, password reset, the Role Gatekeeper rescue link)',
 			'wp-cron.php',
 			'admin-ajax.php and admin-post.php',
 			'xmlrpc.php when XML-RPC is enabled',

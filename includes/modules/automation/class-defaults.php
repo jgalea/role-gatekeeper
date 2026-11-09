@@ -1,5 +1,5 @@
 <?php
-namespace Rolewright\Modules\Automation;
+namespace Rolegate\Modules\Automation;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -25,7 +25,7 @@ final class Defaults {
 		$saved_roles   = $wp_roles;
 		$saved_static  = $wp_user_roles;
 		$wp_user_roles = array(
-			'rolewright_scratch' => array(
+			'rolegate_scratch' => array(
 				'name'         => 'Scratch',
 				'capabilities' => array(),
 			),

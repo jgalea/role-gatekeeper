@@ -1,12 +1,12 @@
 <?php
 /**
- * Run: wp eval-file wp-content/plugins/rolewright/tests/login-redirects-smoke.php
+ * Run: wp eval-file wp-content/plugins/role-gatekeeper/tests/login-redirects-smoke.php
  */
 
-use Rolewright\Modules\Login_Redirects\Login_Redirects_Module;
-use Rolewright\Modules\Login_Redirects\Login_Redirects_Settings;
-use Rolewright\Modules\Login_Redirects\Resolver;
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Modules\Login_Redirects\Login_Redirects_Module;
+use Rolegate\Modules\Login_Redirects\Login_Redirects_Settings;
+use Rolegate\Modules\Login_Redirects\Resolver;
+use Rolegate\Modules\Safety\Caps;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
@@ -176,10 +176,10 @@ try {
 	$listen = function ( $type, $data ) use ( &$events ) {
 		$events[] = array( $type, $data );
 	};
-	add_action( 'rolewright_changed', $listen, 10, 2 );
+	add_action( 'rolegate_changed', $listen, 10, 2 );
 	Login_Redirects_Settings::save( $ok, 1 );
-	remove_action( 'rolewright_changed', $listen, 10 );
-	$rw_ok( 1 === count( $events ) && 'access.updated' === $events[0][0] && 'login-redirects' === $events[0][1]['target'] && 1 === $events[0][1]['actor'] && is_array( $events[0][1]['before'] ) && $events[0][1]['after'] === $ok, 'rolewright_changed fires access.updated' );
+	remove_action( 'rolegate_changed', $listen, 10 );
+	$rw_ok( 1 === count( $events ) && 'access.updated' === $events[0][0] && 'login-redirects' === $events[0][1]['target'] && 1 === $events[0][1]['actor'] && is_array( $events[0][1]['before'] ) && $events[0][1]['after'] === $ok, 'rolegate_changed fires access.updated' );
 	wp_set_current_user( $sub->ID );
 	$rw_ok( ! current_user_can( Caps::MANAGE_ACCESS ), 'page: subscribers cannot manage login redirects' );
 	wp_set_current_user( 0 );

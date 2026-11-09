@@ -1,5 +1,5 @@
 <?php
-namespace Rolewright\Modules\Content_Access;
+namespace Rolegate\Modules\Content_Access;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -88,7 +88,7 @@ final class Rest_Guard {
 		}
 		foreach ( self::targets( $handler, $request ) as $post_id ) {
 			if ( self::denied( $post_id ) ) {
-				return new \WP_Error( 'rest_post_invalid_id', __( 'Invalid post ID.', 'rolewright' ), array( 'status' => 404 ) );
+				return new \WP_Error( 'rest_post_invalid_id', __( 'Invalid post ID.', 'role-gatekeeper' ), array( 'status' => 404 ) );
 			}
 		}
 		return $response;

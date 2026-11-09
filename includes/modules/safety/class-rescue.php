@@ -1,17 +1,17 @@
 <?php
-namespace Rolewright\Modules\Safety;
+namespace Rolegate\Modules\Safety;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * One-time emailed link that puts the rolewright_* caps back on the administrator role.
+ * One-time emailed link that puts the rolegate_* caps back on the administrator role.
  * It never logs anyone in and never reveals whether an address belongs to an account.
  */
 final class Rescue {
-	const ACTION_REQUEST = 'rolewright_rescue';
-	const ACTION_USE     = 'rolewright_rescue_use';
-	const META           = 'rolewright_rescue_token';
-	const HOOK_DELIVER   = 'rolewright_rescue_deliver';
+	const ACTION_REQUEST = 'rolegate_rescue';
+	const ACTION_USE     = 'rolegate_rescue_use';
+	const META           = 'rolegate_rescue_token';
+	const HOOK_DELIVER   = 'rolegate_rescue_deliver';
 	const FLOOR          = 0.25;
 	const TTL            = 900;
 	const LIMIT          = 3;
@@ -26,7 +26,7 @@ final class Rescue {
 
 	public static function client_ip(): string {
 		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
-		return (string) apply_filters( 'rolewright_rescue_client_ip', $ip );
+		return (string) apply_filters( 'rolegate_rescue_client_ip', $ip );
 	}
 
 	public static function is_eligible( \WP_User $user ): bool {
@@ -37,7 +37,7 @@ final class Rescue {
 	 * Counts one hit against $key and reports whether it is still within the limit.
 	 */
 	private static function hit( string $key ): bool {
-		$name  = 'rolewright_rl_' . md5( $key );
+		$name  = 'rolegate_rl_' . md5( $key );
 		$state = get_transient( $name );
 		if ( ! is_array( $state ) || empty( $state['start'] ) || $state['start'] + self::WINDOW < time() ) {
 			$state = array(
@@ -72,8 +72,8 @@ final class Rescue {
 		$token  = bin2hex( random_bytes( 32 ) );
 		$hash   = hash( 'sha256', $token );
 		$acct   = self::hit( 'acct|' . ( $user ? $user->ID : 'none|' . hash( 'sha256', strtolower( $email ) ) ) );
-		$defer      = (bool) apply_filters( 'rolewright_rescue_defer_mail', ! ( defined( 'WP_CLI' ) && WP_CLI ) );
-		$can_detach = (bool) apply_filters( 'rolewright_rescue_can_detach', function_exists( 'fastcgi_finish_request' ) || function_exists( 'litespeed_finish_request' ) );
+		$defer      = (bool) apply_filters( 'rolegate_rescue_defer_mail', ! ( defined( 'WP_CLI' ) && WP_CLI ) );
+		$can_detach = (bool) apply_filters( 'rolegate_rescue_can_detach', function_exists( 'fastcgi_finish_request' ) || function_exists( 'litespeed_finish_request' ) );
 		if ( ! $within || ! $user || ! $acct || ! self::is_eligible( $user ) ) {
 			if ( $within && $defer && ! $can_detach ) {
 				// Same write as the eligible path, so scheduling cost doesn't reveal which addresses are admins. The handler ignores user 0.
@@ -131,10 +131,10 @@ final class Rescue {
 		);
 		$site = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
 		/* translators: %s: site name */
-		$subject = sprintf( __( '[%s] Rolewright access link', 'rolewright' ), $site );
+		$subject = sprintf( __( '[%s] Role Gatekeeper access link', 'role-gatekeeper' ), $site );
 		$body    = sprintf(
 			/* translators: 1: site URL, 2: rescue link */
-			__( "Someone asked to restore Rolewright access for the administrator role on %1\$s.\n\nOpen this link within 15 minutes to restore it. It works once and does not log you in:\n\n%2\$s\n\nIf you didn't ask for this, ignore this email; nothing changes.", 'rolewright' ),
+			__( "Someone asked to restore Role Gatekeeper access for the administrator role on %1\$s.\n\nOpen this link within 15 minutes to restore it. It works once and does not log you in:\n\n%2\$s\n\nIf you didn't ask for this, ignore this email; nothing changes.", 'role-gatekeeper' ),
 			home_url( '/' ),
 			$url
 		);
@@ -154,7 +154,7 @@ final class Rescue {
 	 * @return true|\WP_Error
 	 */
 	public static function consume( int $uid, string $token, string $ip ) {
-		$generic = new \WP_Error( 'rolewright_rescue_invalid', __( 'This link is invalid or has expired. Request a new one.', 'rolewright' ) );
+		$generic = new \WP_Error( 'rolegate_rescue_invalid', __( 'This link is invalid or has expired. Request a new one.', 'role-gatekeeper' ) );
 		if ( ! self::hit( 'use|' . $ip ) || $uid <= 0 || ! preg_match( '/^[a-f0-9]{64}$/', $token ) ) {
 			return $generic;
 		}
@@ -175,7 +175,7 @@ final class Rescue {
 			return $generic;
 		}
 		Caps::grant_to_administrator();
-		do_action( 'rolewright_rescue_used', $uid );
+		do_action( 'rolegate_rescue_used', $uid );
 		return true;
 	}
 
@@ -187,7 +187,7 @@ final class Rescue {
 		printf(
 			'<p style="text-align:center;margin-top:12px"><a href="%s">%s</a></p>',
 			esc_url( add_query_arg( 'action', self::ACTION_REQUEST, wp_login_url() ) ),
-			esc_html__( 'Locked out of Rolewright?', 'rolewright' )
+			esc_html__( 'Locked out of Role Gatekeeper?', 'role-gatekeeper' )
 		);
 	}
 
@@ -195,25 +195,25 @@ final class Rescue {
 		$message = '';
 		if ( 'POST' === ( isset( $_SERVER['REQUEST_METHOD'] ) ? $_SERVER['REQUEST_METHOD'] : '' ) ) { // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
 			if ( ! isset( $_POST['_rwnonce'] ) || ! wp_verify_nonce( sanitize_key( wp_unslash( $_POST['_rwnonce'] ) ), self::ACTION_REQUEST ) ) {
-				wp_die( esc_html__( 'The form expired. Go back and try again.', 'rolewright' ), '', array( 'response' => 403 ) );
+				wp_die( esc_html__( 'The form expired. Go back and try again.', 'role-gatekeeper' ), '', array( 'response' => 403 ) );
 			}
-			$email = isset( $_POST['rolewright_email'] ) ? sanitize_email( wp_unslash( $_POST['rolewright_email'] ) ) : '';
+			$email = isset( $_POST['rolegate_email'] ) ? sanitize_email( wp_unslash( $_POST['rolegate_email'] ) ) : '';
 			self::request( $email, self::client_ip() );
-			$message = __( 'If that address belongs to an administrator account, a one-time link is on its way. It expires in 15 minutes.', 'rolewright' );
+			$message = __( 'If that address belongs to an administrator account, a one-time link is on its way. It expires in 15 minutes.', 'role-gatekeeper' );
 		}
 
-		login_header( __( 'Restore Rolewright access', 'rolewright' ), $message ? '<p class="message">' . esc_html( $message ) . '</p>' : '' );
+		login_header( __( 'Restore Role Gatekeeper access', 'role-gatekeeper' ), $message ? '<p class="message">' . esc_html( $message ) . '</p>' : '' );
 		?>
 		<form method="post" action="<?php echo esc_url( add_query_arg( 'action', self::ACTION_REQUEST, wp_login_url() ) ); ?>">
-			<p><?php esc_html_e( 'Enter the email address of an administrator account. We will email a one-time link that gives the Administrator role its Rolewright capabilities back.', 'rolewright' ); ?></p>
+			<p><?php esc_html_e( 'Enter the email address of an administrator account. We will email a one-time link that gives the Administrator role its Role Gatekeeper capabilities back.', 'role-gatekeeper' ); ?></p>
 			<p>
-				<label for="rolewright_email"><?php esc_html_e( 'Administrator email', 'rolewright' ); ?></label>
-				<input type="email" name="rolewright_email" id="rolewright_email" class="input" required autocomplete="email" />
+				<label for="rolegate_email"><?php esc_html_e( 'Administrator email', 'role-gatekeeper' ); ?></label>
+				<input type="email" name="rolegate_email" id="rolegate_email" class="input" required autocomplete="email" />
 			</p>
 			<input type="hidden" name="_rwnonce" value="<?php echo esc_attr( wp_create_nonce( self::ACTION_REQUEST ) ); ?>" />
-			<p class="submit"><input type="submit" class="button button-primary button-large" value="<?php esc_attr_e( 'Email me a link', 'rolewright' ); ?>" /></p>
+			<p class="submit"><input type="submit" class="button button-primary button-large" value="<?php esc_attr_e( 'Email me a link', 'role-gatekeeper' ); ?>" /></p>
 		</form>
-		<p id="nav"><a href="<?php echo esc_url( wp_login_url() ); ?>"><?php esc_html_e( 'Back to log in', 'rolewright' ); ?></a></p>
+		<p id="nav"><a href="<?php echo esc_url( wp_login_url() ); ?>"><?php esc_html_e( 'Back to log in', 'role-gatekeeper' ); ?></a></p>
 		<?php
 		login_footer();
 		exit;
@@ -229,19 +229,19 @@ final class Rescue {
 		if ( 'POST' === ( isset( $_SERVER['REQUEST_METHOD'] ) ? $_SERVER['REQUEST_METHOD'] : '' ) ) { // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
 			$result = self::consume( $uid, $token, self::client_ip() );
 			if ( true === $result ) {
-				wp_safe_redirect( admin_url( 'admin.php?page=' . \Rolewright\Core\Settings::MENU_SLUG ) );
+				wp_safe_redirect( admin_url( 'admin.php?page=' . \Rolegate\Core\Settings::MENU_SLUG ) );
 				exit;
 			}
 			$error = $result->get_error_message();
 		}
 
-		login_header( __( 'Restore Rolewright access', 'rolewright' ), $error ? '<div id="login_error">' . esc_html( $error ) . '</div>' : '' );
+		login_header( __( 'Restore Role Gatekeeper access', 'role-gatekeeper' ), $error ? '<div id="login_error">' . esc_html( $error ) . '</div>' : '' );
 		?>
 		<form method="post" action="<?php echo esc_url( add_query_arg( 'action', self::ACTION_USE, wp_login_url() ) ); ?>">
-			<p><?php esc_html_e( 'Confirm to give the Administrator role its Rolewright capabilities back. You will then be sent to log in.', 'rolewright' ); ?></p>
+			<p><?php esc_html_e( 'Confirm to give the Administrator role its Role Gatekeeper capabilities back. You will then be sent to log in.', 'role-gatekeeper' ); ?></p>
 			<input type="hidden" name="uid" value="<?php echo esc_attr( (string) $uid ); ?>" />
 			<input type="hidden" name="token" value="<?php echo esc_attr( $token ); ?>" />
-			<p class="submit"><input type="submit" class="button button-primary button-large" value="<?php esc_attr_e( 'Restore access', 'rolewright' ); ?>" /></p>
+			<p class="submit"><input type="submit" class="button button-primary button-large" value="<?php esc_attr_e( 'Restore access', 'role-gatekeeper' ); ?>" /></p>
 		</form>
 		<?php
 		login_footer();

@@ -1,13 +1,13 @@
 <?php
-namespace Rolewright\Modules\Portability;
+namespace Rolegate\Modules\Portability;
 
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Caps;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Extra data a role file can carry next to the roles, such as access rules or deny
- * rules. The module that owns the data registers it with `rolewright_portability_sections`:
+ * rules. The module that owns the data registers it with `rolegate_portability_sections`:
  *
  *     $sections['deny'] = array(
  *         'label'   => 'Deny rules',
@@ -25,7 +25,7 @@ final class Sections {
 	 * @return array<string,array{label:string,cap:string,export:callable,preview:callable,import:callable}>
 	 */
 	public static function all(): array {
-		$raw = apply_filters( 'rolewright_portability_sections', array() );
+		$raw = apply_filters( 'rolegate_portability_sections', array() );
 		$out = array();
 		foreach ( is_array( $raw ) ? $raw : array() as $id => $section ) {
 			$id = sanitize_key( (string) $id );

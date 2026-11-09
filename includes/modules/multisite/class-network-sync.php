@@ -1,8 +1,8 @@
 <?php
-namespace Rolewright\Modules\Multisite;
+namespace Rolegate\Modules\Multisite;
 
-use Rolewright\Modules\Portability\Role_Store;
-use Rolewright\Modules\Safety\Guard;
+use Rolegate\Modules\Portability\Role_Store;
+use Rolegate\Modules\Safety\Guard;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
  * super admin who started them.
  */
 final class Network_Sync {
-	const JOB_KEY       = 'rolewright_ms_job_';
+	const JOB_KEY       = 'rolegate_ms_job_';
 	const JOB_TTL       = DAY_IN_SECONDS;
 	const DEFAULT_BATCH = 25;
 	const MAX_ERRORS    = 50;
@@ -31,10 +31,10 @@ final class Network_Sync {
 	 */
 	public static function start( int $actor, int $source_site, array $roles, string $mode, bool $users ) {
 		if ( ! Guard::is_super( $actor ) ) {
-			return new \WP_Error( 'rolewright_forbidden', __( 'Only super admins can change roles on every site.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_forbidden', __( 'Only super admins can change roles on every site.', 'role-gatekeeper' ) );
 		}
 		if ( ! get_site( $source_site ) ) {
-			return new \WP_Error( 'rolewright_no_site', __( 'That source site does not exist.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_no_site', __( 'That source site does not exist.', 'role-gatekeeper' ) );
 		}
 		switch_to_blog( $source_site );
 		$all = Role_Store::all();
@@ -47,7 +47,7 @@ final class Network_Sync {
 			}
 		}
 		if ( ! $picked ) {
-			return new \WP_Error( 'rolewright_no_role', __( 'The source site has none of the chosen roles.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_no_role', __( 'The source site has none of the chosen roles.', 'role-gatekeeper' ) );
 		}
 		$job = array(
 			'id'         => wp_generate_password( 16, false, false ),
@@ -92,7 +92,7 @@ final class Network_Sync {
 	 */
 	public static function run_batch( array $job, int $actor ) {
 		if ( (int) $job['actor'] !== $actor || ! Guard::is_super( $actor ) ) {
-			return new \WP_Error( 'rolewright_forbidden', __( 'Only the super admin who started this job can continue it.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_forbidden', __( 'Only the super admin who started this job can continue it.', 'role-gatekeeper' ) );
 		}
 		if ( $job['finished'] ) {
 			return $job;
@@ -166,7 +166,7 @@ final class Network_Sync {
 				}
 				if ( is_wp_error( $check ) ) {
 					/* translators: 1: site id, 2: role slug, 3: reason */
-					$out['errors'][] = sprintf( __( 'Site %1$d, role %2$s: %3$s', 'rolewright' ), $site_id, $slug, $check->get_error_message() );
+					$out['errors'][] = sprintf( __( 'Site %1$d, role %2$s: %3$s', 'role-gatekeeper' ), $site_id, $slug, $check->get_error_message() );
 					continue;
 				}
 				$changes[ $slug ] = array(
@@ -179,12 +179,12 @@ final class Network_Sync {
 				$written = Role_Store::write( $changes );
 				if ( is_wp_error( $written ) ) {
 					/* translators: 1: site id, 2: reason */
-					$out['errors'][] = sprintf( __( 'Site %1$d: %2$s', 'rolewright' ), $site_id, $written->get_error_message() );
+					$out['errors'][] = sprintf( __( 'Site %1$d: %2$s', 'role-gatekeeper' ), $site_id, $written->get_error_message() );
 				} else {
 					foreach ( $changes as $slug => $def ) {
 						++$out['roles'];
 						do_action(
-							'rolewright_changed',
+							'rolegate_changed',
 							null === $events[ $slug ] ? 'role.created' : 'caps.updated',
 							array(
 								'actor'   => $actor,
@@ -257,13 +257,13 @@ final class Network_Sync {
 				}
 				if ( ! $ok ) {
 					/* translators: 1: user id, 2: site id */
-					$out['errors'][] = sprintf( __( 'User %1$d was not added to site %2$d: none of their roles exist there or may be assigned.', 'rolewright' ), $uid, $site_id );
+					$out['errors'][] = sprintf( __( 'User %1$d was not added to site %2$d: none of their roles exist there or may be assigned.', 'role-gatekeeper' ), $uid, $site_id );
 					continue;
 				}
 				$added = add_user_to_blog( $site_id, $uid, $ok[0] );
 				if ( is_wp_error( $added ) ) {
 					/* translators: 1: user id, 2: site id, 3: reason */
-					$out['errors'][] = sprintf( __( 'User %1$d was not added to site %2$d: %3$s', 'rolewright' ), $uid, $site_id, $added->get_error_message() );
+					$out['errors'][] = sprintf( __( 'User %1$d was not added to site %2$d: %3$s', 'role-gatekeeper' ), $uid, $site_id, $added->get_error_message() );
 					continue;
 				}
 				$user = new \WP_User( $uid, '', $site_id );
@@ -272,7 +272,7 @@ final class Network_Sync {
 				}
 				++$out['users'];
 				do_action(
-					'rolewright_changed',
+					'rolegate_changed',
 					'user.roles',
 					array(
 						'actor'   => $actor,

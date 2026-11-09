@@ -1,23 +1,23 @@
 <?php
 /**
- * Run: wp eval-file wp-content/plugins/rolewright/tests/automation-smoke.php
+ * Run: wp eval-file wp-content/plugins/role-gatekeeper/tests/automation-smoke.php
  */
 
-use Rolewright\Modules\Audit\Store;
-use Rolewright\Modules\Automation\Abilities;
-use Rolewright\Modules\Automation\Automation_Module;
-use Rolewright\Modules\Automation\Defaults;
-use Rolewright\Modules\Automation\Ops;
-use Rolewright\Modules\Automation\Rest_Routes;
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Modules\Audit\Store;
+use Rolegate\Modules\Automation\Abilities;
+use Rolegate\Modules\Automation\Automation_Module;
+use Rolegate\Modules\Automation\Defaults;
+use Rolegate\Modules\Automation\Ops;
+use Rolegate\Modules\Automation\Rest_Routes;
+use Rolegate\Modules\Safety\Caps;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
 }
 
-// Multisite: site administrators hold rolewright_* caps only when the network grants it; these checks are about role-based access, so grant it.
+// Multisite: site administrators hold rolegate_* caps only when the network grants it; these checks are about role-based access, so grant it.
 if ( is_multisite() ) {
-	add_filter( 'rolewright_multisite_site_admin_access', '__return_true', 20 );
+	add_filter( 'rolegate_multisite_site_admin_access', '__return_true', 20 );
 }
 
 require_once ABSPATH . 'wp-admin/includes/user.php';
@@ -67,7 +67,7 @@ delete_option( Automation_Module::OPTION_SETTINGS );
 
 $events = array();
 add_action(
-	'rolewright_changed',
+	'rolegate_changed',
 	function ( $type, $data ) use ( &$events ) {
 		$events[] = array( $type, $data );
 	},
@@ -89,9 +89,9 @@ $a = 'rw_auto_a_' . $sfx;
 $roles[] = $a;
 $res = Ops::add_role( 0, 'Auto A ' . $sfx, $a, array( 'read', 'edit_posts' ) );
 $rw_ok( $a === $res && ! empty( $role_caps( $a )['edit_posts'] ), 'add_role creates a role with caps' );
-$rw_ok( in_array( 'role.created', $types(), true ) && 'role.created' === $events[0][0] && 'Auto A ' . $sfx === $events[0][1]['after']['name'], 'add_role fires rolewright_changed role.created with before and after' );
-$rw_ok( 'rolewright_role_exists' === $code( Ops::add_role( 0, 'Dup', $a, array() ) ), 'add_role refuses an existing slug' );
-$rw_ok( 'rolewright_invalid_cap' === $code( Ops::add_role( 0, 'Bad Caps', 'rw_auto_bad_' . $sfx, array( 'Bad Cap!' ) ) ), 'add_role refuses an invalid cap name' );
+$rw_ok( in_array( 'role.created', $types(), true ) && 'role.created' === $events[0][0] && 'Auto A ' . $sfx === $events[0][1]['after']['name'], 'add_role fires rolegate_changed role.created with before and after' );
+$rw_ok( 'rolegate_role_exists' === $code( Ops::add_role( 0, 'Dup', $a, array() ) ), 'add_role refuses an existing slug' );
+$rw_ok( 'rolegate_invalid_cap' === $code( Ops::add_role( 0, 'Bad Caps', 'rw_auto_bad_' . $sfx, array( 'Bad Cap!' ) ) ), 'add_role refuses an invalid cap name' );
 $rw_ok( null === get_role( 'rw_auto_bad_' . $sfx ), 'refused add_role left nothing behind' );
 $b = 'rw_auto_b_' . $sfx;
 $roles[] = $b;
@@ -105,17 +105,17 @@ $rw_ok( 'caps.updated' === $last[0] && $b === $last[1]['target'] && ! empty( $la
 $rw_ok( true === Ops::change_role_caps( 0, $b, array( 'manage_options' ), array() ), 'shell actor may grant a critical cap (no actor to hold it)' );
 Ops::change_role_caps( 0, $b, array(), array( 'manage_options' ) );
 
-$rw_ok( 'rolewright_protected_role' === $code( Ops::delete_role( 0, 'administrator' ) ), 'administrator can\'t be deleted' );
-$rw_ok( 'rolewright_protected_role' === $code( Ops::delete_role( 0, get_option( 'default_role' ) ) ), 'default role can\'t be deleted' );
-$rw_ok( 'rolewright_protected_role' === $code( Ops::change_role_caps( 0, 'administrator', array(), array( Caps::MANAGE_ROLES ) ) ), 'administrator can\'t lose Rolewright caps even for the shell' );
-$rw_ok( 'rolewright_protected_role' === $code( Ops::change_role_caps( 0, 'administrator', array(), array( 'manage_options' ) ) ), 'administrator can\'t lose critical caps' );
+$rw_ok( 'rolegate_protected_role' === $code( Ops::delete_role( 0, 'administrator' ) ), 'administrator can\'t be deleted' );
+$rw_ok( 'rolegate_protected_role' === $code( Ops::delete_role( 0, get_option( 'default_role' ) ) ), 'default role can\'t be deleted' );
+$rw_ok( 'rolegate_protected_role' === $code( Ops::change_role_caps( 0, 'administrator', array(), array( Caps::MANAGE_ROLES ) ) ), 'administrator can\'t lose Role Gatekeeper caps even for the shell' );
+$rw_ok( 'rolegate_protected_role' === $code( Ops::change_role_caps( 0, 'administrator', array(), array( 'manage_options' ) ) ), 'administrator can\'t lose critical caps' );
 
 // Guard applies to a named actor. With the role hierarchy on, own-role edits are refused before the lockout check.
-$own_role_codes = \Rolewright\Core\Plugin::is_enabled( 'deny-hierarchy' ) ? array( 'rolewright_lockout', 'rolewright_role_above_position' ) : array( 'rolewright_lockout' );
-$rw_ok( 'rolewright_cap_not_held' === $code( Ops::change_role_caps( $mgr, $a, array( 'manage_options' ), array() ) ), 'named actor can\'t grant a critical cap they lack' );
+$own_role_codes = \Rolegate\Core\Plugin::is_enabled( 'deny-hierarchy' ) ? array( 'rolegate_lockout', 'rolegate_role_above_position' ) : array( 'rolegate_lockout' );
+$rw_ok( 'rolegate_cap_not_held' === $code( Ops::change_role_caps( $mgr, $a, array( 'manage_options' ), array() ) ), 'named actor can\'t grant a critical cap they lack' );
 $rw_ok( empty( $role_caps( $a )['manage_options'] ), 'refused grant changed nothing' );
 $rw_ok( in_array( $code( Ops::change_role_caps( $mgr, $mgr_slug, array(), array( Caps::MANAGE ) ) ), $own_role_codes, true ), 'named actor can\'t remove their own access' );
-$rw_ok( 'rolewright_cannot_assign' === $code( Ops::assign_role( $mgr, $mgr, 'administrator' ) ) || 'rolewright_cannot_assign' === $code( Ops::assign_role( $mgr, $make( 'rw_auto_victim', 'subscriber' ), 'administrator' ) ), 'named actor can\'t hand out the administrator role' );
+$rw_ok( 'rolegate_cannot_assign' === $code( Ops::assign_role( $mgr, $mgr, 'administrator' ) ) || 'rolegate_cannot_assign' === $code( Ops::assign_role( $mgr, $make( 'rw_auto_victim', 'subscriber' ), 'administrator' ) ), 'named actor can\'t hand out the administrator role' );
 
 // Reset.
 $ed_orig = $role_caps( 'editor' );
@@ -130,18 +130,18 @@ $c = $role_caps( 'editor' );
 $rw_ok( empty( $c[ 'rw_junk_' . $sfx ] ) && ! empty( $c['moderate_comments'] ) && $c == $defaults['editor'], 'reset restores the WordPress default caps and drops extras' );
 $last = end( $events );
 $rw_ok( 'caps.updated' === $last[0] && 'editor' === $last[1]['target'], 'reset fires caps.updated' );
-$rw_ok( 'rolewright_not_core_role' === $code( Ops::reset_role( 0, $a ) ), 'reset refuses a custom role' );
-$rw_ok( true === Ops::reset_role( 0, 'administrator' ) && ! empty( $role_caps( 'administrator' )[ Caps::MANAGE_ROLES ] ) && ! empty( $role_caps( 'administrator' )[ Caps::VIEW_AUDIT ] ), 'resetting administrator keeps the Rolewright caps' );
+$rw_ok( 'rolegate_not_core_role' === $code( Ops::reset_role( 0, $a ) ), 'reset refuses a custom role' );
+$rw_ok( true === Ops::reset_role( 0, 'administrator' ) && ! empty( $role_caps( 'administrator' )[ Caps::MANAGE_ROLES ] ) && ! empty( $role_caps( 'administrator' )[ Caps::VIEW_AUDIT ] ), 'resetting administrator keeps the Role Gatekeeper caps' );
 
 // Users.
 $u = $make( 'rw_auto_u', 'subscriber' );
 $rw_ok( true === Ops::assign_role( 0, $u, $a ) && in_array( $a, get_userdata( $u )->roles, true ), 'assign_role adds the role' );
 $last = end( $events );
 $rw_ok( 'user.roles' === $last[0] && $u === (int) $last[1]['target'] && in_array( $a, $last[1]['after']['roles'], true ) && ! in_array( $a, $last[1]['before']['roles'], true ), 'assign_role fires user.roles with before and after' );
-$rw_ok( 'rolewright_already_has_role' === $code( Ops::assign_role( 0, $u, $a ) ), 'assigning a role the user has is refused' );
+$rw_ok( 'rolegate_already_has_role' === $code( Ops::assign_role( 0, $u, $a ) ), 'assigning a role the user has is refused' );
 $rw_ok( true === Ops::unassign_role( 0, $u, $a ) && ! in_array( $a, get_userdata( $u )->roles, true ), 'unassign_role removes it' );
-$rw_ok( 'rolewright_lockout' === $code( Ops::unassign_role( $mgr, $mgr, $mgr_slug ) ), 'named actor can\'t unassign the role that gives them access' );
-$rw_ok( 'rolewright_user_lacks_role' === $code( Ops::unassign_role( 0, $u, $a ) ), 'unassigning a role the user lacks is refused' );
+$rw_ok( 'rolegate_lockout' === $code( Ops::unassign_role( $mgr, $mgr, $mgr_slug ) ), 'named actor can\'t unassign the role that gives them access' );
+$rw_ok( 'rolegate_user_lacks_role' === $code( Ops::unassign_role( 0, $u, $a ) ), 'unassigning a role the user lacks is refused' );
 $sum = Ops::user_summary( $u );
 $rw_ok( ! is_wp_error( $sum ) && in_array( 'read', $sum['capabilities'], true ) && array( 'subscriber' ) === $sum['roles'], 'user_summary lists roles and effective caps' );
 
@@ -150,9 +150,9 @@ $rw_ok( (int) $wpdb->get_var( 'SELECT COUNT(*) FROM ' . Store::table() . " WHERE
 
 // Export and import.
 $data = Ops::export_data( array( $b, 'administrator' ) );
-$rw_ok( 'rolewright' === $data['format'] && 1 === $data['version'] && isset( $data['roles'][ $b ]['capabilities'] ) && isset( $data['roles']['administrator'] ) && 2 === count( $data['roles'] ), 'export has the portability file format and the chosen roles' );
+$rw_ok( 'rolegate' === $data['format'] && 1 === $data['version'] && isset( $data['roles'][ $b ]['capabilities'] ) && isset( $data['roles']['administrator'] ) && 2 === count( $data['roles'] ), 'export has the portability file format and the chosen roles' );
 $import = array(
-	'format'  => 'rolewright',
+	'format'  => 'rolegate',
 	'version' => 1,
 	'roles'   => array(
 		$b                      => array( 'name' => 'Auto B', 'capabilities' => array( 'read' => true, 'upload_files' => true ) ),
@@ -173,8 +173,8 @@ $rw_ok( count( $events ) > $n_events && 'import.applied' === end( $events )[0], 
 $bad = $import;
 $bad['roles']['administrator'] = array( 'name' => 'Administrator', 'capabilities' => array( 'read' => true ) );
 $res = Ops::import_json( 0, wp_json_encode( $bad ), false );
-$rw_ok( 'rolewright_import_blocked' === $code( $res ) && ! empty( $role_caps( 'administrator' )['manage_options'] ), 'a file naming the administrator role is refused and changes nothing' );
-$rw_ok( 'rolewright_import_json' === $code( Ops::import_json( 0, '{nope', true ) ) && 'rolewright_import_format' === $code( Ops::import_json( 0, '{"roles":{}}', true ) ), 'malformed and foreign files are refused' );
+$rw_ok( 'rolegate_import_blocked' === $code( $res ) && ! empty( $role_caps( 'administrator' )['manage_options'] ), 'a file naming the administrator role is refused and changes nothing' );
+$rw_ok( 'rolegate_import_json' === $code( Ops::import_json( 0, '{nope', true ) ) && 'rolegate_import_format' === $code( Ops::import_json( 0, '{"roles":{}}', true ) ), 'malformed and foreign files are refused' );
 $inv = $import;
 $inv['roles']['rw_auto_inv_' . $sfx] = array( 'name' => 'Inv', 'capabilities' => array( 'Bad Cap!' => true ) );
 $res = Ops::import_json( 0, wp_json_encode( $inv ), true );
@@ -187,54 +187,54 @@ if ( defined( 'WP_CLI' ) && WP_CLI ) {
 		return WP_CLI::runcommand( $cmd, array( 'return' => 'all', 'launch' => false, 'exit_error' => false ) );
 	};
 	wp_set_current_user( 0 );
-	$r = $run( 'rolewright role list --format=json' );
-	$rw_ok( 0 === $r->return_code && false !== strpos( $r->stdout, '"slug":"administrator"' ), 'wp rolewright role list' );
+	$r = $run( 'rolegate role list --format=json' );
+	$rw_ok( 0 === $r->return_code && false !== strpos( $r->stdout, '"slug":"administrator"' ), 'wp rolegate role list' );
 	$c1 = 'rw_auto_cli_' . $sfx;
 	$roles[] = $c1;
-	$r = $run( 'rolewright role add "CLI Role" --slug=' . $c1 . ' --caps=read,edit_posts' );
-	$rw_ok( 0 === $r->return_code && ! empty( $role_caps( $c1 )['edit_posts'] ), 'wp rolewright role add' );
+	$r = $run( 'rolegate role add "CLI Role" --slug=' . $c1 . ' --caps=read,edit_posts' );
+	$rw_ok( 0 === $r->return_code && ! empty( $role_caps( $c1 )['edit_posts'] ), 'wp rolegate role add' );
 	$c2 = 'rw_auto_cli2_' . $sfx;
 	$roles[] = $c2;
-	$r = $run( 'rolewright role clone ' . $c1 . ' "CLI Two" --slug=' . $c2 );
-	$rw_ok( 0 === $r->return_code && ! empty( $role_caps( $c2 )['edit_posts'] ), 'wp rolewright role clone' );
-	$r = $run( 'rolewright cap add ' . $c2 . ' moderate_comments' );
-	$rw_ok( 0 === $r->return_code && ! empty( $role_caps( $c2 )['moderate_comments'] ), 'wp rolewright cap add' );
-	$r = $run( 'rolewright cap remove ' . $c2 . ' moderate_comments' );
-	$rw_ok( 0 === $r->return_code && empty( $role_caps( $c2 )['moderate_comments'] ), 'wp rolewright cap remove' );
-	$r = $run( 'rolewright cap list ' . $c2 . ' --format=json' );
-	$rw_ok( 0 === $r->return_code && false !== strpos( $r->stdout, '"cap":"edit_posts"' ), 'wp rolewright cap list <role>' );
-	$r = $run( 'rolewright cap list --format=json' );
-	$rw_ok( 0 === $r->return_code && false !== strpos( $r->stdout, '"cap":"read"' ), 'wp rolewright cap list' );
-	$r = $run( 'rolewright user assign ' . (int) $u . ' ' . $c1 );
-	$rw_ok( 0 === $r->return_code && in_array( $c1, get_userdata( $u )->roles, true ), 'wp rolewright user assign' );
-	$r = $run( 'rolewright user roles ' . (int) $u );
-	$rw_ok( 0 === $r->return_code && false !== strpos( $r->stdout, $c1 ), 'wp rolewright user roles' );
-	$r = $run( 'rolewright user unassign ' . (int) $u . ' ' . $c1 );
-	$rw_ok( 0 === $r->return_code && ! in_array( $c1, get_userdata( $u )->roles, true ), 'wp rolewright user unassign' );
-	$r = $run( 'rolewright role delete ' . $c2 . ' --yes' );
-	$rw_ok( 0 === $r->return_code && null === get_role( $c2 ), 'wp rolewright role delete' );
-	$r = $run( 'rolewright role delete administrator --yes' );
-	$rw_ok( 0 !== $r->return_code && ! empty( get_role( 'administrator' ) ), 'wp rolewright role delete refuses administrator' );
+	$r = $run( 'rolegate role clone ' . $c1 . ' "CLI Two" --slug=' . $c2 );
+	$rw_ok( 0 === $r->return_code && ! empty( $role_caps( $c2 )['edit_posts'] ), 'wp rolegate role clone' );
+	$r = $run( 'rolegate cap add ' . $c2 . ' moderate_comments' );
+	$rw_ok( 0 === $r->return_code && ! empty( $role_caps( $c2 )['moderate_comments'] ), 'wp rolegate cap add' );
+	$r = $run( 'rolegate cap remove ' . $c2 . ' moderate_comments' );
+	$rw_ok( 0 === $r->return_code && empty( $role_caps( $c2 )['moderate_comments'] ), 'wp rolegate cap remove' );
+	$r = $run( 'rolegate cap list ' . $c2 . ' --format=json' );
+	$rw_ok( 0 === $r->return_code && false !== strpos( $r->stdout, '"cap":"edit_posts"' ), 'wp rolegate cap list <role>' );
+	$r = $run( 'rolegate cap list --format=json' );
+	$rw_ok( 0 === $r->return_code && false !== strpos( $r->stdout, '"cap":"read"' ), 'wp rolegate cap list' );
+	$r = $run( 'rolegate user assign ' . (int) $u . ' ' . $c1 );
+	$rw_ok( 0 === $r->return_code && in_array( $c1, get_userdata( $u )->roles, true ), 'wp rolegate user assign' );
+	$r = $run( 'rolegate user roles ' . (int) $u );
+	$rw_ok( 0 === $r->return_code && false !== strpos( $r->stdout, $c1 ), 'wp rolegate user roles' );
+	$r = $run( 'rolegate user unassign ' . (int) $u . ' ' . $c1 );
+	$rw_ok( 0 === $r->return_code && ! in_array( $c1, get_userdata( $u )->roles, true ), 'wp rolegate user unassign' );
+	$r = $run( 'rolegate role delete ' . $c2 . ' --yes' );
+	$rw_ok( 0 === $r->return_code && null === get_role( $c2 ), 'wp rolegate role delete' );
+	$r = $run( 'rolegate role delete administrator --yes' );
+	$rw_ok( 0 !== $r->return_code && ! empty( get_role( 'administrator' ) ), 'wp rolegate role delete refuses administrator' );
 	get_role( 'editor' )->add_cap( 'rw_junk2_' . $sfx );
-	$r = $run( 'rolewright role reset editor --yes' );
-	$rw_ok( 0 === $r->return_code && empty( $role_caps( 'editor' )[ 'rw_junk2_' . $sfx ] ), 'wp rolewright role reset' );
+	$r = $run( 'rolegate role reset editor --yes' );
+	$rw_ok( 0 === $r->return_code && empty( $role_caps( 'editor' )[ 'rw_junk2_' . $sfx ] ), 'wp rolegate role reset' );
 	$file = sys_get_temp_dir() . '/rw-auto-' . $sfx . '.json';
-	$r    = $run( 'rolewright export --roles=' . $c1 . ' --file=' . $file );
-	$rw_ok( 0 === $r->return_code && is_file( $file ) && isset( json_decode( (string) file_get_contents( $file ), true )['roles'][ $c1 ] ), 'wp rolewright export' );
+	$r    = $run( 'rolegate export --roles=' . $c1 . ' --file=' . $file );
+	$rw_ok( 0 === $r->return_code && is_file( $file ) && isset( json_decode( (string) file_get_contents( $file ), true )['roles'][ $c1 ] ), 'wp rolegate export' );
 	$exp = json_decode( (string) file_get_contents( $file ), true );
 	$exp['roles'][ $c1 ]['capabilities']['upload_files'] = true;
 	file_put_contents( $file, wp_json_encode( $exp ) );
-	$r = $run( 'rolewright import ' . $file . ' --dry-run' );
-	$rw_ok( 0 === $r->return_code && false !== strpos( $r->stdout, 'overwrite' ) && empty( $role_caps( $c1 )['upload_files'] ), 'wp rolewright import --dry-run writes nothing' );
-	$r = $run( 'rolewright import ' . $file . ' --yes' );
-	$rw_ok( 0 === $r->return_code && ! empty( $role_caps( $c1 )['upload_files'] ), 'wp rolewright import' );
+	$r = $run( 'rolegate import ' . $file . ' --dry-run' );
+	$rw_ok( 0 === $r->return_code && false !== strpos( $r->stdout, 'overwrite' ) && empty( $role_caps( $c1 )['upload_files'] ), 'wp rolegate import --dry-run writes nothing' );
+	$r = $run( 'rolegate import ' . $file . ' --yes' );
+	$rw_ok( 0 === $r->return_code && ! empty( $role_caps( $c1 )['upload_files'] ), 'wp rolegate import' );
 	@unlink( $file ); // phpcs:ignore
 	wp_set_current_user( $mgr );
-	$r = $run( 'rolewright cap add ' . $c1 . ' manage_options' );
+	$r = $run( 'rolegate cap add ' . $c1 . ' manage_options' );
 	$rw_ok( 0 !== $r->return_code && empty( $role_caps( $c1 )['manage_options'] ), 'CLI as a named user can\'t escalate' );
 	wp_set_current_user( $u );
-	$r = $run( 'rolewright role list' );
-	$rw_ok( 0 !== $r->return_code, 'CLI as a named user without Rolewright caps is refused' );
+	$r = $run( 'rolegate role list' );
+	$rw_ok( 0 !== $r->return_code, 'CLI as a named user without Role Gatekeeper caps is refused' );
 	wp_set_current_user( $admin );
 } else {
 	echo "SKIP wp-cli tests (not running under WP-CLI)\n";
@@ -247,7 +247,7 @@ $GLOBALS['wp_rest_server'] = $server;
 add_action( 'rest_api_init', array( new Rest_Routes(), 'register' ) );
 do_action( 'rest_api_init', $server );
 $call = function ( $method, $route, $params = array() ) use ( $server ) {
-	$req = new WP_REST_Request( $method, '/rolewright/v1' . $route );
+	$req = new WP_REST_Request( $method, '/rolegate/v1' . $route );
 	foreach ( $params as $k => $v ) {
 		$req->set_param( $k, $v );
 	}
@@ -266,10 +266,10 @@ $rw_ok( 200 === $status( $r ) && isset( $r->get_data()['read'] ), 'REST GET /cap
 $r = $call( 'GET', '/users/' . $u . '/caps' );
 $rw_ok( 200 === $status( $r ) && in_array( 'read', $r->get_data()['capabilities'], true ), 'REST GET /users/<id>/caps effective caps' );
 $r = $call( 'POST', '/roles', array( 'name' => 'REST Role' ) );
-$rw_ok( 403 === $status( $r ) && 'rolewright_read_only' === $r->as_error()->get_error_code(), 'REST writes are refused by default, even for an administrator' );
+$rw_ok( 403 === $status( $r ) && 'rolegate_read_only' === $r->as_error()->get_error_code(), 'REST writes are refused by default, even for an administrator' );
 $rw_ok( 403 === $status( $call( 'POST', '/roles/' . $a . '/caps', array( 'add' => array( 'read' ) ) ) ) && 403 === $status( $call( 'POST', '/users/' . $u . '/roles', array( 'assign' => array( $a ) ) ) ) && 403 === $status( $call( 'DELETE', '/roles/' . $a ) ), 'every REST write route is read-only by default' );
 wp_set_current_user( $u );
-$rw_ok( in_array( $status( $call( 'GET', '/roles' ) ), array( 401, 403 ), true ), 'REST read needs the Rolewright capability' );
+$rw_ok( in_array( $status( $call( 'GET', '/roles' ) ), array( 401, 403 ), true ), 'REST read needs the Role Gatekeeper capability' );
 wp_set_current_user( 0 );
 $rw_ok( in_array( $status( $call( 'GET', '/roles' ) ), array( 401, 403 ), true ), 'REST read refuses anonymous callers' );
 
@@ -333,23 +333,23 @@ if ( function_exists( 'wp_register_ability' ) && function_exists( 'wp_get_abilit
 	};
 	$names = array( 'list-roles', 'get-role', 'list-capabilities', 'get-user-capabilities', 'add-role-capability', 'remove-role-capability', 'assign-user-role', 'unassign-user-role', 'delete-role' );
 	$has   = function ( $n ) {
-		return wp_has_ability( 'rolewright/' . $n );
+		return wp_has_ability( 'rolegate/' . $n );
 	};
 	$clear = function () use ( $names, $has ) {
 		foreach ( $names as $n ) {
 			if ( $has( $n ) ) {
-				wp_unregister_ability( 'rolewright/' . $n );
+				wp_unregister_ability( 'rolegate/' . $n );
 			}
 		}
 	};
 	$clear();
 	delete_option( Automation_Module::OPTION_SETTINGS );
 	$register();
-	$list = wp_get_ability( 'rolewright/list-roles' );
+	$list = wp_get_ability( 'rolegate/list-roles' );
 	$rw_ok( $list && ! $has( 'add-role-capability' ) && ! $has( 'delete-role' ), 'abilities: only read abilities are registered by default' );
 	$res = $list ? $list->execute() : null;
 	$rw_ok( is_array( $res ) && count( $res['roles'] ) >= 5, 'abilities: list-roles runs for an administrator' );
-	$get = wp_get_ability( 'rolewright/get-user-capabilities' );
+	$get = wp_get_ability( 'rolegate/get-user-capabilities' );
 	$res = $get ? $get->execute( array( 'user' => $u ) ) : null;
 	$rw_ok( is_array( $res ) && in_array( 'read', $res['capabilities'], true ), 'abilities: get-user-capabilities' );
 	wp_set_current_user( $u );
@@ -362,17 +362,17 @@ if ( function_exists( 'wp_register_ability' ) && function_exists( 'wp_get_abilit
 	$clear();
 	update_option( Automation_Module::OPTION_SETTINGS, array( 'rest_writes' => false, 'abilities_writes' => true ) );
 	$register();
-	$add = wp_get_ability( 'rolewright/add-role-capability' );
+	$add = wp_get_ability( 'rolegate/add-role-capability' );
 	$rw_ok( $add && $has( 'delete-role' ), 'abilities: write abilities appear when the setting allows' );
 	$res = $add->execute( array( 'role' => $a, 'capability' => 'upload_files' ) );
 	$rw_ok( ! is_wp_error( $res ) && ! empty( $role_caps( $a )['upload_files'] ), 'abilities: a harmless change runs without confirm' );
 	$res = $add->execute( array( 'role' => $a, 'capability' => 'manage_options' ) );
-	$rw_ok( 'rolewright_confirm_required' === $code( $res ) && empty( $role_caps( $a )['manage_options'] ), 'abilities: a risky change is refused without confirm' );
+	$rw_ok( 'rolegate_confirm_required' === $code( $res ) && empty( $role_caps( $a )['manage_options'] ), 'abilities: a risky change is refused without confirm' );
 	$res = $add->execute( array( 'role' => $a, 'capability' => 'manage_options', 'confirm' => true ) );
 	$rw_ok( ! is_wp_error( $res ) && ! empty( $role_caps( $a )['manage_options'] ), 'abilities: a risky change runs with confirm' );
-	$rem = wp_get_ability( 'rolewright/remove-role-capability' );
+	$rem = wp_get_ability( 'rolegate/remove-role-capability' );
 	$res = $rem->execute( array( 'role' => 'administrator', 'capability' => Caps::MANAGE, 'confirm' => true ) );
-	$rw_ok( 'rolewright_protected_role' === $code( $res ) && ! empty( $role_caps( 'administrator' )[ Caps::MANAGE ] ), 'abilities: confirm does not override the lockout and protection rules' );
+	$rw_ok( 'rolegate_protected_role' === $code( $res ) && ! empty( $role_caps( 'administrator' )[ Caps::MANAGE ] ), 'abilities: confirm does not override the lockout and protection rules' );
 	wp_set_current_user( $mgr );
 	$res = $add->execute( array( 'role' => $a, 'capability' => 'edit_users', 'confirm' => true ) );
 	$rw_ok( is_wp_error( $res ) && empty( $role_caps( $a )['edit_users'] ), 'abilities: a limited caller can\'t escalate through an ability' );

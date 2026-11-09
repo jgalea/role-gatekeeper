@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
-<ruleset name="Rolewright">
-	<description>Rolewright coding standard.</description>
+<ruleset name="Role Gatekeeper">
+	<description>Role Gatekeeper coding standard.</description>
 
 	<file>.</file>
 	<exclude-pattern>/tests/*</exclude-pattern>
@@ -20,7 +20,7 @@
 	<rule ref="WordPress.WP.I18n">
 		<properties>
 			<property name="text_domain" type="array">
-				<element value="rolewright"/>
+				<element value="role-gatekeeper"/>
 			</property>
 		</properties>
 	</rule>
@@ -28,8 +28,8 @@
 	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
 		<properties>
 			<property name="prefixes" type="array">
-				<element value="rolewright"/>
-				<element value="Rolewright"/>
+				<element value="rolegate"/>
+				<element value="Rolegate"/>
 			</property>
 		</properties>
 	</rule>

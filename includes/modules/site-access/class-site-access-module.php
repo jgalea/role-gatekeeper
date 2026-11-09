@@ -1,7 +1,7 @@
 <?php
-namespace Rolewright\Modules\Site_Access;
+namespace Rolegate\Modules\Site_Access;
 
-use Rolewright\Core\Module;
+use Rolegate\Core\Module;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -11,11 +11,11 @@ final class Site_Access_Module extends Module {
 	}
 
 	public function title(): string {
-		return __( 'Site access', 'rolewright' );
+		return __( 'Site access', 'role-gatekeeper' );
 	}
 
 	public function description(): string {
-		return __( 'Private-site mode, wp-admin access by role and toolbar hiding. Off until you switch it on.', 'rolewright' );
+		return __( 'Private-site mode, wp-admin access by role and toolbar hiding. Off until you switch it on.', 'role-gatekeeper' );
 	}
 
 	public function default_enabled(): bool {
@@ -23,8 +23,8 @@ final class Site_Access_Module extends Module {
 	}
 
 	public function init(): void {
-		add_filter( 'rolewright_module_restricts_user', array( __CLASS__, 'restricts_user' ), 10, 3 );
-		if ( defined( 'ROLEWRIGHT_DISABLE_SITE_ACCESS' ) && ROLEWRIGHT_DISABLE_SITE_ACCESS ) {
+		add_filter( 'rolegate_module_restricts_user', array( __CLASS__, 'restricts_user' ), 10, 3 );
+		if ( defined( 'ROLEGATE_DISABLE_SITE_ACCESS' ) && ROLEGATE_DISABLE_SITE_ACCESS ) {
 			return;
 		}
 		( new Gate() )->register();

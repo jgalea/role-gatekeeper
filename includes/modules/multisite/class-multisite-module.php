@@ -1,44 +1,44 @@
 <?php
-namespace Rolewright\Modules\Multisite;
+namespace Rolegate\Modules\Multisite;
 
-use Rolewright\Core\Module;
-use Rolewright\Modules\Portability\Role_Store;
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Core\Module;
+use Rolegate\Modules\Portability\Role_Store;
+use Rolegate\Modules\Safety\Caps;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
  * Network tools: copy a role to every site, push all roles and users, and decide whether
- * site administrators may use Rolewright. Registers nothing on a single-site install.
+ * site administrators may use Role Gatekeeper. Registers nothing on a single-site install.
  */
 final class Multisite_Module extends Module {
-	const SLUG              = 'rolewright-multisite';
-	const OPTION_SITE_ADMIN = 'rolewright_network_site_admin_access';
-	const OPTION_BATCH      = 'rolewright_network_batch_size';
-	const NOTICE_KEY        = 'rolewright_ms_notice_';
+	const SLUG              = 'role-gatekeeper-multisite';
+	const OPTION_SITE_ADMIN = 'rolegate_network_site_admin_access';
+	const OPTION_BATCH      = 'rolegate_network_batch_size';
+	const NOTICE_KEY        = 'rolegate_ms_notice_';
 
 	public function id(): string {
 		return 'multisite';
 	}
 
 	public function title(): string {
-		return __( 'Multisite', 'rolewright' );
+		return __( 'Multisite', 'role-gatekeeper' );
 	}
 
 	public function description(): string {
-		return __( 'On a network: copy roles to every site, push users to subsites, and choose whether site administrators may use Rolewright.', 'rolewright' );
+		return __( 'On a network: copy roles to every site, push users to subsites, and choose whether site administrators may use Role Gatekeeper.', 'role-gatekeeper' );
 	}
 
 	public function init(): void {
 		if ( ! is_multisite() ) {
 			return;
 		}
-		add_filter( 'rolewright_multisite_site_admin_access', array( __CLASS__, 'site_admins_allowed' ), 10, 1 );
+		add_filter( 'rolegate_multisite_site_admin_access', array( __CLASS__, 'site_admins_allowed' ), 10, 1 );
 		add_filter( 'map_meta_cap', array( __CLASS__, 'restrict_site_admins' ), 10, 4 );
 		add_action( 'network_admin_menu', array( $this, 'menu' ) );
-		add_action( 'admin_post_rolewright_ms_settings', array( $this, 'handle_settings' ) );
-		add_action( 'admin_post_rolewright_ms_start', array( $this, 'handle_start' ) );
-		add_action( 'admin_post_rolewright_ms_batch', array( $this, 'handle_batch' ) );
+		add_action( 'admin_post_rolegate_ms_settings', array( $this, 'handle_settings' ) );
+		add_action( 'admin_post_rolegate_ms_start', array( $this, 'handle_start' ) );
+		add_action( 'admin_post_rolegate_ms_batch', array( $this, 'handle_batch' ) );
 	}
 
 	public static function site_admins_allowed( $allowed = false ): bool {
@@ -46,8 +46,8 @@ final class Multisite_Module extends Module {
 	}
 
 	/**
-	 * With the network setting off and no `rolewright_multisite_site_admin_access` grant,
-	 * no Rolewright cap (pages included) is usable by anyone but a super admin.
+	 * With the network setting off and no `rolegate_multisite_site_admin_access` grant,
+	 * no Role Gatekeeper cap (pages included) is usable by anyone but a super admin.
 	 *
 	 * @param string[] $caps
 	 * @param string   $cap
@@ -56,7 +56,7 @@ final class Multisite_Module extends Module {
 	 * @return string[]
 	 */
 	public static function restrict_site_admins( $caps, $cap, $user_id, $args ) {
-		if ( in_array( $cap, Caps::all(), true ) && ! is_super_admin( (int) $user_id ) && ! apply_filters( 'rolewright_multisite_site_admin_access', false, get_userdata( (int) $user_id ) ) ) {
+		if ( in_array( $cap, Caps::all(), true ) && ! is_super_admin( (int) $user_id ) && ! apply_filters( 'rolegate_multisite_site_admin_access', false, get_userdata( (int) $user_id ) ) ) {
 			return array( 'do_not_allow' );
 		}
 		return $caps;
@@ -67,7 +67,7 @@ final class Multisite_Module extends Module {
 	}
 
 	private function deny(): void {
-		wp_die( esc_html__( 'Only super admins can use the Rolewright network tools.', 'rolewright' ), '', array( 'response' => 403 ) );
+		wp_die( esc_html__( 'Only super admins can use the Role Gatekeeper network tools.', 'role-gatekeeper' ), '', array( 'response' => 403 ) );
 	}
 
 	private function page_url( array $args = array() ): string {
@@ -79,18 +79,18 @@ final class Multisite_Module extends Module {
 	}
 
 	public function menu(): void {
-		add_menu_page( __( 'Rolewright network', 'rolewright' ), __( 'Rolewright', 'rolewright' ), 'manage_network_options', self::SLUG, array( $this, 'render' ), 'dashicons-admin-network', 71 );
+		add_menu_page( __( 'Role Gatekeeper network', 'role-gatekeeper' ), __( 'Role Gatekeeper', 'role-gatekeeper' ), 'manage_network_options', self::SLUG, array( $this, 'render' ), 'dashicons-admin-network', 71 );
 	}
 
 	public function handle_settings(): void {
 		if ( ! $this->can() ) {
 			$this->deny();
 		}
-		check_admin_referer( 'rolewright_ms_settings' );
+		check_admin_referer( 'rolegate_ms_settings' );
 		update_site_option( self::OPTION_SITE_ADMIN, ! empty( $_POST['site_admins'] ) );
 		$batch = isset( $_POST['batch'] ) ? absint( $_POST['batch'] ) : Network_Sync::DEFAULT_BATCH;
 		update_site_option( self::OPTION_BATCH, max( 1, min( 200, $batch ) ) );
-		$this->notice( 'success', __( 'Network settings saved.', 'rolewright' ) );
+		$this->notice( 'success', __( 'Network settings saved.', 'role-gatekeeper' ) );
 		wp_safe_redirect( $this->page_url() );
 		exit;
 	}
@@ -99,7 +99,7 @@ final class Multisite_Module extends Module {
 		if ( ! $this->can() ) {
 			$this->deny();
 		}
-		check_admin_referer( 'rolewright_ms_start' );
+		check_admin_referer( 'rolegate_ms_start' );
 		$kind   = isset( $_POST['kind'] ) && 'push' === $_POST['kind'] ? 'push' : 'role';
 		$source = isset( $_POST['source'] ) ? absint( $_POST['source'] ) : get_main_site_id();
 		if ( 'push' === $kind ) {
@@ -113,7 +113,7 @@ final class Multisite_Module extends Module {
 			$users = false;
 		}
 		if ( empty( $_POST['confirm'] ) ) {
-			$this->notice( 'error', __( 'Tick the confirmation box: this changes every site on the network.', 'rolewright' ) );
+			$this->notice( 'error', __( 'Tick the confirmation box: this changes every site on the network.', 'role-gatekeeper' ) );
 			wp_safe_redirect( $this->page_url() );
 			exit;
 		}
@@ -132,10 +132,10 @@ final class Multisite_Module extends Module {
 			$this->deny();
 		}
 		$id = isset( $_POST['job'] ) ? preg_replace( '/[^A-Za-z0-9]/', '', (string) wp_unslash( $_POST['job'] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- reduced to letters and digits by preg_replace.
-		check_admin_referer( 'rolewright_ms_batch_' . $id );
+		check_admin_referer( 'rolegate_ms_batch_' . $id );
 		$job = Network_Sync::get( get_current_user_id(), $id );
 		if ( ! $job ) {
-			$this->notice( 'error', __( 'That job has expired or belongs to someone else.', 'rolewright' ) );
+			$this->notice( 'error', __( 'That job has expired or belongs to someone else.', 'role-gatekeeper' ) );
 			wp_safe_redirect( $this->page_url() );
 			exit;
 		}
@@ -153,7 +153,7 @@ final class Multisite_Module extends Module {
 		if ( ! $this->can() ) {
 			$this->deny();
 		}
-		echo '<div class="wrap"><h1>' . esc_html__( 'Rolewright network tools', 'rolewright' ) . '</h1>';
+		echo '<div class="wrap"><h1>' . esc_html__( 'Role Gatekeeper network tools', 'role-gatekeeper' ) . '</h1>';
 		$notice = get_site_transient( self::NOTICE_KEY . get_current_user_id() );
 		if ( is_array( $notice ) ) {
 			delete_site_transient( self::NOTICE_KEY . get_current_user_id() );
@@ -171,13 +171,13 @@ final class Multisite_Module extends Module {
 	}
 
 	private function render_job( array $job ): void {
-		echo '<div class="card" style="max-width:none"><h2>' . esc_html( $job['finished'] ? __( 'Job finished', 'rolewright' ) : __( 'Job in progress', 'rolewright' ) ) . '</h2>';
+		echo '<div class="card" style="max-width:none"><h2>' . esc_html( $job['finished'] ? __( 'Job finished', 'role-gatekeeper' ) : __( 'Job in progress', 'role-gatekeeper' ) ) . '</h2>';
 		printf(
 			'<p>%s</p>',
 			esc_html(
 				sprintf(
 					/* translators: 1: sites processed, 2: total sites, 3: role changes, 4: users added */
-					__( 'Sites processed: %1$d of %2$d. Role changes: %3$d. Users added: %4$d.', 'rolewright' ),
+					__( 'Sites processed: %1$d of %2$d. Role changes: %3$d. Users added: %4$d.', 'role-gatekeeper' ),
 					min( $job['offset'], $job['total'] ),
 					$job['total'],
 					$job['roles_done'],
@@ -193,13 +193,13 @@ final class Multisite_Module extends Module {
 			echo '</ul>';
 		}
 		if ( ! $job['finished'] ) {
-			echo '<form id="rolewright-ms-batch" method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
-			echo '<input type="hidden" name="action" value="rolewright_ms_batch" />';
+			echo '<form id="rolegate-ms-batch" method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+			echo '<input type="hidden" name="action" value="rolegate_ms_batch" />';
 			echo '<input type="hidden" name="job" value="' . esc_attr( $job['id'] ) . '" />';
-			wp_nonce_field( 'rolewright_ms_batch_' . $job['id'] );
-			submit_button( __( 'Run next batch', 'rolewright' ), 'primary', 'rolewright-ms-next', false );
+			wp_nonce_field( 'rolegate_ms_batch_' . $job['id'] );
+			submit_button( __( 'Run next batch', 'role-gatekeeper' ), 'primary', 'rolegate-ms-next', false );
 			echo '</form>';
-			echo '<script>setTimeout(function(){document.getElementById("rolewright-ms-batch").submit();},300);</script>';
+			echo '<script>setTimeout(function(){document.getElementById("rolegate-ms-batch").submit();},300);</script>';
 		}
 		echo '</div>';
 	}
@@ -211,54 +211,54 @@ final class Multisite_Module extends Module {
 		restore_current_blog();
 		$post = esc_url( admin_url( 'admin-post.php' ) );
 
-		echo '<h2>' . esc_html__( 'Apply a role to all sites', 'rolewright' ) . '</h2>';
+		echo '<h2>' . esc_html__( 'Apply a role to all sites', 'role-gatekeeper' ) . '</h2>';
 		echo '<form method="post" action="' . $post . '">'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above.
-		echo '<input type="hidden" name="action" value="rolewright_ms_start" /><input type="hidden" name="kind" value="role" />';
+		echo '<input type="hidden" name="action" value="rolegate_ms_start" /><input type="hidden" name="kind" value="role" />';
 		echo '<input type="hidden" name="source" value="' . esc_attr( (string) $main ) . '" />';
-		wp_nonce_field( 'rolewright_ms_start' );
-		echo '<p><label for="rolewright-ms-role">' . esc_html__( 'Role on the main site', 'rolewright' ) . '</label> <select id="rolewright-ms-role" name="role">';
+		wp_nonce_field( 'rolegate_ms_start' );
+		echo '<p><label for="rolegate-ms-role">' . esc_html__( 'Role on the main site', 'role-gatekeeper' ) . '</label> <select id="rolegate-ms-role" name="role">';
 		foreach ( $roles as $slug => $def ) {
 			printf( '<option value="%1$s">%2$s (%1$s)</option>', esc_attr( $slug ), esc_html( translate_user_role( $def['name'] ) ) );
 		}
 		echo '</select></p>';
-		echo '<p><label style="display:block"><input type="radio" name="mode" value="replace" checked="checked" /> ' . esc_html__( 'Sync: copy the role exactly, creating it where missing', 'rolewright' ) . '</label>';
-		echo '<label style="display:block"><input type="radio" name="mode" value="merge" /> ' . esc_html__( 'Add its capabilities only, keep what each site has', 'rolewright' ) . '</label></p>';
-		echo '<p><label><input type="checkbox" name="confirm" value="1" /> ' . esc_html__( 'I understand this changes every site on the network.', 'rolewright' ) . '</label></p>';
-		submit_button( __( 'Apply to all sites', 'rolewright' ), 'secondary', 'rolewright-ms-apply' );
+		echo '<p><label style="display:block"><input type="radio" name="mode" value="replace" checked="checked" /> ' . esc_html__( 'Sync: copy the role exactly, creating it where missing', 'role-gatekeeper' ) . '</label>';
+		echo '<label style="display:block"><input type="radio" name="mode" value="merge" /> ' . esc_html__( 'Add its capabilities only, keep what each site has', 'role-gatekeeper' ) . '</label></p>';
+		echo '<p><label><input type="checkbox" name="confirm" value="1" /> ' . esc_html__( 'I understand this changes every site on the network.', 'role-gatekeeper' ) . '</label></p>';
+		submit_button( __( 'Apply to all sites', 'role-gatekeeper' ), 'secondary', 'rolegate-ms-apply' );
 		echo '</form>';
 
-		echo '<h2>' . esc_html__( 'Push all roles and users', 'rolewright' ) . '</h2>';
-		echo '<p>' . esc_html__( 'Copies every role from the main site to all other sites. Optionally adds the main site\'s users to sites they don\'t belong to yet, with the same roles. Users who are already members keep their roles.', 'rolewright' ) . '</p>';
+		echo '<h2>' . esc_html__( 'Push all roles and users', 'role-gatekeeper' ) . '</h2>';
+		echo '<p>' . esc_html__( 'Copies every role from the main site to all other sites. Optionally adds the main site\'s users to sites they don\'t belong to yet, with the same roles. Users who are already members keep their roles.', 'role-gatekeeper' ) . '</p>';
 		echo '<form method="post" action="' . $post . '">'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped above.
-		echo '<input type="hidden" name="action" value="rolewright_ms_start" /><input type="hidden" name="kind" value="push" />';
+		echo '<input type="hidden" name="action" value="rolegate_ms_start" /><input type="hidden" name="kind" value="push" />';
 		echo '<input type="hidden" name="source" value="' . esc_attr( (string) $main ) . '" />';
-		wp_nonce_field( 'rolewright_ms_start' );
-		echo '<p><label><input type="checkbox" name="users" value="1" /> ' . esc_html__( 'Also add users to every site', 'rolewright' ) . '</label></p>';
-		echo '<p><label><input type="checkbox" name="confirm" value="1" /> ' . esc_html__( 'I understand this changes every site on the network.', 'rolewright' ) . '</label></p>';
-		submit_button( __( 'Push to all sites', 'rolewright' ), 'secondary', 'rolewright-ms-push' );
+		wp_nonce_field( 'rolegate_ms_start' );
+		echo '<p><label><input type="checkbox" name="users" value="1" /> ' . esc_html__( 'Also add users to every site', 'role-gatekeeper' ) . '</label></p>';
+		echo '<p><label><input type="checkbox" name="confirm" value="1" /> ' . esc_html__( 'I understand this changes every site on the network.', 'role-gatekeeper' ) . '</label></p>';
+		submit_button( __( 'Push to all sites', 'role-gatekeeper' ), 'secondary', 'rolegate-ms-push' );
 		echo '</form>';
 	}
 
 	private function render_settings(): void {
-		echo '<h2>' . esc_html__( 'Settings', 'rolewright' ) . '</h2>';
+		echo '<h2>' . esc_html__( 'Settings', 'role-gatekeeper' ) . '</h2>';
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
-		echo '<input type="hidden" name="action" value="rolewright_ms_settings" />';
-		wp_nonce_field( 'rolewright_ms_settings' );
+		echo '<input type="hidden" name="action" value="rolegate_ms_settings" />';
+		wp_nonce_field( 'rolegate_ms_settings' );
 		echo '<table class="form-table" role="presentation"><tbody>';
 		printf(
 			'<tr><th scope="row">%1$s</th><td><label><input type="checkbox" name="site_admins" value="1" %2$s /> %3$s</label></td></tr>',
-			esc_html__( 'Site administrators', 'rolewright' ),
+			esc_html__( 'Site administrators', 'role-gatekeeper' ),
 			checked( self::site_admins_allowed(), true, false ),
-			esc_html__( 'Let site administrators use Rolewright on their own sites', 'rolewright' )
+			esc_html__( 'Let site administrators use Role Gatekeeper on their own sites', 'role-gatekeeper' )
 		);
 		printf(
-			'<tr><th scope="row"><label for="rolewright-ms-batch-size">%1$s</label></th><td><input type="number" id="rolewright-ms-batch-size" name="batch" min="1" max="200" value="%2$d" /> <p class="description">%3$s</p></td></tr>',
-			esc_html__( 'Sites per batch', 'rolewright' ),
+			'<tr><th scope="row"><label for="rolegate-ms-batch-size">%1$s</label></th><td><input type="number" id="rolegate-ms-batch-size" name="batch" min="1" max="200" value="%2$d" /> <p class="description">%3$s</p></td></tr>',
+			esc_html__( 'Sites per batch', 'role-gatekeeper' ),
 			(int) Network_Sync::batch_size(),
-			esc_html__( 'Lower this if a batch times out.', 'rolewright' )
+			esc_html__( 'Lower this if a batch times out.', 'role-gatekeeper' )
 		);
 		echo '</tbody></table>';
-		submit_button( __( 'Save settings', 'rolewright' ), 'primary', 'rolewright-ms-save' );
+		submit_button( __( 'Save settings', 'role-gatekeeper' ), 'primary', 'rolegate-ms-save' );
 		echo '</form>';
 	}
 }

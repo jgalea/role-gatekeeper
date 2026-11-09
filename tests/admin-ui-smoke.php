@@ -1,21 +1,21 @@
 <?php
 /**
- * Run: wp eval-file wp-content/plugins/rolewright/tests/admin-ui-smoke.php
+ * Run: wp eval-file wp-content/plugins/role-gatekeeper/tests/admin-ui-smoke.php
  */
 
-use Rolewright\Modules\Admin_Ui\Discovery;
-use Rolewright\Modules\Admin_Ui\Engine;
-use Rolewright\Modules\Admin_Ui\Enforcer;
-use Rolewright\Modules\Admin_Ui\Rules;
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Modules\Admin_Ui\Discovery;
+use Rolegate\Modules\Admin_Ui\Engine;
+use Rolegate\Modules\Admin_Ui\Enforcer;
+use Rolegate\Modules\Admin_Ui\Rules;
+use Rolegate\Modules\Safety\Caps;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
 }
 
-// Multisite: site administrators hold rolewright_* caps only when the network grants it; these checks are about role-based access, so grant it.
+// Multisite: site administrators hold rolegate_* caps only when the network grants it; these checks are about role-based access, so grant it.
 if ( is_multisite() ) {
-	add_filter( 'rolewright_multisite_site_admin_access', '__return_true', 20 );
+	add_filter( 'rolegate_multisite_site_admin_access', '__return_true', 20 );
 	// Core only lets site administrators manage plugins when the network enables the Plugins menu.
 	$rw_saved_menu_items = get_site_option( 'menu_items' );
 	update_site_option( 'menu_items', array( 'plugins' => 1 ) );
@@ -91,7 +91,7 @@ add_filter(
 );
 $events = array();
 add_action(
-	'rolewright_changed',
+	'rolegate_changed',
 	function ( $type, $data ) use ( &$events ) {
 		$events[] = array( $type, $data );
 	},
@@ -136,7 +136,7 @@ try {
 	add_role( $r_view, 'RW viewer', array( 'read' => true, Caps::MANAGE => true, 'edit_posts' => true ) );
 	add_role( $r_high, 'RW high', array( 'read' => true, 'manage_options' => true ) );
 	// With the role hierarchy on, the manager must rank above the users it restricts.
-	update_option( 'rolewright_role_positions', array_merge( (array) get_option( 'rolewright_role_positions', array() ), array( $r_mgr => 50 ) ), false );
+	update_option( 'rolegate_role_positions', array_merge( (array) get_option( 'rolegate_role_positions', array() ), array( $r_mgr => 50 ) ), false );
 	$mgr     = $make( 'rw_mgr', $r_mgr );
 	get_userdata( $mgr )->add_role( $r_view );
 	$rest    = $make( 'rw_rest', $r_rest );
@@ -150,7 +150,7 @@ try {
 		70 => array( 'Users', 'list_users', 'users.php' ),
 		75 => array( 'Tools', 'edit_posts', 'tools.php' ),
 		80 => array( 'Settings', 'edit_posts', 'options-general.php' ),
-		71 => array( 'Rolewright', 'read', 'rolewright' ),
+		71 => array( 'Role Gatekeeper', 'read', 'role-gatekeeper' ),
 		60 => array( 'Appearance', 'edit_theme_options', 'themes.php' ),
 	);
 	$submenu = array(
@@ -159,7 +159,7 @@ try {
 		'users.php'           => array( array( 'All Users', 'list_users', 'users.php' ), array( 'Profile', 'read', 'profile.php' ) ),
 		'tools.php'           => array( array( 'Available Tools', 'edit_posts', 'tools.php' ), array( 'Import', 'edit_posts', 'import.php' ) ),
 		'options-general.php' => array( array( 'General', 'edit_posts', 'options-general.php' ), array( 'Plugin Page', 'edit_posts', 'my-plugin-page' ) ),
-		'rolewright'          => array( array( 'Modules', 'read', 'rolewright' ), array( 'Admin interface', 'read', 'rolewright-admin-ui' ) ),
+		'role-gatekeeper'          => array( array( 'Modules', 'read', 'role-gatekeeper' ), array( 'Admin interface', 'read', 'role-gatekeeper-admin-ui' ) ),
 		'themes.php'          => array( array( 'Themes', 'edit_theme_options', 'themes.php' ), array( 'Widgets', 'edit_theme_options', 'widgets.php' ), array( 'Menus', 'edit_theme_options', 'nav-menus.php' ) ),
 	);
 	Discovery::set_snapshot( $menu, $submenu );
@@ -169,46 +169,46 @@ try {
 		array(
 			'menu'      => array( 'model' => 'bogus', 'items' => array( 'users.php', '<script>', 'a b', str_repeat( 'x', 300 ) ) ),
 			'blocks'    => array( 'widgets', 'nope' ),
-			'plugins'   => array( 'locked' => array( 'hello.php', '../../evil.php', 'rolewright/rolewright.php', 'x.txt' ) ),
+			'plugins'   => array( 'locked' => array( 'hello.php', '../../evil.php', plugin_basename( ROLEGATE_FILE ), 'x.txt' ) ),
 			'metaboxes' => array( 'post' => array( 'postcustom', 'bad id!' ), 'Bad Type' => array() ),
 		)
 	);
 	$rw_ok( 'deny' === $dirty['menu']['model'] && array( 'users.php' ) === $dirty['menu']['items'], 'sanitize: unknown model falls back to deny, junk slugs dropped' );
 	$rw_ok( array( 'widgets' ) === $dirty['blocks'], 'sanitize: unknown block ids dropped' );
-	$rw_ok( array( 'hello.php' ) === $dirty['plugins']['locked'], 'sanitize: traversal, non-php and the Rolewright plugin itself dropped from plugin lists' );
+	$rw_ok( array( 'hello.php' ) === $dirty['plugins']['locked'], 'sanitize: traversal, non-php and the Role Gatekeeper plugin itself dropped from plugin lists' );
 	$rw_ok( array( 'postcustom' ) === ( $dirty['metaboxes']['post'] ?? array() ) && 1 === count( $dirty['metaboxes'] ), 'sanitize: meta box ids validated' );
 
 	$deny_profile = Rules::save( $mgr, 'role', $r_rest, array( 'menu' => array( 'model' => 'deny', 'items' => array( 'profile.php' ) ) ) );
-	$rw_ok( 'rolewright_exempt_item' === $code_of( $deny_profile ), 'profile page cannot be blocked from the menu' );
+	$rw_ok( 'rolegate_exempt_item' === $code_of( $deny_profile ), 'profile page cannot be blocked from the menu' );
 	$deny_sub = Rules::save( $mgr, 'role', $r_rest, array( 'menu' => array( 'model' => 'deny', 'items' => array( 'users.php|profile.php' ) ) ) );
-	$rw_ok( 'rolewright_exempt_item' === $code_of( $deny_sub ), 'profile submenu entry cannot be blocked' );
+	$rw_ok( 'rolegate_exempt_item' === $code_of( $deny_sub ), 'profile submenu entry cannot be blocked' );
 	$deny_bar = Rules::save( $mgr, 'role', $r_rest, array( 'admin_bar' => array( 'my-account' ) ) );
-	$rw_ok( 'rolewright_exempt_item' === $code_of( $deny_bar ), 'my-account toolbar node cannot be hidden' );
-	$rw_ok( 'rolewright_protected_role' === $code_of( Rules::save( $mgr, 'role', 'administrator', array( 'blocks' => array( 'widgets' ) ) ) ), 'Administrator role cannot be restricted' );
-	$rw_ok( 'rolewright_protected_user' === $code_of( Rules::save( $mgr, 'user', (string) $admin, array( 'blocks' => array( 'widgets' ) ) ) ), 'administrator user cannot be restricted' );
-	$rw_ok( 'rolewright_no_role' === $code_of( Rules::save( $mgr, 'role', 'nonexistent_' . $sfx, array( 'blocks' => array( 'widgets' ) ) ) ), 'unknown role refused' );
-	$rw_ok( 'rolewright_forbidden' === $code_of( Rules::save( $editor, 'role', $r_rest, array( 'blocks' => array( 'widgets' ) ) ) ), 'actor without the access capability refused' );
+	$rw_ok( 'rolegate_exempt_item' === $code_of( $deny_bar ), 'my-account toolbar node cannot be hidden' );
+	$rw_ok( 'rolegate_protected_role' === $code_of( Rules::save( $mgr, 'role', 'administrator', array( 'blocks' => array( 'widgets' ) ) ) ), 'Administrator role cannot be restricted' );
+	$rw_ok( 'rolegate_protected_user' === $code_of( Rules::save( $mgr, 'user', (string) $admin, array( 'blocks' => array( 'widgets' ) ) ) ), 'administrator user cannot be restricted' );
+	$rw_ok( 'rolegate_no_role' === $code_of( Rules::save( $mgr, 'role', 'nonexistent_' . $sfx, array( 'blocks' => array( 'widgets' ) ) ) ), 'unknown role refused' );
+	$rw_ok( 'rolegate_forbidden' === $code_of( Rules::save( $editor, 'role', $r_rest, array( 'blocks' => array( 'widgets' ) ) ) ), 'actor without the access capability refused' );
 	$rw_ok( false === get_option( Rules::OPTION, false ), 'refused saves stored nothing' );
 
 	// Lockout pre-check.
 	$empty_allow = Rules::save( $mgr, 'role', $r_view, array( 'menu' => array( 'model' => 'allow', 'items' => array() ) ) );
-	$rw_ok( 'rolewright_lockout' === $code_of( $empty_allow ) && in_array( 'empty_allow_list', (array) $empty_allow->get_error_data()['reasons'], true ), 'allow model with nothing selected refused for the actor own role (lockout)' );
-	$self_user = Rules::save( $mgr, 'user', (string) $mgr, array( 'menu' => array( 'model' => 'allow', 'items' => array( 'rolewright' ) ) ) );
-	$rw_ok( 'rolewright_lockout' === $code_of( $self_user ), 'allow list with only the Rolewright entry refused for the actor own user rule' );
+	$rw_ok( 'rolegate_lockout' === $code_of( $empty_allow ) && in_array( 'empty_allow_list', (array) $empty_allow->get_error_data()['reasons'], true ), 'allow model with nothing selected refused for the actor own role (lockout)' );
+	$self_user = Rules::save( $mgr, 'user', (string) $mgr, array( 'menu' => array( 'model' => 'allow', 'items' => array( 'role-gatekeeper' ) ) ) );
+	$rw_ok( 'rolegate_lockout' === $code_of( $self_user ), 'allow list with only the Role Gatekeeper entry refused for the actor own user rule' );
 	$rw_ok( false === get_option( Rules::OPTION, false ), 'lockout refusals stored nothing' );
 	$rw_ok( 'ok' === $code_of( Rules::save( $mgr, 'role', $r_rest, array( 'menu' => array( 'model' => 'allow', 'items' => array() ) ) ) ), 'empty allow list is fine for a role the actor does not hold' );
 	Rules::save( $mgr, 'role', $r_rest, array() );
 	$rw_ok( 'ok' === $code_of( Rules::save( $mgr, 'role', $r_view, array( 'menu' => array( 'model' => 'allow', 'items' => array( 'index.php', 'edit.php' ) ) ) ) ), 'allow list with real entries accepted for the actor own role' );
 	Rules::save( $mgr, 'role', $r_view, array() );
-	$rw_ok( 'ok' === $code_of( Rules::save( $mgr, 'role', $r_view, array( 'menu' => array( 'model' => 'deny', 'items' => array( 'rolewright', 'rolewright|rolewright-admin-ui', 'users.php' ) ) ) ) ), 'denying the Rolewright menu for a role holding the manage cap is accepted but never enforced' );
+	$rw_ok( 'ok' === $code_of( Rules::save( $mgr, 'role', $r_view, array( 'menu' => array( 'model' => 'deny', 'items' => array( 'role-gatekeeper', 'role-gatekeeper|role-gatekeeper-admin-ui', 'users.php' ) ) ) ) ), 'denying the Role Gatekeeper menu for a role holding the manage cap is accepted but never enforced' );
 
 	$eff_mgr = Rules::effective_for_user( $mgr );
 	$rw_ok( null !== $eff_mgr, 'effective rules computed for the manager' );
 	$can_manage = user_can( $mgr, Caps::MANAGE );
 	$rw_ok( $can_manage, 'manager holds the manage cap' );
-	$rw_ok( null === Engine::decide( 'admin.php', 'rolewright-admin-ui', array(), $menu, $submenu, $eff_mgr, true ), 'Rolewright admin-ui page is reachable even when its menu is in the deny list' );
-	$rw_ok( null === Engine::decide( 'admin.php', 'rolewright', array(), $menu, $submenu, $eff_mgr, true ), 'Rolewright top page reachable despite deny' );
-	$rw_ok( 'menu' === Engine::decide( 'admin.php', 'rolewright-admin-ui', array(), $menu, $submenu, $eff_mgr, false ), 'control: without the manage cap the same deny does block (exemption is what protects it)' );
+	$rw_ok( null === Engine::decide( 'admin.php', 'role-gatekeeper-admin-ui', array(), $menu, $submenu, $eff_mgr, true ), 'Role Gatekeeper admin-ui page is reachable even when its menu is in the deny list' );
+	$rw_ok( null === Engine::decide( 'admin.php', 'role-gatekeeper', array(), $menu, $submenu, $eff_mgr, true ), 'Role Gatekeeper top page reachable despite deny' );
+	$rw_ok( 'menu' === Engine::decide( 'admin.php', 'role-gatekeeper-admin-ui', array(), $menu, $submenu, $eff_mgr, false ), 'control: without the manage cap the same deny does block (exemption is what protects it)' );
 	wp_set_current_user( $mgr );
 	$GLOBALS['menu']    = $menu;
 	$GLOBALS['submenu'] = $submenu;
@@ -219,7 +219,7 @@ try {
 		},
 		$GLOBALS['menu']
 	);
-	$rw_ok( in_array( 'rolewright', $slugs, true ) && ! in_array( 'users.php', $slugs, true ), 'hide_menu removes users.php but keeps the Rolewright menu for a manage-cap holder' );
+	$rw_ok( in_array( 'role-gatekeeper', $slugs, true ) && ! in_array( 'users.php', $slugs, true ), 'hide_menu removes users.php but keeps the Role Gatekeeper menu for a manage-cap holder' );
 	wp_set_current_user( $admin );
 	$GLOBALS['menu']    = $menu;
 	$GLOBALS['submenu'] = $submenu;
@@ -238,18 +238,18 @@ try {
 	$rw_ok( ! $events, 'unchanged save fires no event' );
 
 	// Role rules need authority over the target role.
-	$rw_ok( 'rolewright_role_above_actor' === $code_of( Rules::save( $mgr, 'role', $r_high, array( 'blocks' => array( 'widgets' ) ) ) ), 'role holding a critical cap the actor lacks (manage_options) cannot be restricted' );
-	$rw_ok( 'rolewright_manager_role' === $code_of( Rules::save( $admin, 'role', $r_mgr, array( 'blocks' => array( 'widgets' ) ) ) ), 'role holding a rolewright_manage_* cap cannot be restricted, even by an administrator' );
-	$rw_ok( 'rolewright_manager_role' === $code_of( Rules::save( $mgr, 'role', $r_mgr, array( 'blocks' => array( 'widgets' ) ) ) ), 'actor cannot restrict their own manager role' );
+	$rw_ok( 'rolegate_role_above_actor' === $code_of( Rules::save( $mgr, 'role', $r_high, array( 'blocks' => array( 'widgets' ) ) ) ), 'role holding a critical cap the actor lacks (manage_options) cannot be restricted' );
+	$rw_ok( 'rolegate_manager_role' === $code_of( Rules::save( $admin, 'role', $r_mgr, array( 'blocks' => array( 'widgets' ) ) ) ), 'role holding a rolegate_manage_* cap cannot be restricted, even by an administrator' );
+	$rw_ok( 'rolegate_manager_role' === $code_of( Rules::save( $mgr, 'role', $r_mgr, array( 'blocks' => array( 'widgets' ) ) ) ), 'actor cannot restrict their own manager role' );
 	$planted                       = Rules::all();
 	$planted['roles'][ $r_high ]   = array_replace_recursive( Engine::empty_rule(), array( 'blocks' => array( 'widgets' ) ) );
 	$planted['roles'][ $r_mgr ]    = array_replace_recursive( Engine::empty_rule(), array( 'blocks' => array( 'widgets' ) ) );
 	update_option( Rules::OPTION, $planted );
 	Rules::flush_cache();
-	$rw_ok( 'rolewright_role_above_actor' === $code_of( Rules::save( $mgr, 'role', $r_high, array( 'blocks' => array( 'nav_menus' ) ) ) ), 'existing rule on a higher role cannot be updated by the actor' );
-	$rw_ok( 'rolewright_role_above_actor' === $code_of( Rules::save( $mgr, 'role', $r_high, array() ) ), 'existing rule on a higher role cannot be deleted by the actor' );
+	$rw_ok( 'rolegate_role_above_actor' === $code_of( Rules::save( $mgr, 'role', $r_high, array( 'blocks' => array( 'nav_menus' ) ) ) ), 'existing rule on a higher role cannot be updated by the actor' );
+	$rw_ok( 'rolegate_role_above_actor' === $code_of( Rules::save( $mgr, 'role', $r_high, array() ) ), 'existing rule on a higher role cannot be deleted by the actor' );
 	$rw_ok( isset( Rules::all()['roles'][ $r_high ] ), 'refused update/delete left the stored rule untouched' );
-	$rw_ok( 'rolewright_manager_role' === $code_of( Rules::save( $admin, 'role', $r_mgr, array( 'blocks' => array( 'nav_menus' ) ) ) ), 'existing rule on a manager role cannot be changed' );
+	$rw_ok( 'rolegate_manager_role' === $code_of( Rules::save( $admin, 'role', $r_mgr, array( 'blocks' => array( 'nav_menus' ) ) ) ), 'existing rule on a manager role cannot be changed' );
 	$rw_ok( 'ok' === $code_of( Rules::save( $mgr, 'role', $r_mgr, array() ) ) && ! isset( Rules::all()['roles'][ $r_mgr ] ), 'a stale rule on a manager role can still be cleared by someone with authority over it' );
 	$rw_ok( 'ok' === $code_of( Rules::save( $admin, 'role', $r_high, array() ) ) && ! isset( Rules::all()['roles'][ $r_high ] ), 'control: administrator can clear the higher role rule' );
 	$rw_ok( 'ok' === $code_of( Rules::save( $admin, 'role', $r_high, array( 'blocks' => array( 'widgets' ) ) ) ), 'control: administrator can restrict a role holding manage_options' );
@@ -419,7 +419,7 @@ try {
 	// Plugin access.
 	wp_set_current_user( $rest );
 	$rw_ok( ! user_can( $rest, 'activate_plugin', 'hello.php' ) && ! user_can( $rest, 'deactivate_plugin', 'hello.php' ) && ! user_can( $rest, 'delete_plugin', 'hello.php' ), 'locked plugin: activate, deactivate and delete caps refused' );
-	$rw_ok( user_can( $rest, 'activate_plugin', 'rolewright/rolewright.php' ), 'unlisted plugin still manageable' );
+	$rw_ok( user_can( $rest, 'activate_plugin', plugin_basename( ROLEGATE_FILE ) ), 'unlisted plugin still manageable' );
 	$rw_ok( ! user_can( $rest, 'activate_plugin', 'akismet/akismet.php' ), 'hidden plugin cannot be managed either' );
 	$rw_ok( user_can( $admin, 'activate_plugin', 'hello.php' ), 'administrator can still manage the locked plugin' );
 	$list = $enf->filter_plugin_list( array( 'akismet/akismet.php' => array(), 'hello.php' => array() ) );
@@ -447,7 +447,7 @@ try {
 	$rw_ok( $threw, 'deactivate_plugin action refuses a hidden plugin' );
 	$threw = false;
 	try {
-		do_action( 'activate_plugin', 'rolewright/rolewright.php', false );
+		do_action( 'activate_plugin', plugin_basename( ROLEGATE_FILE ), false );
 	} catch ( \RuntimeException $e ) {
 		$threw = true;
 	}
@@ -574,8 +574,8 @@ try {
 	wp_set_current_user( $admin );
 	$rw_ok( 'new-theme' === apply_filters( 'pre_update_option_stylesheet', 'new-theme', 'old-theme' ), 'control: administrator can switch themes' );
 
-	// Settings page registered under the Rolewright menu with the module capability.
-	$rw_ok( class_exists( '\Rolewright\Modules\Admin_Ui\Admin_Page' ) && 'rolewright-admin-ui' === \Rolewright\Modules\Admin_Ui\Admin_Page::SLUG, 'page slug is rolewright-admin-ui' );
+	// Settings page registered under the Role Gatekeeper menu with the module capability.
+	$rw_ok( class_exists( '\Rolegate\Modules\Admin_Ui\Admin_Page' ) && 'role-gatekeeper-admin-ui' === \Rolegate\Modules\Admin_Ui\Admin_Page::SLUG, 'page slug is role-gatekeeper-admin-ui' );
 } catch ( \Throwable $e ) {
 	++$rw_fail;
 	echo 'FAIL exception: ' . $e->getMessage() . ' at ' . basename( $e->getFile() ) . ':' . $e->getLine() . "\n";

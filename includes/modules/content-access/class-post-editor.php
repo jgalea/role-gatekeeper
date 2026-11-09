@@ -1,12 +1,12 @@
 <?php
-namespace Rolewright\Modules\Content_Access;
+namespace Rolegate\Modules\Content_Access;
 
-use Rolewright\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Caps;
 
 defined( 'ABSPATH' ) || exit;
 
 final class Post_Editor {
-	const NONCE = 'rolewright_post_access';
+	const NONCE = 'rolegate_post_access';
 
 	public function register(): void {
 		add_action( 'init', array( $this, 'register_meta' ), 100 );
@@ -20,7 +20,7 @@ final class Post_Editor {
 	private function post_types(): array {
 		$types = get_post_types( array( 'show_ui' => true ), 'names' );
 		unset( $types['attachment'], $types['wp_block'], $types['wp_template'], $types['wp_template_part'], $types['wp_navigation'], $types['wp_global_styles'] );
-		return array_values( (array) apply_filters( 'rolewright_access_post_types', $types ) );
+		return array_values( (array) apply_filters( 'rolegate_access_post_types', $types ) );
 	}
 
 	public function register_meta(): void {
@@ -102,8 +102,8 @@ final class Post_Editor {
 			return;
 		}
 		add_meta_box(
-			'rolewright-access',
-			__( 'Access', 'rolewright' ),
+			'rolegate-access',
+			__( 'Access', 'role-gatekeeper' ),
 			array( $this, 'render_meta_box' ),
 			$post_type,
 			'side',
@@ -114,25 +114,25 @@ final class Post_Editor {
 
 	public function render_meta_box( \WP_Post $post ): void {
 		$rules = Access::rules( (int) $post->ID );
-		wp_nonce_field( self::NONCE, '_rolewright_access_nonce' );
-		echo '<p>' . esc_html__( 'Only these roles can view this content. Leave all unchecked for everyone.', 'rolewright' ) . '</p>';
+		wp_nonce_field( self::NONCE, '_rolegate_access_nonce' );
+		echo '<p>' . esc_html__( 'Only these roles can view this content. Leave all unchecked for everyone.', 'role-gatekeeper' ) . '</p>';
 		foreach ( wp_roles()->get_names() as $slug => $name ) {
 			printf(
-				'<label style="display:block"><input type="checkbox" name="rolewright_roles[]" value="%1$s" %2$s /> %3$s</label>',
+				'<label style="display:block"><input type="checkbox" name="rolegate_roles[]" value="%1$s" %2$s /> %3$s</label>',
 				esc_attr( $slug ),
 				checked( in_array( $slug, $rules['roles'], true ), true, false ),
 				esc_html( translate_user_role( $name ) )
 			);
 		}
-		echo '<p><label for="rolewright-message">' . esc_html__( 'Message for people without access', 'rolewright' ) . '</label>';
+		echo '<p><label for="rolegate-message">' . esc_html__( 'Message for people without access', 'role-gatekeeper' ) . '</label>';
 		printf(
-			'<textarea id="rolewright-message" name="rolewright_message" rows="3" class="widefat">%s</textarea></p>',
+			'<textarea id="rolegate-message" name="rolegate_message" rows="3" class="widefat">%s</textarea></p>',
 			esc_textarea( $rules['message'] )
 		);
 	}
 
 	public function save_meta_box( int $post_id, \WP_Post $post ): void {
-		if ( ! isset( $_POST['_rolewright_access_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_rolewright_access_nonce'] ) ), self::NONCE ) ) {
+		if ( ! isset( $_POST['_rolegate_access_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['_rolegate_access_nonce'] ) ), self::NONCE ) ) {
 			return;
 		}
 		if ( ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) || wp_is_post_revision( $post_id ) ) {
@@ -141,8 +141,8 @@ final class Post_Editor {
 		if ( ! current_user_can( 'edit_post', $post_id ) || ! current_user_can( Caps::MANAGE_ACCESS ) ) {
 			return;
 		}
-		$roles   = isset( $_POST['rolewright_roles'] ) ? (array) wp_unslash( $_POST['rolewright_roles'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-		$message = isset( $_POST['rolewright_message'] ) ? (string) wp_unslash( $_POST['rolewright_message'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		$roles   = isset( $_POST['rolegate_roles'] ) ? (array) wp_unslash( $_POST['rolegate_roles'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		$message = isset( $_POST['rolegate_message'] ) ? (string) wp_unslash( $_POST['rolegate_message'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		Access::save_rules( $post_id, $roles, $message );
 	}
 
@@ -158,12 +158,12 @@ final class Post_Editor {
 			);
 		}
 		wp_enqueue_script(
-			'rolewright-content-access',
-			ROLEWRIGHT_URL . 'assets/content-access/editor.js',
+			'rolegate-content-access',
+			ROLEGATE_URL . 'assets/content-access/editor.js',
 			array( 'wp-plugins', 'wp-element', 'wp-components', 'wp-data', 'wp-block-editor', 'wp-compose', 'wp-hooks', 'wp-i18n', 'wp-edit-post' ),
-			ROLEWRIGHT_VERSION,
+			ROLEGATE_VERSION,
 			true
 		);
-		wp_add_inline_script( 'rolewright-content-access', 'window.rolewrightAccess = ' . wp_json_encode( array( 'roles' => $roles ) ) . ';', 'before' );
+		wp_add_inline_script( 'rolegate-content-access', 'window.rolegateAccess = ' . wp_json_encode( array( 'roles' => $roles ) ) . ';', 'before' );
 	}
 }

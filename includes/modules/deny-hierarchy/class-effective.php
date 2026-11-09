@@ -1,8 +1,8 @@
 <?php
-namespace Rolewright\Modules\Deny_Hierarchy;
+namespace Rolegate\Modules\Deny_Hierarchy;
 
-use Rolewright\Modules\Safety\Caps;
-use Rolewright\Modules\Safety\Guard;
+use Rolegate\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Guard;
 
 defined( 'ABSPATH' ) || exit;
 

@@ -1,5 +1,5 @@
 <?php
-namespace Rolewright\Modules\Portability;
+namespace Rolegate\Modules\Portability;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -17,13 +17,13 @@ final class Sources {
 		$prefix  = $wpdb->get_blog_prefix();
 		$sources = array(
 			'ure_backup' => array(
-				'label' => __( 'User Role Editor: its saved copy of the roles from before its first change', 'rolewright' ),
+				'label' => __( 'User Role Editor: its saved copy of the roles from before its first change', 'role-gatekeeper' ),
 				'read'  => function () use ( $prefix ) {
 					return get_option( $prefix . 'backup_user_roles', null );
 				},
 			),
 		);
-		$sources = apply_filters( 'rolewright_portability_import_sources', $sources );
+		$sources = apply_filters( 'rolegate_portability_import_sources', $sources );
 		$out     = array();
 		foreach ( is_array( $sources ) ? $sources : array() as $id => $source ) {
 			if ( is_array( $source ) && isset( $source['label'], $source['read'] ) && is_callable( $source['read'] ) ) {
@@ -54,15 +54,15 @@ final class Sources {
 	public static function load( string $id ) {
 		$all = self::all();
 		if ( ! isset( $all[ $id ] ) ) {
-			return new \WP_Error( 'rolewright_import_source', __( 'Unknown import source.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_import_source', __( 'Unknown import source.', 'role-gatekeeper' ) );
 		}
 		$roles = call_user_func( $all[ $id ]['read'] );
 		if ( ! is_array( $roles ) || ! $roles ) {
-			return new \WP_Error( 'rolewright_import_source', __( 'That source holds no roles on this site.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_import_source', __( 'That source holds no roles on this site.', 'role-gatekeeper' ) );
 		}
 		$size = strlen( (string) wp_json_encode( $roles ) );
 		if ( $size > Importer::max_bytes() ) {
-			return new \WP_Error( 'rolewright_import_too_large', __( 'That source is larger than the import size limit.', 'rolewright' ) );
+			return new \WP_Error( 'rolegate_import_too_large', __( 'That source is larger than the import size limit.', 'role-gatekeeper' ) );
 		}
 		return Importer::normalize( $roles, array(), $id );
 	}

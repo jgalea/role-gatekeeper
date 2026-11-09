@@ -3,9 +3,9 @@
 	var Fragment = wp.element.Fragment;
 	var __ = wp.i18n.__;
 	var c = wp.components;
-	var cfg = window.rolewrightAccess || { roles: [] };
-	var META_ROLES = '_rolewright_roles';
-	var META_MESSAGE = '_rolewright_message';
+	var cfg = window.rolegateAccess || { roles: [] };
+	var META_ROLES = '_rolegate_roles';
+	var META_MESSAGE = '_rolegate_message';
 
 	function toggle( list, value, on ) {
 		var next = ( list || [] ).filter( function ( v ) {
@@ -30,48 +30,48 @@
 		} );
 	}
 
-	wp.hooks.addFilter( 'blocks.registerBlockType', 'rolewright/attributes', function ( settings ) {
+	wp.hooks.addFilter( 'blocks.registerBlockType', 'rolegate/attributes', function ( settings ) {
 		settings.attributes = Object.assign( {}, settings.attributes, {
-			rolewrightMode: { type: 'string' },
-			rolewrightRoles: { type: 'array', items: { type: 'string' } },
+			rolegateMode: { type: 'string' },
+			rolegateRoles: { type: 'array', items: { type: 'string' } },
 		} );
 		return settings;
 	} );
 
 	var withControls = wp.compose.createHigherOrderComponent( function ( BlockEdit ) {
 		return function ( props ) {
-			var mode = props.attributes.rolewrightMode || 'all';
-			var roles = props.attributes.rolewrightRoles || [];
+			var mode = props.attributes.rolegateMode || 'all';
+			var roles = props.attributes.rolegateRoles || [];
 			var panel = el(
 				wp.blockEditor.InspectorControls,
 				null,
 				el(
 					c.PanelBody,
-					{ title: __( 'Visibility by role', 'rolewright' ), initialOpen: mode !== 'all' },
+					{ title: __( 'Visibility by role', 'role-gatekeeper' ), initialOpen: mode !== 'all' },
 					el( c.SelectControl, {
-						label: __( 'Show this block to', 'rolewright' ),
+						label: __( 'Show this block to', 'role-gatekeeper' ),
 						value: mode,
 						options: [
-							{ value: 'all', label: __( 'Everyone', 'rolewright' ) },
-							{ value: 'logged_in', label: __( 'Logged-in users', 'rolewright' ) },
-							{ value: 'logged_out', label: __( 'Logged-out visitors', 'rolewright' ) },
-							{ value: 'roles', label: __( 'Selected roles', 'rolewright' ) },
+							{ value: 'all', label: __( 'Everyone', 'role-gatekeeper' ) },
+							{ value: 'logged_in', label: __( 'Logged-in users', 'role-gatekeeper' ) },
+							{ value: 'logged_out', label: __( 'Logged-out visitors', 'role-gatekeeper' ) },
+							{ value: 'roles', label: __( 'Selected roles', 'role-gatekeeper' ) },
 						],
 						onChange: function ( value ) {
-							props.setAttributes( { rolewrightMode: 'all' === value ? undefined : value } );
+							props.setAttributes( { rolegateMode: 'all' === value ? undefined : value } );
 						},
 					} ),
 					mode === 'roles'
 						? roleBoxes( roles, function ( next ) {
-								props.setAttributes( { rolewrightRoles: next.length ? next : undefined } );
+								props.setAttributes( { rolegateRoles: next.length ? next : undefined } );
 						  } )
 						: null
 				)
 			);
 			return el( Fragment, null, el( BlockEdit, props ), props.isSelected ? panel : null );
 		};
-	}, 'withRolewrightControls' );
-	wp.hooks.addFilter( 'editor.BlockEdit', 'rolewright/controls', withControls );
+	}, 'withRolegateControls' );
+	wp.hooks.addFilter( 'editor.BlockEdit', 'rolegate/controls', withControls );
 
 	var Panel = ( wp.editor && wp.editor.PluginDocumentSettingPanel ) || ( wp.editPost && wp.editPost.PluginDocumentSettingPanel );
 	if ( ! Panel ) {
@@ -92,8 +92,8 @@
 		}
 		return el(
 			Panel,
-			{ name: 'rolewright-access', title: __( 'Access', 'rolewright' ) },
-			el( 'p', null, __( 'Only these roles can view this content. Leave all unchecked for everyone.', 'rolewright' ) ),
+			{ name: 'rolegate-access', title: __( 'Access', 'role-gatekeeper' ) },
+			el( 'p', null, __( 'Only these roles can view this content. Leave all unchecked for everyone.', 'role-gatekeeper' ) ),
 			el(
 				'div',
 				{ style: { display: 'grid', gap: '12px', marginBottom: '16px' } },
@@ -102,7 +102,7 @@
 				} )
 			),
 			el( c.TextareaControl, {
-				label: __( 'Message for people without access', 'rolewright' ),
+				label: __( 'Message for people without access', 'role-gatekeeper' ),
 				value: message,
 				onChange: function ( value ) {
 					set( META_MESSAGE, value );
@@ -111,5 +111,5 @@
 		);
 	}
 
-	wp.plugins.registerPlugin( 'rolewright-access', { render: AccessPanel } );
+	wp.plugins.registerPlugin( 'rolegate-access', { render: AccessPanel } );
 } )( window.wp );

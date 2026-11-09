@@ -1,5 +1,5 @@
 <?php
-namespace Rolewright\Modules\Portability;
+namespace Rolegate\Modules\Portability;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -65,7 +65,7 @@ final class Role_Store {
 			$ok = null === $def ? ! isset( $after[ $slug ] ) : ( isset( $after[ $slug ] ) && self::same_caps( $after[ $slug ]['capabilities'], (array) $def['capabilities'] ) );
 			if ( ! $ok ) {
 				wp_roles()->for_site();
-				return new \WP_Error( 'rolewright_write_refused', __( 'The roles could not be saved. The safety net refused the change or another plugin reverted it.', 'rolewright' ) );
+				return new \WP_Error( 'rolegate_write_refused', __( 'The roles could not be saved. The safety net refused the change or another plugin reverted it.', 'role-gatekeeper' ) );
 			}
 		}
 		wp_roles()->for_site();

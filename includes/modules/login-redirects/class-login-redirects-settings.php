@@ -1,12 +1,12 @@
 <?php
-namespace Rolewright\Modules\Login_Redirects;
+namespace Rolegate\Modules\Login_Redirects;
 
-use Rolewright\Modules\Site_Access\Redirects;
+use Rolegate\Modules\Site_Access\Redirects;
 
 defined( 'ABSPATH' ) || exit;
 
 final class Login_Redirects_Settings {
-	const OPTION = 'rolewright_login_redirects';
+	const OPTION = 'rolegate_login_redirects';
 	const FIELDS = array( 'login', 'logout', 'landing' );
 
 	public static function defaults(): array {
@@ -46,10 +46,10 @@ final class Login_Redirects_Settings {
 				$ok = Redirects::sanitize_target( $url, 'logout' !== $field );
 				if ( false === $ok ) {
 					return new \WP_Error(
-						'rolewright_bad_redirect',
+						'rolegate_bad_redirect',
 						sprintf(
 							/* translators: 1: role slug, 2: field name */
-							__( 'The %2$s URL for %1$s must be a page on this site, and cannot be the login page (or wp-admin for logout).', 'rolewright' ),
+							__( 'The %2$s URL for %1$s must be a page on this site, and cannot be the login page (or wp-admin for logout).', 'role-gatekeeper' ),
 							$role,
 							$field
 						)
@@ -75,7 +75,7 @@ final class Login_Redirects_Settings {
 		$before = self::get();
 		update_option( self::OPTION, $new, false );
 		do_action(
-			'rolewright_changed',
+			'rolegate_changed',
 			'access.updated',
 			array(
 				'actor'  => $actor_id,
