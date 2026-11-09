@@ -30,6 +30,7 @@ final class Hierarchy {
 		}
 		add_action( 'add_role', array( __CLASS__, 'reset_cache' ) );
 		add_action( 'remove_role', array( __CLASS__, 'reset_cache' ) );
+		add_action( 'remove_role', array( __CLASS__, 'forget_role' ) );
 	}
 
 	public static function reset_cache(): void {
@@ -163,7 +164,19 @@ final class Hierarchy {
 			return self::TOP;
 		}
 		$stored = self::stored();
-		return isset( $stored[ $role ] ) ? $stored[ $role ] : self::default_position_for_caps( $new_caps );
+		if ( get_role( $role ) && isset( $stored[ $role ] ) ) {
+			return $stored[ $role ];
+		}
+		return self::default_position_for_caps( $new_caps );
+	}
+
+	/** A deleted role's stored position must not carry over to a new role created under the same slug. */
+	public static function forget_role( $role ): void {
+		$stored = self::stored();
+		if ( is_string( $role ) && isset( $stored[ $role ] ) ) {
+			unset( $stored[ $role ] );
+			update_option( self::OPTION, $stored, false );
+		}
 	}
 
 	/**

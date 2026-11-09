@@ -158,6 +158,10 @@ final class Importer {
 		if ( false === $clean || $clean !== $slug || false !== strpos( $clean, ':' ) ) {
 			return false;
 		}
+		// WordPress counts a user's role name as one of their capabilities, so a new role must not share a capability's name.
+		if ( ! wp_roles()->is_role( $clean ) && ( Guard::cap_exists( $clean ) || Guard::is_critical_cap( $clean ) ) ) {
+			return false;
+		}
 		return $clean;
 	}
 
