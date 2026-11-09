@@ -519,6 +519,8 @@ try {
 		$rw_ok( 'die:403' === $ajax( $rest, $act, array( 'plugin' => 'hello.php', 'slug' => 'hello-dolly' ) ), "ajax $act refused for a locked plugin" );
 	}
 	$rw_ok( 'die:403' === $ajax( $rest, 'toggle-auto-updates', array( 'type' => 'plugin', 'asset' => 'hello.php' ) ), 'ajax toggle-auto-updates refused for a locked plugin' );
+	$rw_ok( 'die:403' === $ajax( $rest, 'toggle-auto-updates', array( 'type' => 'Plugin', 'asset' => 'hello.php' ) ), 'ajax toggle-auto-updates: type parsed like core (case-insensitive)' );
+	$rw_ok( 'die:403' === $ajax( $rest, 'toggle-auto-updates', array( 'type' => 'plugin', 'asset' => 'hello%2Ephp' ) ), 'ajax toggle-auto-updates: asset url-decoded like core' );
 	$rw_ok( 'ok' === $ajax( $rest, 'update-plugin', array( 'plugin' => 'akismet/akismet.php', 'slug' => 'akismet' ) ), 'control: ajax update-plugin allowed for an unlocked plugin' );
 	$rw_ok( 'ok' === $ajax( $rest, 'install-plugin', array( 'slug' => 'akismet' ) ), 'control: ajax install-plugin allowed under the deny model' );
 	$rw_ok( 'ok' === $ajax( $rest, 'heartbeat' ), 'control: unrelated ajax action allowed' );

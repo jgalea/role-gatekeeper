@@ -195,11 +195,13 @@ final class Enforcer {
 		}
 		if ( in_array( $action, self::plugin_ajax_actions(), true ) ) {
 			// phpcs:disable WordPress.Security.NonceVerification.Missing -- core verifies the nonce after this check.
-			if ( 'toggle-auto-updates' === $action && ( ! isset( $_POST['type'] ) || 'plugin' !== $_POST['type'] ) ) {
+			$type = isset( $_POST['type'] ) && is_scalar( $_POST['type'] ) ? sanitize_key( wp_unslash( (string) $_POST['type'] ) ) : '';
+			if ( 'toggle-auto-updates' === $action && 'theme' === $type ) {
 				return false;
 			}
 			$key    = 'toggle-auto-updates' === $action ? 'asset' : 'plugin';
-			$plugin = isset( $_POST[ $key ] ) && is_scalar( $_POST[ $key ] ) ? plugin_basename( sanitize_text_field( wp_unslash( (string) $_POST[ $key ] ) ) ) : '';
+			$raw    = isset( $_POST[ $key ] ) && is_scalar( $_POST[ $key ] ) ? wp_unslash( (string) $_POST[ $key ] ) : '';
+			$plugin = '' === $raw ? '' : plugin_basename( sanitize_text_field( urldecode( $raw ) ) );
 			// phpcs:enable
 			return '' !== $plugin && self::plugin_blocked( $plugin, $eff );
 		}
