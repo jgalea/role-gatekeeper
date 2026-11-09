@@ -117,7 +117,8 @@ final class Visibility {
 			return $data;
 		}
 		$content = wp_unslash( (string) $data['post_content'] );
-		if ( false === stripos( $content, 'rolewright' ) ) {
+		// Block attributes are JSON and may be written with unicode escapes, so look for any block comment, not for the attribute name.
+		if ( false === strpos( $content, '<!-- wp:' ) ) {
 			return $data;
 		}
 		$old = '';

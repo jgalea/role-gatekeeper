@@ -380,7 +380,12 @@ final class Guard {
 				return true;
 			}
 		}
-		return false;
+		$meta = array( 'edit_post', 'delete_post', 'read_post', 'publish_post', 'edit_page', 'delete_page', 'read_page', 'edit_user', 'delete_user', 'remove_user', 'promote_user', 'add_user', 'create_user', 'edit_term', 'delete_term', 'assign_term', 'manage_post_tags', 'upload_files', 'customize', 'delete_site', 'manage_privacy_options' );
+		if ( in_array( $cap, $meta, true ) ) {
+			return true;
+		}
+		$catalog = '\\Rolewright\\Modules\\Capabilities\\Cap_Catalog';
+		return class_exists( $catalog ) && in_array( $cap, $catalog::universe(), true );
 	}
 
 	/**

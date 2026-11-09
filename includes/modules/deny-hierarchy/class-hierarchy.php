@@ -31,6 +31,9 @@ final class Hierarchy {
 		add_action( 'add_role', array( __CLASS__, 'reset_cache' ) );
 		add_action( 'remove_role', array( __CLASS__, 'reset_cache' ) );
 		add_action( 'remove_role', array( __CLASS__, 'forget_role' ) );
+		add_action( 'add_role', array( __CLASS__, 'forget_role' ) );
+		global $wpdb;
+		add_action( 'update_option_' . $wpdb->get_blog_prefix() . 'user_roles', array( __CLASS__, 'prune_missing_roles' ), 10, 2 );
 	}
 
 	public static function reset_cache(): void {
@@ -168,6 +171,18 @@ final class Hierarchy {
 			return $stored[ $role ];
 		}
 		return self::default_position_for_caps( $new_caps );
+	}
+
+	/** Roles removed by a bulk rewrite of the roles option (reset, import) lose their stored position. */
+	public static function prune_missing_roles( $old, $new ): void {
+		if ( ! is_array( $new ) ) {
+			return;
+		}
+		$stored = self::stored();
+		$kept   = array_intersect_key( $stored, $new );
+		if ( count( $kept ) !== count( $stored ) ) {
+			update_option( self::OPTION, $kept, false );
+		}
 	}
 
 	/** A deleted role's stored position must not carry over to a new role created under the same slug. */
