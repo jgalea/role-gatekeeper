@@ -30,6 +30,7 @@ final class Deny_Hierarchy_Module extends Module {
 			return;
 		}
 		self::$registered = true;
+		add_filter( 'rolewright_module_restricts_user', array( __CLASS__, 'restricts_user' ), 10, 3 );
 
 		Denials::register();
 		Hierarchy::register();
@@ -52,5 +53,18 @@ final class Deny_Hierarchy_Module extends Module {
 		if ( is_admin() ) {
 			( new Admin_Page() )->register();
 		}
+	}
+
+	/**
+	 * @param bool   $restricts
+	 * @param string $module
+	 * @param int    $user_id
+	 */
+	public static function restricts_user( $restricts, $module, $user_id ): bool {
+		if ( $restricts || 'deny-hierarchy' !== $module ) {
+			return (bool) $restricts;
+		}
+		$user = get_userdata( (int) $user_id );
+		return $user && ( Denials::for_user( $user ) || ! Hierarchy::is_top( (int) $user_id ) );
 	}
 }

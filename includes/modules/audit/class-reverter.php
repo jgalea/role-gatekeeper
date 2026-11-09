@@ -111,8 +111,9 @@ final class Reverter {
 
 	/** @return true|\WP_Error */
 	private static function revert_deleted( int $entry_id, int $actor, string $slug, array $diff, array $detail ) {
-		if ( get_role( $slug ) ) {
-			return new \WP_Error( 'rolewright_role_exists', __( 'A role with that name already exists.', 'rolewright' ) );
+		$valid = Guard::valid_new_role_slug( $slug );
+		if ( is_wp_error( $valid ) ) {
+			return $valid;
 		}
 		$caps = Diff::undo_caps( array(), (array) ( $diff['caps'] ?? array() ) );
 		$ok   = Guard::assert_can_modify_role( $actor, $slug, $caps );
@@ -187,6 +188,9 @@ final class Reverter {
 
 	/** @return true|\WP_Error */
 	private static function revert_user_roles( int $entry_id, int $actor, int $target, array $diff ) {
+		if ( $actor === $target ) {
+			return new \WP_Error( 'rolewright_self_role', __( 'You can\'t change your own roles.', 'rolewright' ) );
+		}
 		$user = get_userdata( $target );
 		if ( ! $user ) {
 			return new \WP_Error( 'rolewright_no_user', __( 'That user does not exist any more.', 'rolewright' ) );
@@ -241,6 +245,9 @@ final class Reverter {
 
 	/** @return true|\WP_Error */
 	private static function revert_user_caps( int $entry_id, int $actor, int $target, array $diff ) {
+		if ( $actor === $target ) {
+			return new \WP_Error( 'rolewright_self_caps', __( 'You can\'t change your own capabilities.', 'rolewright' ) );
+		}
 		$user = get_userdata( $target );
 		if ( ! $user ) {
 			return new \WP_Error( 'rolewright_no_user', __( 'That user does not exist any more.', 'rolewright' ) );
@@ -253,6 +260,11 @@ final class Reverter {
 		$ok = self::refuse_ungrantable( $actor, self::changed_caps( $current, $new ) );
 		if ( is_wp_error( $ok ) ) {
 			return $ok;
+		}
+		foreach ( array_keys( array_diff_key( $new, $current ) ) as $cap ) {
+			if ( Guard::is_role_slug_name( (string) $cap ) ) {
+				return new \WP_Error( 'rolewright_cap_is_role', __( 'A capability from this entry is now a role name, so it can\'t be restored as a per-user capability.', 'rolewright' ) );
+			}
 		}
 		$ok = self::check_user_result( $actor, array_values( (array) $user->roles ), $new );
 		if ( is_wp_error( $ok ) ) {
@@ -283,8 +295,14 @@ final class Reverter {
 		$proposed = array();
 		$current  = array();
 		foreach ( $plan as $slug => $d ) {
-			$slug              = (string) $slug;
-			$role              = get_role( $slug );
+			$slug = (string) $slug;
+			$role = get_role( $slug );
+			if ( ! $role ) {
+				$valid = Guard::valid_new_role_slug( $slug );
+				if ( is_wp_error( $valid ) ) {
+					return $valid;
+				}
+			}
 			$current[ $slug ]  = $role ? Guard::normalize_caps( (array) $role->capabilities ) : array();
 			$proposed[ $slug ] = Diff::undo_caps( $current[ $slug ], (array) $d );
 			$ok                = Guard::assert_can_modify_role( $actor, $slug, $proposed[ $slug ] );

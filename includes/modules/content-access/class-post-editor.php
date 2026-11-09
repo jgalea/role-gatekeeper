@@ -68,7 +68,28 @@ final class Post_Editor {
 	public function hook_rest_events(): void {
 		foreach ( $this->post_types() as $type ) {
 			add_action( "rest_after_insert_{$type}", array( $this, 'after_rest_save' ) );
+			add_filter( "rest_prepare_{$type}", array( $this, 'hide_rule_meta' ), 10, 2 );
 		}
+	}
+
+	/**
+	 * The access rule is shown over REST only to users who may edit the post, which is
+	 * what the block editor needs. Everyone else gets the post without the rule.
+	 *
+	 * @param \WP_REST_Response $response
+	 * @param \WP_Post          $post
+	 * @return \WP_REST_Response
+	 */
+	public function hide_rule_meta( $response, $post ) {
+		if ( ! $response instanceof \WP_REST_Response || ! $post instanceof \WP_Post || current_user_can( 'edit_post', (int) $post->ID ) ) {
+			return $response;
+		}
+		$data = $response->get_data();
+		if ( is_array( $data ) && isset( $data['meta'] ) && is_array( $data['meta'] ) ) {
+			unset( $data['meta'][ Access::META_ROLES ], $data['meta'][ Access::META_MESSAGE ] );
+			$response->set_data( $data );
+		}
+		return $response;
 	}
 
 	/** @param \WP_Post $post */

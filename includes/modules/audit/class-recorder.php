@@ -36,6 +36,20 @@ final class Recorder {
 			}
 		}
 
+		if ( in_array( $type, array( 'modules.updated', 'automation.updated' ), true ) ) {
+			$b = is_array( $before ) ? $before : array();
+			$a = is_array( $after ) ? $after : array();
+			foreach ( array_unique( array_merge( array_keys( $b ), array_keys( $a ) ) ) as $key ) {
+				$was = ! empty( $b[ $key ] );
+				$now = ! empty( $a[ $key ] );
+				if ( $was !== $now ) {
+					$diff['settings'][ $now ? 'enabled' : 'disabled' ][] = $this->clean_target( $key );
+				}
+			}
+			$detail['before'] = array_values( array_map( array( $this, 'clean_target' ), array_keys( array_filter( $b ) ) ) );
+			$detail['after']  = array_values( array_map( array( $this, 'clean_target' ), array_keys( array_filter( $a ) ) ) );
+		}
+
 		if ( 'roles.reset' === $type ) {
 			$b = is_array( $before ) && isset( $before['roles'] ) && is_array( $before['roles'] ) ? $before['roles'] : array();
 			$a = is_array( $after ) && isset( $after['roles'] ) && is_array( $after['roles'] ) ? $after['roles'] : array();

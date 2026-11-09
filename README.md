@@ -29,6 +29,10 @@ Each module has its own switch under Rolewright in the admin menu.
 
 The safety module is always on. Nobody can grant a role or capability they don't hold, the administrator role is protected, changes that would lock you out are refused, and a rescue link on the login screen restores access to the Rolewright screens.
 
+## Delegating access
+
+Switching modules on or off and changing the automation settings needs an administrator who holds every administrator capability; `rolewright_manage` alone only opens the screens. Treat `rolewright_manage_caps` and `rolewright_import` as administrator-level: a holder can hand out any non-critical capability, or create and overwrite roles from a file.
+
 ## Requirements
 
 WordPress 6.2 or later, PHP 7.4 or later.

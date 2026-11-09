@@ -106,6 +106,9 @@ final class Rest_Guard {
 		$hidden = Access::hidden_ids();
 		if ( $hidden && is_array( $args ) ) {
 			$args['post__not_in'] = array_values( array_unique( array_merge( array_map( 'intval', (array) ( $args['post__not_in'] ?? array() ) ), $hidden ) ) );
+			if ( ! empty( $args['post__in'] ) ) {
+				$args['post__in'] = Query_Guard::without_hidden( (array) $args['post__in'], $hidden );
+			}
 		}
 		return $args;
 	}

@@ -32,40 +32,125 @@ final class Settings {
 		if ( ! current_user_can( self::CAP ) ) {
 			wp_die( esc_html__( 'You do not have permission to view this page.', 'rolewright' ) );
 		}
+		$can_edit = self::can_change( get_current_user_id() );
 		echo '<div class="wrap"><h1>' . esc_html__( 'Rolewright', 'rolewright' ) . '</h1>';
+		// phpcs:disable WordPress.Security.NonceVerification -- display flags only.
+		if ( isset( $_GET['refused'] ) ) {
+			echo '<div class="notice notice-error"><p>' . esc_html__( 'Nothing was saved: a module you tried to switch off currently applies rules to your own account. Ask a super admin.', 'rolewright' ) . '</p></div>';
+		} elseif ( isset( $_GET['updated'] ) ) {
+			echo '<div class="notice notice-success"><p>' . esc_html__( 'Modules saved.', 'rolewright' ) . '</p></div>';
+		}
+		// phpcs:enable
+		if ( ! $can_edit ) {
+			echo '<p>' . esc_html__( 'Only an administrator who holds every administrator capability can switch modules on or off.', 'rolewright' ) . '</p>';
+		}
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 		echo '<input type="hidden" name="action" value="rolewright_save_modules" />';
 		wp_nonce_field( 'rolewright_save_modules' );
 		echo '<table class="form-table" role="presentation"><tbody>';
 		foreach ( Plugin::modules() as $module ) {
-			$locked = ( 'safety' === $module->id() );
+			$locked = ( 'safety' === $module->id() ) || ! $can_edit;
 			printf(
 				'<tr><th scope="row">%1$s</th><td><label><input type="checkbox" name="modules[%2$s]" value="1" %3$s %4$s /> %5$s</label></td></tr>',
 				esc_html( $module->title() ),
 				esc_attr( $module->id() ),
-				checked( Plugin::is_enabled( $module->id() ) || $locked, true, false ),
+				checked( Plugin::is_enabled( $module->id() ) || 'safety' === $module->id(), true, false ),
 				disabled( $locked, true, false ),
 				esc_html( $module->description() )
 			);
 		}
 		echo '</tbody></table>';
-		submit_button( __( 'Save modules', 'rolewright' ) );
+		if ( $can_edit ) {
+			submit_button( __( 'Save modules', 'rolewright' ) );
+		}
 		echo '</form></div>';
 	}
 
+	/**
+	 * Plugin-wide settings need an administrator-level authority, not just rolewright_manage.
+	 */
+	public static function can_change( int $user_id ): bool {
+		return \Rolewright\Modules\Safety\Guard::is_site_authority( $user_id );
+	}
+
+	/**
+	 * Modules from $turning_off whose rules currently apply to the user. Modules answer
+	 * through the rolewright_module_restricts_user filter. Super admins are never refused.
+	 *
+	 * @param string[] $turning_off
+	 * @return string[]
+	 */
+	public static function restricting_modules( int $user_id, array $turning_off ): array {
+		if ( is_multisite() && is_super_admin( $user_id ) ) {
+			return array();
+		}
+		$out = array();
+		foreach ( $turning_off as $id ) {
+			if ( apply_filters( 'rolewright_module_restricts_user', false, (string) $id, $user_id ) ) {
+				$out[] = (string) $id;
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * Saves the module map for $actor after the authority and self-restriction checks,
+	 * and fires rolewright_changed (modules.updated).
+	 *
+	 * @param string[] $enabled_ids
+	 * @return true|\WP_Error
+	 */
+	public static function apply_modules( int $actor, array $enabled_ids ) {
+		if ( ! self::can_change( $actor ) ) {
+			return new \WP_Error( 'rolewright_not_authority', __( 'Only an administrator who holds every administrator capability can switch modules on or off.', 'rolewright' ) );
+		}
+		$before = array();
+		$after  = array();
+		foreach ( Plugin::modules() as $module ) {
+			$before[ $module->id() ] = Plugin::is_enabled( $module->id() );
+			$after[ $module->id() ]  = in_array( $module->id(), $enabled_ids, true );
+		}
+		$after['safety']  = true;
+		$before['safety'] = true;
+		$turning_off      = array_keys( array_filter( $before ) );
+		$turning_off      = array_values(
+			array_filter(
+				$turning_off,
+				function ( $id ) use ( $after ) {
+					return empty( $after[ $id ] );
+				}
+			)
+		);
+		$restricting      = self::restricting_modules( $actor, $turning_off );
+		if ( $restricting ) {
+			return new \WP_Error( 'rolewright_module_applies_to_actor', __( 'A module you tried to switch off currently applies rules to your own account.', 'rolewright' ), array( 'modules' => $restricting ) );
+		}
+		if ( $before === $after ) {
+			return true;
+		}
+		update_option( Plugin::OPTION_MODULES, $after, false );
+		do_action(
+			'rolewright_changed',
+			'modules.updated',
+			array(
+				'actor'  => $actor,
+				'target' => 'modules',
+				'before' => $before,
+				'after'  => $after,
+			)
+		);
+		return true;
+	}
+
 	public function save(): void {
-		if ( ! current_user_can( self::CAP ) ) {
+		if ( ! current_user_can( self::CAP ) || ! self::can_change( get_current_user_id() ) ) {
 			wp_die( esc_html__( 'You do not have permission to do that.', 'rolewright' ), '', array( 'response' => 403 ) );
 		}
 		check_admin_referer( 'rolewright_save_modules' );
 		$posted = isset( $_POST['modules'] ) && is_array( $_POST['modules'] ) ? array_map( 'sanitize_key', array_keys( wp_unslash( $_POST['modules'] ) ) ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- only the keys are read, each through sanitize_key.
-		$map    = array();
-		foreach ( Plugin::modules() as $module ) {
-			$map[ $module->id() ] = in_array( $module->id(), $posted, true );
-		}
-		$map['safety'] = true;
-		update_option( Plugin::OPTION_MODULES, $map, false );
-		wp_safe_redirect( add_query_arg( 'updated', '1', admin_url( 'admin.php?page=' . self::MENU_SLUG ) ) );
+		$result = self::apply_modules( get_current_user_id(), $posted );
+		$flag   = is_wp_error( $result ) ? 'refused' : 'updated';
+		wp_safe_redirect( add_query_arg( $flag, '1', admin_url( 'admin.php?page=' . self::MENU_SLUG ) ) );
 		exit;
 	}
 }

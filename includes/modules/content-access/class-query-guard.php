@@ -135,7 +135,34 @@ final class Query_Guard {
 		$hidden = Access::hidden_ids();
 		if ( $hidden ) {
 			$query->set( 'post__not_in', array_values( array_unique( array_merge( array_map( 'intval', (array) $query->get( 'post__not_in' ) ), $hidden ) ) ) );
+			$in = $query->get( 'post__in' );
+			if ( $in ) {
+				$query->set( 'post__in', self::without_hidden( (array) $in, $hidden ) );
+			}
+			// p, page_id and attachment_id win over post__not_in in WP_Query, so a direct
+			// lookup of a hidden post becomes a query that matches nothing.
+			foreach ( array( 'p', 'page_id', 'attachment_id' ) as $var ) {
+				if ( in_array( (int) $query->get( $var ), $hidden, true ) ) {
+					$query->set( 'p', 0 );
+					$query->set( 'page_id', 0 );
+					$query->set( 'attachment_id', 0 );
+					$query->set( 'post__in', array( 0 ) );
+				}
+			}
 		}
+	}
+
+	/**
+	 * WP_Query ignores post__not_in once post__in is set, so hidden ids are removed from
+	 * post__in itself. An emptied list becomes [0], which matches nothing.
+	 *
+	 * @param array $ids
+	 * @param int[] $hidden
+	 * @return int[]
+	 */
+	public static function without_hidden( array $ids, array $hidden ): array {
+		$left = array_values( array_diff( array_map( 'intval', $ids ), array_map( 'intval', $hidden ) ) );
+		return $left ? $left : array( 0 );
 	}
 
 	public function exclude_hidden_comments( \WP_Comment_Query $query ): void {
@@ -254,6 +281,9 @@ final class Query_Guard {
 		$hidden = Access::hidden_ids();
 		if ( $hidden ) {
 			$args['post__not_in'] = array_values( array_unique( array_merge( array_map( 'intval', (array) ( $args['post__not_in'] ?? array() ) ), $hidden ) ) );
+			if ( ! empty( $args['post__in'] ) ) {
+				$args['post__in'] = self::without_hidden( (array) $args['post__in'], $hidden );
+			}
 		}
 		return $args;
 	}

@@ -330,6 +330,33 @@ do_action( 'rolewright_changed', 'caps.options_updated', array( 'actor' => $admi
 do_action( 'rolewright_changed', 'access.updated', array( 'actor' => $admin, 'target' => 'edit-scope:settings', 'before' => array(), 'after' => array() ) );
 $rw_ok( $logged( 'caps.options_updated' ) && 'options' === $logged( 'caps.options_updated' )->target && $logged( 'access.updated' ) && 'edit-scope:settings' === $logged( 'access.updated' )->target, 'caps.options_updated and access.updated are logged' );
 
+// Module and automation settings changes are logged with what was switched on and off.
+$mods_before = get_option( 'rolewright_modules' );
+$mods_on     = array();
+foreach ( \Rolewright\Core\Plugin::modules() as $m ) {
+	if ( \Rolewright\Core\Plugin::is_enabled( $m->id() ) && 'login-redirects' !== $m->id() ) {
+		$mods_on[] = $m->id();
+	}
+}
+$mods_res = \Rolewright\Core\Settings::apply_modules( $admin, $mods_on );
+$mods_row = $logged( 'modules.updated' );
+$mods_d   = $mods_row ? json_decode( (string) $mods_row->diff, true ) : array();
+$rw_ok( true === $mods_res && $mods_row && (int) $mods_row->actor_id === $admin && in_array( 'login-redirects', (array) ( $mods_d['settings']['disabled'] ?? array() ), true ), 'switching a module off is logged as modules.updated with the module listed' );
+update_option( 'rolewright_modules', $mods_before, false );
+$auto_before = get_option( \Rolewright\Modules\Automation\Automation_Module::OPTION_SETTINGS );
+$auto_res    = \Rolewright\Modules\Automation\Automation_Page::apply(
+	$admin,
+	array(
+		'rest_writes'      => empty( $auto_before['rest_writes'] ),
+		'abilities_writes' => ! empty( $auto_before['abilities_writes'] ),
+	)
+);
+$auto_row    = $logged( 'automation.updated' );
+$auto_d      = $auto_row ? json_decode( (string) $auto_row->diff, true ) : array();
+$rw_ok( true === $auto_res && $auto_row && ( in_array( 'rest_writes', (array) ( $auto_d['settings']['enabled'] ?? array() ), true ) || in_array( 'rest_writes', (array) ( $auto_d['settings']['disabled'] ?? array() ), true ) ), 'changing automation writes is logged as automation.updated' );
+update_option( \Rolewright\Modules\Automation\Automation_Module::OPTION_SETTINGS, $auto_before, false );
+$rw_ok( ! Reverter::can_revert_row( (object) array( 'type' => 'modules.updated', 'reverted_by' => 0 ) ), 'modules.updated is not revertible' );
+
 // not revertible
 $rw_ok( ! Reverter::can_revert_row( (object) array( 'type' => 'rescue.used', 'reverted_by' => 0 ) ), 'rescue.used is not revertible' );
 

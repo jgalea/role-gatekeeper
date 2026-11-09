@@ -285,6 +285,9 @@ final class Users {
 			if ( false === $name ) {
 				return new \WP_Error( 'rolewright_invalid_cap', sprintf( /* translators: %s: capability name */ __( '"%s" is not a valid capability name.', 'rolewright' ), $cap ) );
 			}
+			if ( Guard::is_role_slug_name( $name ) ) {
+				return new \WP_Error( 'rolewright_cap_is_role', sprintf( /* translators: %s: capability name */ __( '"%s" is a role name, so it can\'t be a per-user capability. Assign the role instead.', 'rolewright' ), $name ) );
+			}
 			if ( ! Guard::can_grant_cap( $actor, $name ) ) {
 				return new \WP_Error( 'rolewright_cap_not_held', sprintf( /* translators: %s: capability name */ __( 'You can\'t grant "%s": you don\'t hold it.', 'rolewright' ), $name ) );
 			}

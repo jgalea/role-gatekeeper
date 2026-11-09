@@ -47,6 +47,10 @@ No. Every feature is in this plugin.
 
 Use the "Locked out of Rolewright?" link on the login screen. It emails a one-time link to the administrator's address that restores the Rolewright capabilities. You can also add `define( 'ROLEWRIGHT_DISABLE_SITE_ACCESS', true );` to wp-config.php to switch off private-site and admin-access rules.
 
+= Delegating access =
+
+Switching modules on or off and changing the automation settings needs an administrator who holds every administrator capability. Treat `rolewright_manage_caps` and `rolewright_import` as administrator-level: a holder can hand out any non-critical capability, or create and overwrite roles from a file.
+
 == Changelog ==
 
 = 0.1.0 =

@@ -93,6 +93,9 @@ final class Caps {
 		if ( ! $user instanceof \WP_User || ! $user->ID ) {
 			return $allcaps;
 		}
+		foreach ( Guard::role_name_caps_of( $user ) as $cap ) {
+			$allcaps[ $cap ] = false;
+		}
 		if ( in_array( 'administrator', (array) $user->roles, true ) ) {
 			$admin = get_role( 'administrator' );
 			if ( $admin ) {

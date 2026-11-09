@@ -23,6 +23,7 @@ final class Edit_Scope_Module extends Module {
 	}
 
 	public function init(): void {
+		add_filter( 'rolewright_module_restricts_user', array( __CLASS__, 'restricts_user' ), 10, 3 );
 		add_action( 'update_option_' . Rules::OPTION, array( Rules::class, 'flush' ) );
 		add_action( 'add_option_' . Rules::OPTION, array( Rules::class, 'flush' ) );
 		( new Scope_Enforcer() )->register();
@@ -33,5 +34,17 @@ final class Edit_Scope_Module extends Module {
 		if ( is_admin() ) {
 			( new Admin_Page() )->register();
 		}
+	}
+
+	/**
+	 * @param bool   $restricts
+	 * @param string $module
+	 * @param int    $user_id
+	 */
+	public static function restricts_user( $restricts, $module, $user_id ): bool {
+		if ( $restricts || 'edit-scope' !== $module ) {
+			return (bool) $restricts;
+		}
+		return (bool) Rules::for_user( (int) $user_id );
 	}
 }

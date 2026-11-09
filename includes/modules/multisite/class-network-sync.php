@@ -160,7 +160,10 @@ final class Network_Sync {
 				if ( $before && Role_Store::same_caps( $before['capabilities'], $caps ) && $before['name'] === $name ) {
 					continue;
 				}
-				$check = Guard::assert_can_modify_role( $actor, (string) $slug, $caps );
+				$check = $before ? true : Guard::valid_new_role_slug( (string) $slug );
+				if ( true === $check ) {
+					$check = Guard::assert_can_modify_role( $actor, (string) $slug, $caps );
+				}
 				if ( is_wp_error( $check ) ) {
 					/* translators: 1: site id, 2: role slug, 3: reason */
 					$out['errors'][] = sprintf( __( 'Site %1$d, role %2$s: %3$s', 'rolewright' ), $site_id, $slug, $check->get_error_message() );

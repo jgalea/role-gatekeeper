@@ -160,7 +160,7 @@ final class Audit_Page {
 		foreach ( $result['rows'] as $row ) {
 			echo '<tr>';
 			echo '<td>' . esc_html( get_date_from_gmt( $row->created_at, 'Y-m-d H:i' ) ) . '</td>';
-			echo '<td><code>' . esc_html( $row->type ) . '</code>' . ( (int) $row->reverted_by ? ' <em>' . esc_html__( '(reverted)', 'rolewright' ) . '</em>' : '' ) . ( (int) $row->reverted_of ? ' <em>' . esc_html__( '(revert)', 'rolewright' ) . '</em>' : '' ) . '</td>';
+			echo '<td><code>' . esc_html( $row->type ) . '</code>' . ( '' !== self::type_label( (string) $row->type ) ? '<br>' . esc_html( self::type_label( (string) $row->type ) ) : '' ) . ( (int) $row->reverted_by ? ' <em>' . esc_html__( '(reverted)', 'rolewright' ) . '</em>' : '' ) . ( (int) $row->reverted_of ? ' <em>' . esc_html__( '(revert)', 'rolewright' ) . '</em>' : '' ) . '</td>';
 			echo '<td>' . esc_html( $this->actor_label( (int) $row->actor_id ) ) . '</td>';
 			echo '<td>' . esc_html( $this->target_label( $row ) ) . '</td>';
 			echo '<td>' . wp_kses(
@@ -303,15 +303,19 @@ final class Audit_Page {
 			}
 		}
 		$groups = array(
-			'caps'  => array(
+			'caps'     => array(
 				'added'    => __( 'Granted', 'rolewright' ),
 				'removed'  => __( 'Removed', 'rolewright' ),
 				'denied'   => __( 'Denied', 'rolewright' ),
 				'undenied' => __( 'Deny lifted', 'rolewright' ),
 			),
-			'roles' => array(
+			'roles'    => array(
 				'added'   => __( 'Roles added', 'rolewright' ),
 				'removed' => __( 'Roles removed', 'rolewright' ),
+			),
+			'settings' => array(
+				'enabled'  => __( 'Switched on', 'rolewright' ),
+				'disabled' => __( 'Switched off', 'rolewright' ),
 			),
 		);
 		foreach ( (array) ( $diff['role_caps'] ?? array() ) as $slug => $d ) {
@@ -339,5 +343,13 @@ final class Audit_Page {
 			}
 		}
 		return implode( '<br>', $lines );
+	}
+
+	private static function type_label( string $type ): string {
+		$labels = array(
+			'modules.updated'    => __( 'Modules switched on or off', 'rolewright' ),
+			'automation.updated' => __( 'Automation settings changed', 'rolewright' ),
+		);
+		return isset( $labels[ $type ] ) ? $labels[ $type ] : '';
 	}
 }

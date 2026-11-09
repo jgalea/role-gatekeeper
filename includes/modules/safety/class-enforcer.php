@@ -200,12 +200,19 @@ final class Enforcer {
 		$expand = function ( array $meta ) use ( $roles_caps ) {
 			$meta  = Guard::normalize_caps( $meta );
 			$roles = array_keys( array_filter( array_intersect_key( $meta, $roles_caps ) ) );
-			return Guard::critical_subset( Guard::caps_from_roles( $roles, $roles_caps, $meta ) );
+			$out   = Guard::critical_subset( Guard::caps_from_roles( $roles, $roles_caps, $meta ) );
+			foreach ( $roles as $role ) {
+				if ( Guard::is_critical_cap( (string) $role ) ) {
+					$out[] = (string) $role;
+				}
+			}
+			return array_values( array_unique( $out ) );
 		};
 		$before = $expand( $old );
 		$after  = $expand( $new );
 
-		$actor_critical = $actor === $target ? $before : Guard::user_critical_caps( $actor );
+		$target_user    = get_userdata( $target );
+		$actor_critical = $actor === $target ? array_values( array_diff( $before, $target_user ? Guard::role_name_caps_of( $target_user ) : array() ) ) : Guard::user_critical_caps( $actor );
 		$gained         = array_diff( $after, $before );
 		$blocked        = (bool) Guard::missing( $gained, $actor_critical );
 		if ( ! $blocked && $actor !== $target && Guard::missing( $before, $actor_critical ) && Guard::normalize_caps( $old ) !== Guard::normalize_caps( $new ) ) {
@@ -225,7 +232,11 @@ final class Enforcer {
 	 */
 	public function after_register( $user_id ): void {
 		$actor = self::actor();
-		if ( ! $actor || Guard::is_super( $actor ) || (int) $user_id === $actor ) {
+		if ( ! $actor ) {
+			$this->strip_anonymous_registration( (int) $user_id );
+			return;
+		}
+		if ( Guard::is_super( $actor ) || (int) $user_id === $actor ) {
 			return;
 		}
 		$extra = Guard::missing( Guard::user_critical_caps( (int) $user_id ), Guard::user_critical_caps( $actor ) );
@@ -241,6 +252,40 @@ final class Enforcer {
 			);
 			do_action( 'rolewright_escalation_blocked', 'new_user', $actor, (int) $user_id, $extra );
 		}
+	}
+
+	/**
+	 * A user created with nobody logged in (self-registration, a checkout form) must not
+	 * receive a critical cap, whatever the default role carries. WP-CLI and the plugin's
+	 * own system context are trusted and skipped.
+	 */
+	private function strip_anonymous_registration( int $user_id ): void {
+		$trusted = (bool) apply_filters( 'rolewright_trust_anonymous_user_creation', defined( 'WP_CLI' ) && WP_CLI, $user_id );
+		if ( self::$system > 0 || $trusted || ! apply_filters( 'rolewright_storage_backstop', true, 'user', $user_id ) ) {
+			return;
+		}
+		$user = get_userdata( $user_id );
+		if ( ! $user ) {
+			return;
+		}
+		$critical = Guard::critical_subset( (array) $user->allcaps );
+		if ( ! $critical ) {
+			return;
+		}
+		self::as_system(
+			function () use ( $user ) {
+				foreach ( (array) $user->roles as $role ) {
+					$obj = get_role( (string) $role );
+					if ( Guard::is_critical_cap( (string) $role ) || ( $obj && Guard::critical_subset( (array) $obj->capabilities ) ) ) {
+						$user->remove_role( (string) $role );
+					}
+				}
+				foreach ( Guard::critical_subset( (array) $user->caps ) as $cap ) {
+					$user->remove_cap( $cap );
+				}
+			}
+		);
+		do_action( 'rolewright_escalation_blocked', 'new_user', 0, $user_id, $critical );
 	}
 
 	/**
@@ -292,6 +337,15 @@ final class Enforcer {
 			if ( ! isset( $value['administrator'] ) || $lost ) {
 				$reason = 'administrator';
 				$detail = $lost;
+			}
+		}
+
+		if ( ! $reason ) {
+			foreach ( array_keys( array_diff_key( $value, $old ) ) as $name ) {
+				if ( Guard::is_critical_cap( (string) $name ) ) {
+					$reason   = 'reserved_slug';
+					$detail[] = (string) $name;
+				}
 			}
 		}
 

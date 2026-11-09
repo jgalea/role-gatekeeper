@@ -20,8 +20,9 @@ final class Role_Service {
 		if ( '' === $name || '' === $slug ) {
 			return new \WP_Error( 'rolewright_invalid_name', __( 'Enter a role name.', 'rolewright' ) );
 		}
-		if ( get_role( $slug ) || Guard::cap_exists( $slug ) ) {
-			return new \WP_Error( 'rolewright_role_exists', __( 'A role or capability with that name already exists.', 'rolewright' ) );
+		$valid = Guard::valid_new_role_slug( $slug );
+		if ( is_wp_error( $valid ) ) {
+			return $valid;
 		}
 		$caps = Guard::normalize_caps( $caps );
 		$ok   = Guard::assert_can_modify_role( $actor, $slug, $caps );

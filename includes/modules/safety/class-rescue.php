@@ -11,6 +11,7 @@ final class Rescue {
 	const ACTION_REQUEST = 'rolewright_rescue';
 	const ACTION_USE     = 'rolewright_rescue_use';
 	const META           = 'rolewright_rescue_token';
+	const FLOOR          = 0.25;
 	const TTL            = 900;
 	const LIMIT          = 3;
 	const WINDOW         = HOUR_IN_SECONDS;
@@ -52,20 +53,31 @@ final class Rescue {
 	 * show that to the visitor.
 	 */
 	public static function request( string $email, string $ip ): bool {
-		if ( ! self::hit( 'ip|' . $ip ) ) {
+		$start = microtime( true );
+		$sent  = self::request_inner( $email, $ip );
+		self::pad( $start );
+		return $sent;
+	}
+
+	/**
+	 * Every path does the same lookup, token generation and hashing, and the caller pads
+	 * the total to a constant floor, so response time doesn't reveal admin addresses.
+	 */
+	private static function request_inner( string $email, string $ip ): bool {
+		$within = self::hit( 'ip|' . $ip );
+		$email  = sanitize_email( $email );
+		$user   = $email ? get_user_by( 'email', $email ) : false;
+		$token  = bin2hex( random_bytes( 32 ) );
+		$hash   = hash( 'sha256', $token );
+		$acct   = self::hit( 'acct|' . ( $user ? $user->ID : 'none|' . hash( 'sha256', strtolower( $email ) ) ) );
+		if ( ! $within || ! $user || ! $acct || ! self::is_eligible( $user ) ) {
 			return false;
 		}
-		$email = sanitize_email( $email );
-		$user  = $email ? get_user_by( 'email', $email ) : false;
-		if ( ! $user || ! self::hit( 'acct|' . $user->ID ) || ! self::is_eligible( $user ) ) {
-			return false;
-		}
-		$token = bin2hex( random_bytes( 32 ) );
 		update_user_meta(
 			$user->ID,
 			self::META,
 			array(
-				'hash'    => hash( 'sha256', $token ),
+				'hash'    => $hash,
 				'expires' => time() + self::TTL,
 			)
 		);
@@ -87,6 +99,13 @@ final class Rescue {
 			$url
 		);
 		return (bool) wp_mail( $user->user_email, $subject, $body );
+	}
+
+	private static function pad( float $start ): void {
+		$left = (int) round( ( self::FLOOR - ( microtime( true ) - $start ) ) * 1000000 );
+		if ( $left > 0 ) {
+			usleep( min( $left, 300000 ) );
+		}
 	}
 
 	/**

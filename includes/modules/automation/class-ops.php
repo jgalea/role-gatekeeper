@@ -58,11 +58,9 @@ final class Ops {
 		if ( '' === $slug ) {
 			return new \WP_Error( 'rolewright_invalid_name', __( 'That name can\'t be turned into a role slug.', 'rolewright' ) );
 		}
-		if ( get_role( $slug ) || Guard::cap_exists( $slug ) ) {
-			return new \WP_Error( 'rolewright_role_exists', __( 'A role or capability with that name already exists.', 'rolewright' ) );
-		}
-		if ( Guard::sanitize_cap_name( $slug ) !== $slug ) {
-			return new \WP_Error( 'rolewright_invalid_name', __( 'Role slugs use lowercase letters, numbers, underscores, hyphens and colons.', 'rolewright' ) );
+		$valid = Guard::valid_new_role_slug( $slug );
+		if ( is_wp_error( $valid ) ) {
+			return $valid;
 		}
 		$caps = Guard::normalize_caps( $caps );
 		$ok   = Gate::modify_role( $actor, $slug, $caps );
@@ -351,9 +349,12 @@ final class Ops {
 				continue;
 			}
 			$exists = (bool) get_role( $slug );
-			if ( ! $exists && Guard::sanitize_cap_name( $slug ) !== $slug ) {
-				$rejected[] = $slug . ': not a valid role name';
-				continue;
+			if ( ! $exists ) {
+				$valid = Guard::valid_new_role_slug( $slug );
+				if ( is_wp_error( $valid ) ) {
+					$rejected[] = $slug . ': ' . $valid->get_error_message();
+					continue;
+				}
 			}
 			$incoming = array();
 			foreach ( $def['capabilities'] as $cap => $grant ) {

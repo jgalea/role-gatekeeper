@@ -50,7 +50,18 @@ final class Guard {
 		'level_8',
 		'level_9',
 		'level_10',
+		'manage_woocommerce',
+		'view_woocommerce_reports',
+		'gform_full_access',
+		'gravityforms_edit_forms',
+		'wpseo_manage_options',
 	);
+
+	/** @var string[] */
+	private static $network_caps = array( 'manage_sites', 'create_sites', 'delete_sites', 'upgrade_network', 'setup_network' );
+
+	/** @var string[] */
+	private static $reserved_role_slugs = array( 'shop_manager', 'customer', 'wpseo_manager', 'wpseo_editor', 'bbp_keymaster', 'bbp_moderator', 'bbp_participant', 'bbp_spectator', 'bbp_blocked' );
 
 	/**
 	 * Caps whose holder can take over the site. Always includes every rolewright_* cap.
@@ -66,10 +77,95 @@ final class Guard {
 	}
 
 	public static function is_critical_cap( string $cap ): bool {
-		if ( 0 === strpos( $cap, 'rolewright_' ) || 0 === strpos( $cap, 'manage_network' ) ) {
+		if ( 0 === strpos( $cap, 'rolewright_' ) || self::is_network_cap( $cap ) ) {
 			return true;
 		}
 		return in_array( $cap, self::critical_caps(), true );
+	}
+
+	/**
+	 * Multisite network caps. Not filterable: a role or per-user cap must never be named after one.
+	 */
+	public static function is_network_cap( string $cap ): bool {
+		return 0 === strpos( $cap, 'manage_network' ) || in_array( $cap, self::$network_caps, true );
+	}
+
+	/**
+	 * Role slugs well-known plugins register. A per-user cap with one of these names would
+	 * turn into a role membership once the plugin is activated.
+	 *
+	 * @return string[]
+	 */
+	public static function reserved_role_slugs(): array {
+		$slugs = apply_filters( 'rolewright_reserved_role_slugs', self::$reserved_role_slugs );
+		return is_array( $slugs ) ? array_values( array_unique( array_merge( self::$reserved_role_slugs, array_map( 'strval', $slugs ) ) ) ) : self::$reserved_role_slugs;
+	}
+
+	/**
+	 * True when $name is, or is reserved as, a role slug. WordPress derives a user's roles
+	 * from the keys of their capabilities meta, so such a name can't be a per-user cap.
+	 */
+	public static function is_role_slug_name( string $name ): bool {
+		return wp_roles()->is_role( $name ) || in_array( $name, self::reserved_role_slugs(), true );
+	}
+
+	/**
+	 * Every check a new role's slug must pass. WordPress counts each role a user holds as a
+	 * capability, so a slug must never collide with a capability name, critical or not, or
+	 * with a per-user cap some user already holds (that user would silently join the role).
+	 *
+	 * @return true|\WP_Error
+	 */
+	public static function valid_new_role_slug( string $slug ) {
+		if ( '' === $slug || strtolower( trim( $slug ) ) !== $slug || ! preg_match( '/^[a-z0-9_:\-]+$/', $slug ) || ctype_digit( $slug ) || strlen( $slug ) > self::CAP_MAX_LENGTH ) {
+			return new \WP_Error( 'rolewright_invalid_name', __( 'Role slugs use lowercase letters, numbers, underscores, hyphens and colons.', 'rolewright' ) );
+		}
+		if ( wp_roles()->is_role( $slug ) ) {
+			return new \WP_Error( 'rolewright_role_exists', __( 'A role with that name already exists.', 'rolewright' ) );
+		}
+		if ( self::is_network_cap( $slug ) || self::is_critical_cap( $slug ) || in_array( $slug, self::$base_critical, true ) ) {
+			return new \WP_Error( 'rolewright_reserved_slug', __( 'That name is reserved for a capability and can\'t be used as a role.', 'rolewright' ) );
+		}
+		if ( self::cap_exists( $slug ) ) {
+			return new \WP_Error( 'rolewright_role_exists', __( 'A role or capability with that name already exists.', 'rolewright' ) );
+		}
+		if ( self::slug_held_as_user_cap( $slug ) ) {
+			return new \WP_Error( 'rolewright_slug_held_as_cap', __( 'Some users hold a capability with that name. Remove it from them or pick another name.', 'rolewright' ) );
+		}
+		return true;
+	}
+
+	/**
+	 * Whether any user on the current site has $slug as a key in their capabilities meta.
+	 */
+	public static function slug_held_as_user_cap( string $slug ): bool {
+		global $wpdb;
+		$needle = '%' . $wpdb->esc_like( 's:' . strlen( $slug ) . ':"' . $slug . '";' ) . '%';
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- must see the live meta table.
+		$hit = $wpdb->get_var( $wpdb->prepare( "SELECT umeta_id FROM {$wpdb->usermeta} WHERE meta_key = %s AND meta_value LIKE %s LIMIT 1", $wpdb->get_blog_prefix() . 'capabilities', $needle ) );
+		return null !== $hit;
+	}
+
+	/**
+	 * Role-name keys in a user's caps that collide with a critical cap and are not granted
+	 * by a real cap source (the user's roles or per-user caps). WordPress would otherwise
+	 * count holding the role as holding the cap.
+	 *
+	 * @param string[]                         $role_names
+	 * @param array<string,array<string,bool>> $roles_caps
+	 * @param array                            $user_caps
+	 * @return string[]
+	 */
+	public static function role_name_critical_caps( array $role_names, array $roles_caps, array $user_caps = array() ): array {
+		$granted = self::caps_from_roles( $role_names, $roles_caps, $user_caps );
+		$out     = array();
+		foreach ( $role_names as $role ) {
+			$role = (string) $role;
+			if ( self::is_critical_cap( $role ) && empty( $granted[ $role ] ) ) {
+				$out[] = $role;
+			}
+		}
+		return $out;
 	}
 
 	/**
@@ -200,6 +296,9 @@ final class Guard {
 				$caps[ (string) $cap ] = true;
 			}
 		}
+		foreach ( self::role_name_caps_of( $user ) as $cap ) {
+			unset( $caps[ $cap ] );
+		}
 		if ( in_array( 'administrator', (array) $user->roles, true ) ) {
 			$admin = get_role( 'administrator' );
 			foreach ( Caps::all() as $cap ) {
@@ -213,6 +312,30 @@ final class Guard {
 	}
 
 	/**
+	 * Critical caps the user only appears to hold because a role they hold is named after one.
+	 *
+	 * @return string[]
+	 */
+	public static function role_name_caps_of( \WP_User $user ): array {
+		$suspect = false;
+		foreach ( (array) $user->roles as $role ) {
+			if ( self::is_critical_cap( (string) $role ) ) {
+				$suspect = true;
+				break;
+			}
+		}
+		if ( ! $suspect ) {
+			return array();
+		}
+		$roles_caps = array();
+		foreach ( wp_roles()->roles as $name => $data ) {
+			$roles_caps[ $name ] = (array) $data['capabilities'];
+		}
+		$held = array_values( array_filter( array_map( 'strval', array_keys( (array) $user->caps ) ), array( wp_roles(), 'is_role' ) ) );
+		return self::role_name_critical_caps( $held, $roles_caps, (array) $user->caps );
+	}
+
+	/**
 	 * @return string[]
 	 */
 	public static function user_critical_caps( int $user_id ): array {
@@ -220,6 +343,29 @@ final class Guard {
 			return self::critical_caps();
 		}
 		return self::critical_subset( self::user_caps( $user_id ) );
+	}
+
+	/**
+	 * Whether the user may change plugin-wide settings (modules on or off, automation
+	 * writes): a super admin, or a user who holds every critical cap any role on the site
+	 * carries and may manage roles. Holding rolewright_manage alone is not enough.
+	 */
+	public static function is_site_authority( int $user_id ): bool {
+		if ( $user_id <= 0 ) {
+			return false;
+		}
+		if ( self::is_super( $user_id ) ) {
+			return true;
+		}
+		if ( ! user_can( $user_id, Caps::MANAGE_ROLES ) ) {
+			return false;
+		}
+		$in_use = array();
+		foreach ( wp_roles()->roles as $data ) {
+			$in_use = array_merge( $in_use, self::critical_subset( (array) $data['capabilities'] ) );
+		}
+		$in_use = array_values( array_unique( array_merge( $in_use, Caps::all() ) ) );
+		return ! self::missing( $in_use, self::user_caps( $user_id ) );
 	}
 
 	/**
@@ -270,7 +416,11 @@ final class Guard {
 			return false;
 		}
 		$actor_caps = self::user_caps( $actor_id );
-		if ( self::missing( self::critical_subset( $role_obj->capabilities ), $actor_caps ) ) {
+		$needed     = self::critical_subset( $role_obj->capabilities );
+		if ( self::is_critical_cap( $role ) ) {
+			$needed[] = $role;
+		}
+		if ( self::missing( $needed, $actor_caps ) ) {
 			return false;
 		}
 		if ( $target_id > 0 && $target_id === $actor_id ) {
@@ -468,11 +618,34 @@ final class Guard {
 			);
 		}
 
+		if ( in_array( $role, self::registration_roles(), true ) ) {
+			$added = array_diff( self::critical_subset( $new ), self::critical_subset( $current ) );
+			if ( $added ) {
+				return new \WP_Error(
+					'rolewright_default_too_powerful',
+					/* translators: %s: comma-separated capability names */
+					sprintf( __( 'New registrations get this role, so it can\'t hold these capabilities: %s.', 'rolewright' ), implode( ', ', $added ) )
+				);
+			}
+		}
+
 		$reasons = self::lockout_reasons_for( $actor_id, array( $role => $new ) );
 		if ( $reasons ) {
 			return self::lockout_error( $reasons );
 		}
 		return true;
+	}
+
+	/**
+	 * Roles anonymous registrations receive: the site's default role plus the extra
+	 * default roles the roles module manages.
+	 *
+	 * @return string[]
+	 */
+	public static function registration_roles(): array {
+		$extra = get_option( 'rolewright_extra_default_roles', array() );
+		$extra = is_array( $extra ) ? array_map( 'strval', $extra ) : array();
+		return array_values( array_unique( array_filter( array_merge( array( (string) get_option( 'default_role', 'subscriber' ) ), $extra ) ) ) );
 	}
 
 	/**
