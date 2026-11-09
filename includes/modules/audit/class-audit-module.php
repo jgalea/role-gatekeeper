@@ -23,6 +23,7 @@ class Audit_Module extends Module {
 	public function init(): void {
 		add_action( 'rolewright_activate', array( Store::class, 'install' ) );
 		add_action( 'init', array( Store::class, 'maybe_upgrade' ), 2 );
+		add_action( 'wp_initialize_site', array( Store::class, 'on_initialize_site' ), 20 );
 		add_action( 'init', array( Store::class, 'schedule' ), 3 );
 		add_action( Store::CRON_HOOK, array( Store::class, 'prune' ) );
 

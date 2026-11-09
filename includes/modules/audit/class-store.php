@@ -8,6 +8,9 @@ final class Store {
 	const OPTION_SCHEMA  = 'rolewright_audit_schema';
 	const CRON_HOOK      = 'rolewright_audit_prune';
 
+	/** @var array<string,bool> Table name => exists, for the current request. */
+	private static $exists = array();
+
 	public static function table(): string {
 		global $wpdb;
 		return $wpdb->prefix . 'rolewright_audit';
@@ -37,12 +40,47 @@ final class Store {
 ) {$charset};"
 		);
 		update_option( self::OPTION_SCHEMA, self::SCHEMA_VERSION, false );
+		unset( self::$exists[ $table ] );
 	}
 
+	/** Runs on init, so on multisite it covers whichever site the request is for. */
 	public static function maybe_upgrade(): void {
 		if ( get_option( self::OPTION_SCHEMA ) !== self::SCHEMA_VERSION ) {
 			self::install();
 		}
+	}
+
+	/** Creates the table on a new subsite when the plugin is network active. */
+	public static function on_initialize_site( $site ): void {
+		if ( ! $site instanceof \WP_Site ) {
+			return;
+		}
+		if ( ! function_exists( 'is_plugin_active_for_network' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+		if ( ! is_plugin_active_for_network( plugin_basename( ROLEWRIGHT_FILE ) ) ) {
+			return;
+		}
+		switch_to_blog( (int) $site->blog_id );
+		self::install();
+		restore_current_blog();
+	}
+
+	public static function table_exists(): bool {
+		global $wpdb;
+		$table = self::table();
+		if ( empty( self::$exists[ $table ] ) ) {
+			self::$exists[ $table ] = $table === $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) );
+		}
+		return self::$exists[ $table ];
+	}
+
+	/** Creates the table for the current site when it is missing. */
+	public static function ensure_table(): bool {
+		if ( ! self::table_exists() ) {
+			self::install();
+		}
+		return self::table_exists();
 	}
 
 	public static function schedule(): void {
@@ -54,6 +92,9 @@ final class Store {
 	/** @return int Rows deleted. */
 	public static function prune(): int {
 		global $wpdb;
+		if ( ! self::table_exists() ) {
+			return 0;
+		}
 		$days   = Audit_Module::settings()['retention_days'];
 		$cutoff = gmdate( 'Y-m-d H:i:s', time() - $days * DAY_IN_SECONDS );
 		$table  = self::table();
@@ -66,6 +107,9 @@ final class Store {
 	 */
 	public static function insert( array $row ): int {
 		global $wpdb;
+		if ( ! self::ensure_table() ) {
+			return 0;
+		}
 		$ok = $wpdb->insert(
 			self::table(),
 			array(
@@ -85,12 +129,18 @@ final class Store {
 
 	public static function mark_reverted( int $id, int $by ): void {
 		global $wpdb;
+		if ( ! self::table_exists() ) {
+			return;
+		}
 		$wpdb->update( self::table(), array( 'reverted_by' => $by ), array( 'id' => $id ), array( '%d' ), array( '%d' ) );
 	}
 
 	/** @return object|null */
 	public static function get( int $id ) {
 		global $wpdb;
+		if ( ! self::table_exists() ) {
+			return null;
+		}
 		$table = self::table();
 		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	}
@@ -101,6 +151,12 @@ final class Store {
 	 */
 	public static function query( array $filters, int $page, int $per_page ): array {
 		global $wpdb;
+		if ( ! self::table_exists() ) {
+			return array(
+				'rows'  => array(),
+				'total' => 0,
+			);
+		}
 		$table = self::table();
 		$where = array( '1=1' );
 		$args  = array();
@@ -138,6 +194,9 @@ final class Store {
 	/** @return string[] */
 	public static function types(): array {
 		global $wpdb;
+		if ( ! self::table_exists() ) {
+			return array();
+		}
 		$table = self::table();
 		return array_map( 'strval', (array) $wpdb->get_col( "SELECT DISTINCT type FROM {$table} ORDER BY type" ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	}
@@ -145,6 +204,9 @@ final class Store {
 	/** @return int[] */
 	public static function actors(): array {
 		global $wpdb;
+		if ( ! self::table_exists() ) {
+			return array();
+		}
 		$table = self::table();
 		return array_map( 'intval', (array) $wpdb->get_col( "SELECT DISTINCT actor_id FROM {$table} ORDER BY actor_id" ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 	}

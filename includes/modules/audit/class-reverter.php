@@ -169,6 +169,10 @@ final class Reverter {
 		if ( is_wp_error( $ok ) ) {
 			return $ok;
 		}
+		$ok = self::check_role_result( $actor, $current, $new );
+		if ( is_wp_error( $ok ) ) {
+			return $ok;
+		}
 		foreach ( array_keys( array_diff_key( $current, $new ) ) as $cap ) {
 			$role->remove_cap( $cap );
 		}
@@ -202,6 +206,25 @@ final class Reverter {
 				return new \WP_Error( 'rolewright_cannot_assign', __( 'You can\'t assign a role from this entry.', 'rolewright' ) );
 			}
 		}
+		if ( $actor !== $target && ! user_can( $actor, 'promote_user', $target ) ) {
+			return new \WP_Error( 'rolewright_cannot_promote', __( 'You can\'t change the roles of this user.', 'rolewright' ) );
+		}
+		if ( in_array( 'administrator', $before, true ) && ! in_array( 'administrator', $after, true ) ) {
+			$admins = get_users(
+				array(
+					'role'   => 'administrator',
+					'fields' => 'ID',
+					'number' => 2,
+				)
+			);
+			if ( count( $admins ) < 2 ) {
+				return new \WP_Error( 'rolewright_last_admin', __( 'The last administrator can\'t lose the Administrator role.', 'rolewright' ) );
+			}
+		}
+		$ok = self::check_user_result( $actor, $after, self::user_own_caps( $user ) );
+		if ( is_wp_error( $ok ) ) {
+			return $ok;
+		}
 		$lock = self::self_lockout( $actor, $target, $after, null, $user );
 		if ( is_wp_error( $lock ) ) {
 			return $lock;
@@ -222,24 +245,18 @@ final class Reverter {
 		if ( ! $user ) {
 			return new \WP_Error( 'rolewright_no_user', __( 'That user does not exist any more.', 'rolewright' ) );
 		}
-		$current = array();
-		foreach ( (array) $user->caps as $cap => $grant ) {
-			if ( ! in_array( $cap, (array) $user->roles, true ) ) {
-				$current[ (string) $cap ] = (bool) $grant;
-			}
-		}
-		$new = Diff::undo_caps( $current, (array) ( $diff['caps'] ?? array() ) );
-		if ( ! Guard::can_act_on_user( $actor, $target ) ) {
+		$current = self::user_own_caps( $user );
+		$new     = Diff::undo_caps( $current, (array) ( $diff['caps'] ?? array() ) );
+		if ( ! Guard::can_act_on_user( $actor, $target ) || ( $actor !== $target && ! user_can( $actor, 'edit_user', $target ) ) ) {
 			return new \WP_Error( 'rolewright_user_above_actor', __( 'You can\'t change a user who holds capabilities you don\'t have.', 'rolewright' ) );
 		}
-		foreach ( $new as $cap => $grant ) {
-			if ( $grant && empty( $current[ $cap ] ) && ! Guard::can_grant_cap( $actor, $cap ) ) {
-				return new \WP_Error(
-					'rolewright_cap_not_held',
-					/* translators: %s: capability name */
-					sprintf( __( 'You can\'t grant a capability you don\'t hold yourself: %s.', 'rolewright' ), $cap )
-				);
-			}
+		$ok = self::refuse_ungrantable( $actor, self::changed_caps( $current, $new ) );
+		if ( is_wp_error( $ok ) ) {
+			return $ok;
+		}
+		$ok = self::check_user_result( $actor, array_values( (array) $user->roles ), $new );
+		if ( is_wp_error( $ok ) ) {
+			return $ok;
 		}
 		$lock = self::self_lockout( $actor, $target, array_values( (array) $user->roles ), $new, $user );
 		if ( is_wp_error( $lock ) ) {
@@ -271,6 +288,10 @@ final class Reverter {
 			$current[ $slug ]  = $role ? Guard::normalize_caps( (array) $role->capabilities ) : array();
 			$proposed[ $slug ] = Diff::undo_caps( $current[ $slug ], (array) $d );
 			$ok                = Guard::assert_can_modify_role( $actor, $slug, $proposed[ $slug ] );
+			if ( is_wp_error( $ok ) ) {
+				return $ok;
+			}
+			$ok = self::check_role_result( $actor, $current[ $slug ], $proposed[ $slug ] );
 			if ( is_wp_error( $ok ) ) {
 				return $ok;
 			}
@@ -358,21 +379,135 @@ final class Reverter {
 		if ( $actor !== $target || Guard::is_super( $actor ) ) {
 			return true;
 		}
-		$roles_caps = array();
-		foreach ( wp_roles()->roles as $name => $data ) {
-			$roles_caps[ $name ] = Guard::normalize_caps( (array) $data['capabilities'] );
-		}
 		if ( null === $user_caps ) {
-			$user_caps = array();
-			foreach ( (array) $user->caps as $cap => $grant ) {
-				if ( ! in_array( $cap, (array) $user->roles, true ) ) {
-					$user_caps[ $cap ] = (bool) $grant;
-				}
-			}
+			$user_caps = self::user_own_caps( $user );
 		}
-		$reasons = array_diff( Guard::lockout_reasons( $roles, $user_caps, $roles_caps ), array( 'no_manager_role' ) );
+		$reasons = array_diff( Guard::lockout_reasons( $roles, $user_caps, self::roles_caps() ), array( 'no_manager_role' ) );
 		if ( $reasons ) {
 			return new \WP_Error( 'rolewright_lockout', __( 'This revert would lock you out of your own account or of Rolewright.', 'rolewright' ), array( 'reasons' => array_values( $reasons ) ) );
+		}
+		return true;
+	}
+
+	/**
+	 * Per-user caps stored on the user, role entries left out.
+	 *
+	 * @return array<string,bool>
+	 */
+	private static function user_own_caps( \WP_User $user ): array {
+		$out = array();
+		foreach ( (array) $user->caps as $cap => $grant ) {
+			if ( ! in_array( $cap, (array) $user->roles, true ) ) {
+				$out[ (string) $cap ] = (bool) $grant;
+			}
+		}
+		return $out;
+	}
+
+	/** @return array<string,array<string,bool>> */
+	private static function roles_caps(): array {
+		$out = array();
+		foreach ( wp_roles()->roles as $name => $data ) {
+			$out[ (string) $name ] = Guard::normalize_caps( (array) $data['capabilities'] );
+		}
+		return $out;
+	}
+
+	/**
+	 * Caps added, dropped or flipped between two sets. Lifting a per-user deny or dropping
+	 * a grant counts, the same as granting.
+	 *
+	 * @return string[]
+	 */
+	private static function changed_caps( array $current, array $new ): array {
+		$out = array();
+		foreach ( array_unique( array_merge( array_keys( $current ), array_keys( $new ) ) ) as $cap ) {
+			$cap = (string) $cap;
+			if ( ! array_key_exists( $cap, $current ) || ! array_key_exists( $cap, $new ) || $current[ $cap ] !== $new[ $cap ] ) {
+				$out[] = $cap;
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * Caps explicitly denied in $current that $new grants or no longer lists.
+	 *
+	 * @return string[]
+	 */
+	private static function lifted_denies( array $current, array $new ): array {
+		$out = array();
+		foreach ( $current as $cap => $grant ) {
+			if ( false === $grant && ( ! array_key_exists( $cap, $new ) || $new[ $cap ] ) ) {
+				$out[] = (string) $cap;
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * @param string[] $caps
+	 * @return true|\WP_Error
+	 */
+	private static function refuse_ungrantable( int $actor, array $caps ) {
+		$refused = array();
+		foreach ( $caps as $cap ) {
+			if ( ! Guard::can_grant_cap( $actor, $cap ) ) {
+				$refused[] = $cap;
+			}
+		}
+		if ( $refused ) {
+			return new \WP_Error(
+				'rolewright_cap_not_held',
+				/* translators: %s: comma-separated capability names */
+				sprintf( __( 'You can\'t grant or lift a capability you don\'t hold yourself: %s.', 'rolewright' ), implode( ', ', $refused ) )
+			);
+		}
+		return true;
+	}
+
+	/**
+	 * A role revert may not lift a deny the actor couldn't grant, nor leave the role with a
+	 * critical cap the actor lacks.
+	 *
+	 * @return true|\WP_Error
+	 */
+	private static function check_role_result( int $actor, array $current, array $new ) {
+		$ok = self::refuse_ungrantable( $actor, self::lifted_denies( $current, $new ) );
+		if ( is_wp_error( $ok ) || Guard::is_super( $actor ) ) {
+			return $ok;
+		}
+		$above = Guard::missing( Guard::critical_subset( $new ), Guard::user_caps( $actor ) );
+		if ( $above ) {
+			return new \WP_Error(
+				'rolewright_role_above_actor',
+				/* translators: %s: comma-separated capability names */
+				sprintf( __( 'This revert would give the role capabilities you don\'t have: %s.', 'rolewright' ), implode( ', ', $above ) )
+			);
+		}
+		return true;
+	}
+
+	/**
+	 * The user's effective critical caps after the revert must be ones the actor holds, the
+	 * rule Guard::can_act_on_user applies before any change, applied to the result.
+	 *
+	 * @param string[]           $roles
+	 * @param array<string,bool> $user_caps
+	 * @return true|\WP_Error
+	 */
+	private static function check_user_result( int $actor, array $roles, array $user_caps ) {
+		if ( Guard::is_super( $actor ) ) {
+			return true;
+		}
+		$effective = Guard::caps_from_roles( $roles, self::roles_caps(), $user_caps );
+		$above     = Guard::missing( Guard::critical_subset( $effective ), Guard::user_caps( $actor ) );
+		if ( $above ) {
+			return new \WP_Error(
+				'rolewright_user_above_actor',
+				/* translators: %s: comma-separated capability names */
+				sprintf( __( 'This revert would give the user capabilities you don\'t have: %s.', 'rolewright' ), implode( ', ', $above ) )
+			);
 		}
 		return true;
 	}

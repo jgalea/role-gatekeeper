@@ -57,6 +57,8 @@ $last = function () use ( $wpdb ) {
 $admin = get_users( array( 'role' => 'administrator', 'number' => 1, 'fields' => 'ID' ) );
 $admin = (int) $admin[0];
 wp_set_current_user( $admin );
+// The revert fixtures use site-level managers; on multisite those need site admin access on.
+add_filter( 'rolewright_multisite_site_admin_access', '__return_true' );
 
 // Schema.
 $rw_ok( Store::SCHEMA_VERSION === get_option( Store::OPTION_SCHEMA ), 'schema version option set' );
@@ -177,7 +179,7 @@ $rw_ok( true === $res && empty( get_role( $slug )->capabilities['moderate_commen
 // caps.updated: escalation refused (actor lacks the critical cap the revert would restore)
 $mgr_slug = 'rw_audit_mgr_' . $sfx;
 $roles[]  = $mgr_slug;
-$mgr_caps = array( 'read' => true, Caps::MANAGE => true, Caps::MANAGE_ROLES => true, Caps::MANAGE_CAPS => true, Caps::MANAGE_USERS => true, Caps::VIEW_AUDIT => true );
+$mgr_caps = array( 'read' => true, 'list_users' => true, 'edit_users' => true, 'promote_users' => true, Caps::MANAGE => true, Caps::MANAGE_ROLES => true, Caps::MANAGE_CAPS => true, Caps::MANAGE_USERS => true, Caps::VIEW_AUDIT => true );
 add_role( $mgr_slug, 'Audit Mgr', $mgr_caps );
 $mgr = $make( 'rw_audit_mgr', $mgr_slug );
 $rw_ok( user_can( $mgr, Caps::VIEW_AUDIT ), 'fixture: manager holds audit cap but not manage_options' );
@@ -221,6 +223,77 @@ $ud->add_cap( 'rw_audit_cap_' . $sfx );
 do_action( 'rolewright_changed', 'user.caps', array( 'actor' => $admin, 'target' => $u, 'before' => array( 'caps' => array() ), 'after' => array( 'caps' => array( 'rw_audit_cap_' . $sfx => true ) ) ) );
 $res = Reverter::revert( (int) $logged( 'user.caps' )->id, $admin );
 $rw_ok( true === $res && empty( get_userdata( $u )->caps[ 'rw_audit_cap_' . $sfx ] ), 'reverting user.caps removes the per-user cap' );
+
+// Reverts that would lift a deny or unmask a critical cap, by an actor without manage_options.
+// The storage backstop is off here so the reverter's own checks are what refuses.
+$rw_no_backstop = function () {
+	return false;
+};
+add_filter( 'rolewright_storage_backstop', $rw_no_backstop );
+$opts_slug = 'rw_audit_opts_' . $sfx;
+$deny_slug = 'rw_audit_deny_' . $sfx;
+$roles[]   = $opts_slug;
+$roles[]   = $deny_slug;
+add_role( $opts_slug, 'Audit Opts', array( 'read' => true, 'manage_options' => true ) );
+add_role( $deny_slug, 'Audit Deny', array( 'read' => true, 'manage_options' => false ) );
+$mgr3 = $make( 'rw_audit_mgr3', $mgr_slug );
+$rw_ok( user_can( $mgr3, Caps::VIEW_AUDIT ) && user_can( $mgr3, Caps::MANAGE_USERS ) && ! user_can( $mgr3, 'manage_options' ), 'fixture: manager holds audit and user caps but not manage_options' );
+
+$t1 = $make( 'rw_audit_t1', $opts_slug );
+( new WP_User( $t1 ) )->add_cap( 'manage_options', false );
+clean_user_cache( $t1 );
+$rw_ok( ! user_can( $t1, 'manage_options' ), 'fixture: per-user deny masks manage_options' );
+do_action( 'rolewright_changed', 'user.caps', array( 'actor' => $admin, 'target' => $t1, 'before' => array( 'caps' => array() ), 'after' => array( 'caps' => array( 'manage_options' => false ) ) ) );
+$entry = $logged( 'user.caps' );
+wp_set_current_user( $mgr3 );
+$res = Reverter::revert( (int) $entry->id, $mgr3 );
+wp_set_current_user( $admin );
+clean_user_cache( $t1 );
+// On multisite core already refuses edit_user to a site admin, so the code differs there.
+$rw_t1_code = is_multisite() ? array( 'rolewright_cap_not_held', 'rolewright_user_above_actor' ) : array( 'rolewright_cap_not_held' );
+$rw_ok( is_wp_error( $res ) && in_array( $res->get_error_code(), $rw_t1_code, true ) && ! user_can( $t1, 'manage_options' ) && array_key_exists( 'manage_options', get_userdata( $t1 )->caps ), 'user.caps revert refused when it would lift a per-user deny on manage_options' );
+
+$t2 = $make( 'rw_audit_t2', 'subscriber' );
+( new WP_User( $t2 ) )->add_cap( 'manage_options', false );
+do_action( 'rolewright_changed', 'user.caps', array( 'actor' => $admin, 'target' => $t2, 'before' => array( 'caps' => array( 'manage_options' => true ) ), 'after' => array( 'caps' => array( 'manage_options' => false ) ) ) );
+$entry = $logged( 'user.caps' );
+wp_set_current_user( $mgr3 );
+$res = Reverter::revert( (int) $entry->id, $mgr3 );
+wp_set_current_user( $admin );
+clean_user_cache( $t2 );
+$rw_ok( is_wp_error( $res ) && ! user_can( $t2, 'manage_options' ), 'user.caps revert refused when it would flip a per-user deny on manage_options to a grant' );
+
+$t3 = $make( 'rw_audit_t3', $opts_slug );
+( new WP_User( $t3 ) )->add_role( $deny_slug );
+clean_user_cache( $t3 );
+$rw_ok( ! user_can( $t3, 'manage_options' ), 'fixture: a second role\'s deny masks manage_options' );
+do_action( 'rolewright_changed', 'user.roles', array( 'actor' => $admin, 'target' => $t3, 'before' => array( 'roles' => array( $opts_slug ) ), 'after' => array( 'roles' => array( $opts_slug, $deny_slug ) ) ) );
+$entry = $logged( 'user.roles' );
+wp_set_current_user( $mgr3 );
+$res = Reverter::revert( (int) $entry->id, $mgr3 );
+wp_set_current_user( $admin );
+clean_user_cache( $t3 );
+$rw_ok( is_wp_error( $res ) && 'rolewright_user_above_actor' === $res->get_error_code() && ! user_can( $t3, 'manage_options' ) && in_array( $deny_slug, get_userdata( $t3 )->roles, true ), 'user.roles revert refused when removing a role would unmask manage_options' );
+
+$t4 = $make( 'rw_audit_t4', 'subscriber' );
+do_action( 'rolewright_changed', 'user.roles', array( 'actor' => $admin, 'target' => $t4, 'before' => array( 'roles' => array( 'subscriber', $opts_slug ) ), 'after' => array( 'roles' => array( 'subscriber' ) ) ) );
+$entry = $logged( 'user.roles' );
+wp_set_current_user( $mgr3 );
+$res = Reverter::revert( (int) $entry->id, $mgr3 );
+wp_set_current_user( $admin );
+clean_user_cache( $t4 );
+$rw_ok( is_wp_error( $res ) && ! user_can( $t4, 'manage_options' ), 'user.roles revert refused when it would restore an admin-level role' );
+
+do_action( 'rolewright_changed', 'caps.updated', array( 'actor' => $admin, 'target' => $deny_slug, 'before' => array( 'caps' => array( 'read' => true ) ), 'after' => array( 'caps' => array( 'read' => true, 'manage_options' => false ) ) ) );
+$entry = $logged( 'caps.updated' );
+wp_set_current_user( $mgr3 );
+$res = Reverter::revert( (int) $entry->id, $mgr3 );
+wp_set_current_user( $admin );
+$rw_ok( is_wp_error( $res ) && 'rolewright_cap_not_held' === $res->get_error_code() && array_key_exists( 'manage_options', get_role( $deny_slug )->capabilities ), 'caps.updated revert refused when it would lift a role deny on manage_options' );
+
+$res = Reverter::revert( (int) $entry->id, $admin );
+$rw_ok( true === $res && ! array_key_exists( 'manage_options', get_role( $deny_slug )->capabilities ), 'an administrator can still revert the role deny' );
+remove_filter( 'rolewright_storage_backstop', $rw_no_backstop );
 
 // roles.reset, role.default_set, caps.options_updated, access.updated
 $ed_before = wp_roles()->roles['editor']['capabilities'];
@@ -325,14 +398,57 @@ try {
 $rw_ok( $died, 'revert handler refuses a request without a nonce' );
 $_POST = array();
 
+// Multisite: a new subsite gets its own table; a site without one creates it on the first write.
+$rw_subs        = array();
+$rw_has_table   = function ( $blog_id ) use ( $wpdb ) {
+	$t = $wpdb->get_blog_prefix( $blog_id ) . 'rolewright_audit';
+	return $t === $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $t ) );
+};
+if ( is_multisite() ) {
+	$rw_net    = get_network();
+	$rw_subs[] = wp_insert_site( array( 'domain' => $rw_net->domain, 'path' => '/rwaudit-a-' . $sfx . '/', 'user_id' => $admin ) );
+	$rw_ok( is_int( $rw_subs[0] ) && $rw_has_table( $rw_subs[0] ), 'multisite: a new subsite gets its own audit table' );
+	switch_to_blog( $rw_subs[0] );
+	do_action( 'rolewright_changed', 'role.created', array( 'actor' => $admin, 'target' => 'rw_sub_' . $sfx, 'before' => array(), 'after' => array( 'name' => 'Sub', 'caps' => array( 'read' => true ) ) ) );
+	$rw_row = $last();
+	restore_current_blog();
+	$rw_ok( $rw_row && 'rw_sub_' . $sfx === $rw_row->target, 'multisite: a change on the subsite lands in its log' );
+
+	remove_action( 'wp_initialize_site', array( Store::class, 'on_initialize_site' ), 20 );
+	$rw_subs[] = wp_insert_site( array( 'domain' => $rw_net->domain, 'path' => '/rwaudit-b-' . $sfx . '/', 'user_id' => $admin ) );
+	add_action( 'wp_initialize_site', array( Store::class, 'on_initialize_site' ), 20 );
+	$rw_ok( ! $rw_has_table( $rw_subs[1] ), 'fixture: second subsite has no audit table' );
+	switch_to_blog( $rw_subs[1] );
+	$wpdb->last_error = '';
+	$rw_empty         = Store::query( array(), 1, 20 );
+	$rw_ok( 0 === $rw_empty['total'] && null === Store::get( 1 ) && '' === $wpdb->last_error, 'multisite: reading a missing table returns nothing without a database error' );
+	do_action( 'rolewright_changed', 'role.created', array( 'actor' => $admin, 'target' => 'rw_sub_b_' . $sfx, 'before' => array(), 'after' => array( 'name' => 'Sub B', 'caps' => array( 'read' => true ) ) ) );
+	$rw_row = $last();
+	$rw_err = $wpdb->last_error;
+	restore_current_blog();
+	$rw_ok( $rw_has_table( $rw_subs[1] ) && $rw_row && 'rw_sub_b_' . $sfx === $rw_row->target && '' === $rw_err, 'multisite: the first write creates the missing table and lands' );
+}
+
 // Uninstall.
 wp_set_current_user( $admin );
 update_option( Audit_Module::OPTION_SETTINGS, array( 'retention_days' => 180, 'delete_on_uninstall' => false ) );
 include ROLEWRIGHT_DIR . 'includes/modules/audit/uninstall.php';
 $rw_ok( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', Store::table() ) ) === Store::table(), 'uninstall keeps the table when the setting is off' );
+foreach ( $rw_subs as $rw_sub ) {
+	switch_to_blog( $rw_sub );
+	Store::install();
+	restore_current_blog();
+}
+$rw_ok( ! $rw_subs || ( $rw_has_table( $rw_subs[0] ) && $rw_has_table( $rw_subs[1] ) ), 'fixture: every subsite has an audit table before uninstall' );
 update_option( Audit_Module::OPTION_SETTINGS, array( 'retention_days' => 180, 'delete_on_uninstall' => true ) );
 include ROLEWRIGHT_DIR . 'includes/modules/audit/uninstall.php';
 $rw_ok( null === $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', Store::table() ) ), 'uninstall drops the table when the setting is on' );
+if ( $rw_subs ) {
+	$rw_ok( ! $rw_has_table( $rw_subs[0] ) && ! $rw_has_table( $rw_subs[1] ), 'multisite: uninstall drops the table on every subsite' );
+	foreach ( $rw_subs as $rw_sub ) {
+		wp_delete_site( $rw_sub );
+	}
+}
 
 // Cleanup.
 Store::install();
