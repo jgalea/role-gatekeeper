@@ -3,6 +3,7 @@ namespace Rolewright\Modules\Automation;
 
 use Rolewright\Modules\Safety\Caps;
 use Rolewright\Modules\Safety\Guard;
+use Rolewright\Modules\User_Roles\Users;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -14,11 +15,16 @@ defined( 'ABSPATH' ) || exit;
 final class Gate {
 	/** @return true|\WP_Error */
 	public static function modify_role( int $actor, string $role, array $new_caps ) {
-		$ok = Guard::assert_can_modify_role( $actor, $role, $new_caps );
 		if ( $actor > 0 ) {
-			return $ok;
+			return Guard::assert_can_modify_role( $actor, $role, $new_caps );
 		}
-		$ok = self::drop_actor_checks( $ok );
+		$ok = self::drop_actor_checks(
+			self::as_shell(
+				function () use ( $role, $new_caps ) {
+					return Guard::assert_can_modify_role( 0, $role, $new_caps );
+				}
+			)
+		);
 		if ( is_wp_error( $ok ) ) {
 			return $ok;
 		}
@@ -27,11 +33,16 @@ final class Gate {
 
 	/** @return true|\WP_Error */
 	public static function delete_role( int $actor, string $role ) {
-		$ok = Guard::assert_can_delete_role( $actor, $role );
 		if ( $actor > 0 ) {
-			return $ok;
+			return Guard::assert_can_delete_role( $actor, $role );
 		}
-		$ok = self::drop_actor_checks( $ok );
+		$ok = self::drop_actor_checks(
+			self::as_shell(
+				function () use ( $role ) {
+					return Guard::assert_can_delete_role( 0, $role );
+				}
+			)
+		);
 		if ( is_wp_error( $ok ) ) {
 			return $ok;
 		}
@@ -40,8 +51,38 @@ final class Gate {
 
 	/** @return true|\WP_Error */
 	public static function rename_role( int $actor, string $role ) {
-		$ok = Guard::assert_can_rename_role( $actor, $role );
-		return $actor > 0 ? $ok : self::drop_actor_checks( $ok );
+		if ( $actor > 0 ) {
+			return Guard::assert_can_rename_role( $actor, $role );
+		}
+		return self::drop_actor_checks(
+			self::as_shell(
+				function () use ( $role ) {
+					return Guard::assert_can_rename_role( 0, $role );
+				}
+			)
+		);
+	}
+
+	/**
+	 * Runs a Guard assertion for the shell actor. The shell has no role, so a role
+	 * hierarchy would rank it below everything; that veto is about what the actor holds and
+	 * is dropped here, so Guard's own checks (names, protected roles) still run.
+	 *
+	 * @return true|\WP_Error
+	 */
+	private static function as_shell( callable $fn ) {
+		$drop = function ( $veto ) {
+			if ( $veto instanceof \WP_Error && 'rolewright_role_above_position' === $veto->get_error_code() ) {
+				return null;
+			}
+			return $veto;
+		};
+		add_filter( 'rolewright_role_change_veto', $drop, PHP_INT_MAX );
+		try {
+			return $fn();
+		} finally {
+			remove_filter( 'rolewright_role_change_veto', $drop, PHP_INT_MAX );
+		}
 	}
 
 	/** @return true|\WP_Error */
@@ -53,6 +94,23 @@ final class Gate {
 			return new \WP_Error( 'rolewright_cannot_assign', __( 'You can\'t assign that role to this user.', 'rolewright' ) );
 		}
 		return true;
+	}
+
+	/**
+	 * On multisite a named actor may only touch users who belong to the current site, the
+	 * same rule the user-roles screens apply. The shell actor keeps WP-CLI's own reach.
+	 *
+	 * @return true|\WP_Error
+	 */
+	public static function site_member( int $actor, int $target ) {
+		if ( $actor <= 0 ) {
+			return true;
+		}
+		$ok = Users::check_site_member( $actor, $target );
+		if ( is_wp_error( $ok ) ) {
+			$ok->add_data( array( 'status' => 404 ) );
+		}
+		return $ok;
 	}
 
 	/** @return true|\WP_Error */

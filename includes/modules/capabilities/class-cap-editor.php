@@ -16,7 +16,7 @@ final class Cap_Editor {
 
 	public function handle_post(): void {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- the nonce is checked below.
-		if ( 'POST' !== ( isset( $_SERVER['REQUEST_METHOD'] ) ? $_SERVER['REQUEST_METHOD'] : '' ) || ! isset( $_POST['rw_op'] ) ) {
+		if ( 'POST' !== ( isset( $_SERVER['REQUEST_METHOD'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) : '' ) || ! isset( $_POST['rw_op'] ) ) {
 			return;
 		}
 		if ( ! current_user_can( Caps::MANAGE_CAPS ) ) {

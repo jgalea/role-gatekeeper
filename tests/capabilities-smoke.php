@@ -127,14 +127,19 @@ $rw_ok( is_wp_error( $res ), 'escalation: can\'t edit the administrator role' );
 // Lockout and self-edit confirmation.
 $res = Cap_Service::update_role( $rw_mgr, $rw_mgr_role, array( 'read', Caps::MANAGE_CAPS, Caps::MANAGE_ROLES ) );
 $rw_ok( is_wp_error( $res ) && 'rolewright_confirm' === $res->get_error_code() && array( Caps::MANAGE ) === $res->get_error_data()['removed'], 'self-edit: removing a cap from own role asks for confirmation' );
+// With the role hierarchy on, a user below the top can't edit their own role at all.
+$rw_hier    = \Rolewright\Core\Plugin::is_enabled( 'deny-hierarchy' );
+$rw_refused = function ( $res, $code ) use ( $rw_hier ) {
+	return is_wp_error( $res ) && ( $code === $res->get_error_code() || ( $rw_hier && 'rolewright_role_above_position' === $res->get_error_code() ) );
+};
 $res = Cap_Service::update_role( $rw_mgr, $rw_mgr_role, array( 'read', Caps::MANAGE_CAPS, Caps::MANAGE_ROLES ), null, array(), true );
-$rw_ok( is_wp_error( $res ) && 'rolewright_lockout' === $res->get_error_code(), 'lockout: confirmed removal of rolewright_manage is still refused' );
+$rw_ok( $rw_refused( $res, 'rolewright_lockout' ), 'lockout: confirmed removal of rolewright_manage is still refused' );
 $res = Cap_Service::update_role( $rw_mgr, $rw_mgr_role, array( Caps::MANAGE, Caps::MANAGE_CAPS, Caps::MANAGE_ROLES ), null, array(), true );
-$rw_ok( is_wp_error( $res ) && 'rolewright_lockout' === $res->get_error_code(), 'lockout: removing read from own role refused' );
+$rw_ok( $rw_refused( $res, 'rolewright_lockout' ), 'lockout: removing read from own role refused' );
 $res = Cap_Service::update_role( $rw_mgr, $rw_mgr_role, array( 'read', Caps::MANAGE, Caps::MANAGE_CAPS, Caps::MANAGE_ROLES, 'upload_files' ) );
-$rw_ok( is_array( $res ), 'self-edit: adding a cap to own role needs no confirmation' );
+$rw_ok( $rw_hier ? $rw_refused( $res, '' ) : is_array( $res ), 'self-edit: adding a cap to own role needs no confirmation (refused under the hierarchy)' );
 $res = Cap_Service::update_role( $rw_mgr, $rw_mgr_role, array( 'read', Caps::MANAGE, Caps::MANAGE_CAPS, Caps::MANAGE_ROLES ), null, array(), true );
-$rw_ok( is_array( $res ) && array( 'upload_files' ) === $res['removed'], 'self-edit: confirmed harmless removal goes through' );
+$rw_ok( $rw_hier ? $rw_refused( $res, '' ) : ( is_array( $res ) && array( 'upload_files' ) === $res['removed'] ), 'self-edit: confirmed harmless removal goes through (refused under the hierarchy)' );
 wp_set_current_user( $rw_admin );
 $res = Cap_Service::update_role( $rw_admin, 'administrator', array_diff( array_keys( array_filter( Role_Store::caps( 'administrator' ) ) ), array( Caps::MANAGE_ROLES ) ), null, array(), true );
 $rw_ok( is_wp_error( $res ) && 'rolewright_protected_role' === $res->get_error_code(), 'lockout: administrator can\'t lose rolewright_manage_roles' );

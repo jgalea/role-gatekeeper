@@ -73,7 +73,7 @@ final class Abilities {
 			$this->schema( array( 'user' => array( 'type' => 'integer' ) ), array( 'user' ) ),
 			true,
 			function ( $input ) {
-				return Ops::user_summary( (int) ( $input['user'] ?? 0 ) );
+				return Ops::user_summary( (int) ( $input['user'] ?? 0 ), get_current_user_id() );
 			}
 		);
 
@@ -138,7 +138,7 @@ final class Abilities {
 					return $ask;
 				}
 				$result = Ops::assign_role( get_current_user_id(), (int) ( $input['user'] ?? 0 ), $role );
-				return is_wp_error( $result ) ? $result : Ops::user_summary( (int) $input['user'] );
+				return is_wp_error( $result ) ? $result : Ops::user_summary( (int) $input['user'], get_current_user_id() );
 			}
 		);
 		$this->add(
@@ -156,7 +156,7 @@ final class Abilities {
 			false,
 			function ( $input ) {
 				$result = Ops::unassign_role( get_current_user_id(), (int) ( $input['user'] ?? 0 ), (string) ( $input['role'] ?? '' ) );
-				return is_wp_error( $result ) ? $result : Ops::user_summary( (int) $input['user'] );
+				return is_wp_error( $result ) ? $result : Ops::user_summary( (int) $input['user'], get_current_user_id() );
 			}
 		);
 		$this->add(

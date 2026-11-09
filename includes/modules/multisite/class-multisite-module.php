@@ -42,12 +42,12 @@ final class Multisite_Module extends Module {
 	}
 
 	public static function site_admins_allowed( $allowed = false ): bool {
-		return (bool) get_site_option( self::OPTION_SITE_ADMIN, false );
+		return (bool) $allowed || (bool) get_site_option( self::OPTION_SITE_ADMIN, false );
 	}
 
 	/**
-	 * With the network setting off, no Rolewright cap (pages included) is usable by
-	 * anyone but a super admin.
+	 * With the network setting off and no `rolewright_multisite_site_admin_access` grant,
+	 * no Rolewright cap (pages included) is usable by anyone but a super admin.
 	 *
 	 * @param string[] $caps
 	 * @param string   $cap
@@ -56,7 +56,7 @@ final class Multisite_Module extends Module {
 	 * @return string[]
 	 */
 	public static function restrict_site_admins( $caps, $cap, $user_id, $args ) {
-		if ( in_array( $cap, Caps::all(), true ) && ! self::site_admins_allowed() && ! is_super_admin( (int) $user_id ) ) {
+		if ( in_array( $cap, Caps::all(), true ) && ! is_super_admin( (int) $user_id ) && ! apply_filters( 'rolewright_multisite_site_admin_access', false, get_userdata( (int) $user_id ) ) ) {
 			return array( 'do_not_allow' );
 		}
 		return $caps;

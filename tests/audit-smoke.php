@@ -193,7 +193,7 @@ $rw_ok( is_wp_error( $res ) && 'rolewright_cap_not_held' === $res->get_error_cod
 do_action( 'rolewright_changed', 'caps.updated', array( 'actor' => $admin, 'target' => $mgr_slug, 'before' => array( 'caps' => array( 'read' => true, Caps::MANAGE_ROLES => true, Caps::MANAGE_CAPS => true, Caps::VIEW_AUDIT => true ) ), 'after' => array( 'caps' => $mgr_caps ) ) );
 $entry = $logged( 'caps.updated' );
 $res   = Reverter::revert( (int) $entry->id, $mgr );
-$rw_ok( is_wp_error( $res ) && 'rolewright_lockout' === $res->get_error_code() && ! empty( get_role( $mgr_slug )->capabilities[ Caps::MANAGE ] ), 'revert refused when it would lock the actor out' );
+$rw_ok( is_wp_error( $res ) && in_array( $res->get_error_code(), \Rolewright\Core\Plugin::is_enabled( 'deny-hierarchy' ) ? array( 'rolewright_lockout', 'rolewright_role_above_position' ) : array( 'rolewright_lockout' ), true ) && ! empty( get_role( $mgr_slug )->capabilities[ Caps::MANAGE ] ), 'revert refused when it would lock the actor out (the hierarchy may refuse own-role edits first)' );
 
 // no permission
 $plain = $make( 'rw_audit_plain', 'editor' );

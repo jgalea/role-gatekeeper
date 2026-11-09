@@ -188,7 +188,7 @@ $rw_ed_saved = Role_Store::caps( 'editor' );
 );
 wp_set_current_user( $core_mgr );
 $res = Role_Service::reset( $core_mgr );
-$rw_ok( is_wp_error( $res ) && 'rolewright_lockout' === $res->get_error_code(), 'reset: refused when the actor would lose access (' . ( is_wp_error( $res ) ? $res->get_error_code() : 'ok' ) . ')' );
+$rw_ok( is_wp_error( $res ) && in_array( $res->get_error_code(), \Rolewright\Core\Plugin::is_enabled( 'deny-hierarchy' ) ? array( 'rolewright_lockout', 'rolewright_role_above_position' ) : array( 'rolewright_lockout' ), true ), 'reset: refused when the actor would lose access (' . ( is_wp_error( $res ) ? $res->get_error_code() : 'ok' ) . ')' );
 $rw_ok( get_role( 'editor' )->has_cap( 'manage_options' ) && get_role( 'editor' )->has_cap( Caps::MANAGE_ROLES ), 'reset: roles unchanged after the lockout refusal' );
 $rw_ok( count( Role_Service::backups() ) === $bk_n, 'reset: lockout refusal leaves no stray backup' );
 wp_set_current_user( $rw_admin );

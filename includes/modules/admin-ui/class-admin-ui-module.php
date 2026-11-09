@@ -21,6 +21,7 @@ final class Admin_Ui_Module extends Module {
 	public function init(): void {
 		( new Enforcer() )->register();
 		( new Discovery() )->register();
+		add_filter( 'rolewright_portability_sections', array( Portability_Section::class, 'register' ) );
 		if ( is_admin() ) {
 			( new Admin_Page() )->register();
 		}

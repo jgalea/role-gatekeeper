@@ -223,10 +223,14 @@ final class Ops {
 	}
 
 	/** @return array{id:int,login:string,roles:string[],direct:array<string,bool>,capabilities:string[]}|\WP_Error */
-	public static function user_summary( int $user_id ) {
+	public static function user_summary( int $user_id, int $actor = 0 ) {
 		$user = get_userdata( $user_id );
 		if ( ! $user ) {
 			return new \WP_Error( 'rolewright_no_user', __( 'That user does not exist.', 'rolewright' ), array( 'status' => 404 ) );
+		}
+		$ok = Gate::site_member( $actor, $user_id );
+		if ( is_wp_error( $ok ) ) {
+			return $ok;
 		}
 		$caps = array_keys( Guard::user_caps( $user_id ) );
 		sort( $caps );
@@ -244,6 +248,10 @@ final class Ops {
 		$user = get_userdata( $target );
 		if ( ! $user ) {
 			return new \WP_Error( 'rolewright_no_user', __( 'That user does not exist.', 'rolewright' ), array( 'status' => 404 ) );
+		}
+		$ok = Gate::site_member( $actor, $target );
+		if ( is_wp_error( $ok ) ) {
+			return $ok;
 		}
 		if ( in_array( $role, (array) $user->roles, true ) ) {
 			return new \WP_Error( 'rolewright_already_has_role', __( 'The user already has that role.', 'rolewright' ) );
@@ -269,6 +277,10 @@ final class Ops {
 		$user = get_userdata( $target );
 		if ( ! $user ) {
 			return new \WP_Error( 'rolewright_no_user', __( 'That user does not exist.', 'rolewright' ), array( 'status' => 404 ) );
+		}
+		$ok = Gate::site_member( $actor, $target );
+		if ( is_wp_error( $ok ) ) {
+			return $ok;
 		}
 		if ( ! in_array( $role, (array) $user->roles, true ) ) {
 			return new \WP_Error( 'rolewright_user_lacks_role', __( 'The user doesn\'t have that role.', 'rolewright' ) );

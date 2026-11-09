@@ -221,7 +221,9 @@ try {
 	$rw_ok( ! Admin_Gate::is_gated( get_userdata( $sub ), $defs ), 'admin gate: off means nobody is gated' );
 	$mgr = $rw_make( 'rw_sa_mgr', 'subscriber' );
 	get_userdata( $mgr )->add_cap( Caps::MANAGE );
-	$rw_ok( ! Admin_Gate::is_gated( get_userdata( $mgr ), $gated ), 'admin gate: a user with Rolewright manage access is never gated' );
+	// On multisite, unless site admins are granted Rolewright access, only super admins hold its caps, so the per-user grant is void and the user is gated like any other.
+	$rw_ms_locked = is_multisite() && ! apply_filters( 'rolewright_multisite_site_admin_access', false, get_userdata( $mgr ) );
+	$rw_ok( $rw_ms_locked === Admin_Gate::is_gated( get_userdata( $mgr ), $gated ), 'admin gate: a user with Rolewright manage access is never gated (multisite: only once site admins are granted access)' );
 	$rw_ok( home_url( '/' ) === Admin_Gate::target( $gated ), 'admin gate: default target is the home page' );
 	foreach ( array( admin_url( 'index.php' ), wp_login_url(), 'https://evil.example/phish', '//evil.example', home_url( '/wp-admin/profile.php' ) ) as $bad ) {
 		$tgt = Admin_Gate::target( array_merge( $gated, array( 'admin_redirect' => $bad ) ) );
@@ -289,7 +291,8 @@ try {
 	$token = ( $rw_mails && preg_match( '/token=([a-f0-9]{64})/', (string) end( $rw_mails )['message'], $m ) ) ? $m[1] : '';
 	$rw_ok( true === Rescue::consume( $admin_id, $token, $ip ), 'lockout: rescue link restores the Rolewright caps' );
 	clean_user_cache( $admin_id );
-	$rw_ok( get_userdata( $admin_id )->has_cap( Caps::MANAGE ), 'lockout: administrator can manage Rolewright again' );
+	// On multisite the restored role cap is what to check: site admins only use it once they are granted access.
+	$rw_ok( is_multisite() ? get_role( 'administrator' )->has_cap( Caps::MANAGE ) : get_userdata( $admin_id )->has_cap( Caps::MANAGE ), 'lockout: administrator can manage Rolewright again' );
 	delete_transient( 'rolewright_rl_' . md5( 'ip|' . $ip ) );
 	delete_transient( 'rolewright_rl_' . md5( 'use|' . $ip ) );
 	delete_transient( 'rolewright_rl_' . md5( 'acct|' . $admin_id ) );
@@ -298,7 +301,7 @@ try {
 	wp_set_current_user( $sub );
 	$rw_ok( ! current_user_can( Caps::MANAGE_ACCESS ), 'page: a subscriber lacks the access-management capability' );
 	wp_set_current_user( $admin_id );
-	$rw_ok( current_user_can( Caps::MANAGE_ACCESS ), 'page: an administrator holds it' );
+	$rw_ok( ( is_multisite() && ! apply_filters( 'rolewright_multisite_site_admin_access', false, wp_get_current_user() ) ) !== current_user_can( Caps::MANAGE_ACCESS ), 'page: an administrator holds it (multisite: only once site admins are granted access)' );
 	wp_set_current_user( 0 );
 } finally {
 	remove_filter( 'pre_wp_mail', $rw_capture_mail, 10 );

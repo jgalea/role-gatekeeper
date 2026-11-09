@@ -127,6 +127,8 @@ try {
 	);
 	add_role( $r_view, 'RW viewer', array( 'read' => true, Caps::MANAGE => true, 'edit_posts' => true ) );
 	add_role( $r_high, 'RW high', array( 'read' => true, 'manage_options' => true ) );
+	// With the role hierarchy on, the manager must rank above the users it restricts.
+	update_option( 'rolewright_role_positions', array_merge( (array) get_option( 'rolewright_role_positions', array() ), array( $r_mgr => 50 ) ), false );
 	$mgr     = $make( 'rw_mgr', $r_mgr );
 	get_userdata( $mgr )->add_role( $r_view );
 	$rest    = $make( 'rw_rest', $r_rest );
@@ -521,6 +523,10 @@ try {
 	$rw_ok( 'die:403' === $ajax( $rest, 'toggle-auto-updates', array( 'type' => 'plugin', 'asset' => 'hello.php' ) ), 'ajax toggle-auto-updates refused for a locked plugin' );
 	$rw_ok( 'die:403' === $ajax( $rest, 'toggle-auto-updates', array( 'type' => 'Plugin', 'asset' => 'hello.php' ) ), 'ajax toggle-auto-updates: type parsed like core (case-insensitive)' );
 	$rw_ok( 'die:403' === $ajax( $rest, 'toggle-auto-updates', array( 'type' => 'plugin', 'asset' => 'hello%2Ephp' ) ), 'ajax toggle-auto-updates: asset url-decoded like core' );
+	$rw_ok( 'die:403' === $ajax( $rest, 'toggle-auto-updates', array( 'type' => 'PLUGIN', 'asset' => 'hello%2ephp' ) ), 'ajax toggle-auto-updates: upper-case type and lower-case percent escape still refused' );
+	$rw_ok( 'die:403' === $ajax( $rest, 'update-plugin', array( 'plugin' => 'hello%2Ephp', 'slug' => 'hello-dolly' ) ), 'ajax update-plugin: percent-encoded plugin name refused' );
+	$rw_ok( 'die:403' === $ajax( $rest, 'update-plugin', array( 'plugin' => 'Hello.PHP', 'slug' => 'hello-dolly' ) ), 'ajax update-plugin: case-varied plugin name refused' );
+	$rw_ok( 'die:403' === $ajax( $rest, 'toggle-auto-updates', array( 'type' => 'plugin', 'asset' => 'HELLO%2Ephp' ) ), 'ajax toggle-auto-updates: case-varied, percent-encoded asset refused' );
 	$rw_ok( 'ok' === $ajax( $rest, 'update-plugin', array( 'plugin' => 'akismet/akismet.php', 'slug' => 'akismet' ) ), 'control: ajax update-plugin allowed for an unlocked plugin' );
 	$rw_ok( 'ok' === $ajax( $rest, 'install-plugin', array( 'slug' => 'akismet' ) ), 'control: ajax install-plugin allowed under the deny model' );
 	$rw_ok( 'ok' === $ajax( $rest, 'heartbeat' ), 'control: unrelated ajax action allowed' );

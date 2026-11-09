@@ -137,7 +137,7 @@ final class Rest_Routes {
 	}
 
 	public function user_caps( \WP_REST_Request $request ) {
-		return $this->respond( Ops::user_summary( (int) $request['id'] ) );
+		return $this->respond( Ops::user_summary( (int) $request['id'], get_current_user_id() ) );
 	}
 
 	public function create_role( \WP_REST_Request $request ) {
@@ -199,7 +199,7 @@ final class Rest_Routes {
 				return $this->error( $result );
 			}
 		}
-		return $this->respond( Ops::user_summary( $id ) );
+		return $this->respond( Ops::user_summary( $id, get_current_user_id() ) );
 	}
 
 	/** @param mixed $data */

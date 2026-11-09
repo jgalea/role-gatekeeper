@@ -39,7 +39,15 @@ final class Plugin {
 	/** @return array<string,bool> */
 	public static function enabled_map(): array {
 		$map = get_option( self::OPTION_MODULES, array() );
-		return is_array( $map ) ? $map : array();
+		if ( ! is_array( $map ) ) {
+			return array();
+		}
+		return array_map(
+			function ( $on ) {
+				return filter_var( $on, FILTER_VALIDATE_BOOLEAN );
+			},
+			$map
+		);
 	}
 
 	public static function is_enabled( string $id ): bool {

@@ -105,10 +105,11 @@ $rw_ok( 'rolewright_protected_role' === $code( Ops::delete_role( 0, get_option( 
 $rw_ok( 'rolewright_protected_role' === $code( Ops::change_role_caps( 0, 'administrator', array(), array( Caps::MANAGE_ROLES ) ) ), 'administrator can\'t lose Rolewright caps even for the shell' );
 $rw_ok( 'rolewright_protected_role' === $code( Ops::change_role_caps( 0, 'administrator', array(), array( 'manage_options' ) ) ), 'administrator can\'t lose critical caps' );
 
-// Guard applies to a named actor.
+// Guard applies to a named actor. With the role hierarchy on, own-role edits are refused before the lockout check.
+$own_role_codes = \Rolewright\Core\Plugin::is_enabled( 'deny-hierarchy' ) ? array( 'rolewright_lockout', 'rolewright_role_above_position' ) : array( 'rolewright_lockout' );
 $rw_ok( 'rolewright_cap_not_held' === $code( Ops::change_role_caps( $mgr, $a, array( 'manage_options' ), array() ) ), 'named actor can\'t grant a critical cap they lack' );
 $rw_ok( empty( $role_caps( $a )['manage_options'] ), 'refused grant changed nothing' );
-$rw_ok( 'rolewright_lockout' === $code( Ops::change_role_caps( $mgr, $mgr_slug, array(), array( Caps::MANAGE ) ) ), 'named actor can\'t remove their own access' );
+$rw_ok( in_array( $code( Ops::change_role_caps( $mgr, $mgr_slug, array(), array( Caps::MANAGE ) ) ), $own_role_codes, true ), 'named actor can\'t remove their own access' );
 $rw_ok( 'rolewright_cannot_assign' === $code( Ops::assign_role( $mgr, $mgr, 'administrator' ) ) || 'rolewright_cannot_assign' === $code( Ops::assign_role( $mgr, $make( 'rw_auto_victim', 'subscriber' ), 'administrator' ) ), 'named actor can\'t hand out the administrator role' );
 
 // Reset.
@@ -371,7 +372,7 @@ if ( function_exists( 'wp_register_ability' ) && function_exists( 'wp_get_abilit
 	$res = $add->execute( array( 'role' => $a, 'capability' => 'edit_users', 'confirm' => true ) );
 	$rw_ok( is_wp_error( $res ) && empty( $role_caps( $a )['edit_users'] ), 'abilities: a limited caller can\'t escalate through an ability' );
 	$res = $rem->execute( array( 'role' => $mgr_slug, 'capability' => Caps::MANAGE, 'confirm' => true ) );
-	$rw_ok( 'rolewright_lockout' === $code( $res ), 'abilities: a lockout is refused' );
+	$rw_ok( in_array( $code( $res ), $own_role_codes, true ), 'abilities: a lockout is refused' );
 	wp_set_current_user( $admin );
 	$clear();
 } else {

@@ -26,6 +26,7 @@ final class Edit_Scope_Module extends Module {
 		add_action( 'update_option_' . Rules::OPTION, array( Rules::class, 'flush' ) );
 		add_action( 'add_option_' . Rules::OPTION, array( Rules::class, 'flush' ) );
 		( new Scope_Enforcer() )->register();
+		add_filter( 'rolewright_portability_sections', array( Portability_Section::class, 'register' ) );
 		if ( Gravity_Forms::available() ) {
 			( new Gravity_Forms() )->register();
 		}

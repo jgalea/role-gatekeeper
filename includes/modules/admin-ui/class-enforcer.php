@@ -253,8 +253,18 @@ final class Enforcer {
 		}
 	}
 
+	/** Case-insensitive, because plugin paths resolve that way on case-insensitive file systems. */
 	private static function plugin_blocked( string $plugin, array $eff ): bool {
-		return $plugin !== plugin_basename( ROLEWRIGHT_FILE ) && ( Engine::plugin_locked( $plugin, $eff ) || in_array( $plugin, $eff['plugins_hide'], true ) );
+		$plugin = strtolower( $plugin );
+		if ( strtolower( plugin_basename( ROLEWRIGHT_FILE ) ) === $plugin ) {
+			return false;
+		}
+		foreach ( array( 'plugins_deny', 'plugins_allow', 'plugins_hide' ) as $key ) {
+			if ( is_array( $eff[ $key ] ) ) {
+				$eff[ $key ] = array_map( 'strtolower', $eff[ $key ] );
+			}
+		}
+		return Engine::plugin_locked( $plugin, $eff ) || in_array( $plugin, $eff['plugins_hide'], true );
 	}
 
 	public function map_plugin_caps( $caps, $cap, $user_id, $args ) {

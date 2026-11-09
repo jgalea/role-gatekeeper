@@ -1,6 +1,7 @@
 <?php
 namespace Rolewright\Modules\Deny_Hierarchy;
 
+use Rolewright\Modules\Safety\Caps;
 use Rolewright\Modules\Safety\Guard;
 
 defined( 'ABSPATH' ) || exit;
@@ -30,6 +31,7 @@ final class Hierarchy {
 		}
 		add_action( 'add_role', array( __CLASS__, 'reset_cache' ) );
 		add_action( 'remove_role', array( __CLASS__, 'reset_cache' ) );
+		add_action( 'switch_blog', array( __CLASS__, 'reset_cache' ) );
 		add_action( 'remove_role', array( __CLASS__, 'forget_role' ) );
 		add_action( 'add_role', array( __CLASS__, 'forget_role' ) );
 		global $wpdb;
@@ -57,8 +59,8 @@ final class Hierarchy {
 	/**
 	 * Position for a role with nothing stored: ten times its highest legacy user level, so
 	 * core roles rank Editor 70, Author 20, Contributor 10, Subscriber 0. A role that
-	 * manages users ranks at least 90, so turning the module on doesn't stop an existing
-	 * user-manager role from assigning the roles it could assign before.
+	 * manages users or Rolewright roles ranks at least 90, so turning the module on doesn't
+	 * stop an existing manager role from assigning or editing the roles it could before.
 	 */
 	public static function default_position( string $role ): int {
 		if ( 'administrator' === $role ) {
@@ -81,7 +83,7 @@ final class Hierarchy {
 			}
 			if ( preg_match( '/^level_(\d+)$/', (string) $cap, $m ) ) {
 				$pos = max( $pos, (int) $m[1] * 10 );
-			} elseif ( in_array( $cap, array( 'promote_users', 'edit_users', 'create_users', 'delete_users' ), true ) ) {
+			} elseif ( in_array( $cap, array( 'promote_users', 'edit_users', 'create_users', 'delete_users', Caps::MANAGE_ROLES, Caps::MANAGE_USERS ), true ) ) {
 				$pos = max( $pos, 90 );
 			}
 		}
@@ -175,6 +177,7 @@ final class Hierarchy {
 
 	/** Roles removed by a bulk rewrite of the roles option (reset, import) lose their stored position. */
 	public static function prune_missing_roles( $old, $new ): void {
+		self::reset_cache();
 		if ( ! is_array( $new ) ) {
 			return;
 		}

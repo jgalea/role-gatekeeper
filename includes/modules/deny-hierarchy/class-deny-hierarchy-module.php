@@ -33,6 +33,7 @@ final class Deny_Hierarchy_Module extends Module {
 
 		Denials::register();
 		Hierarchy::register();
+		add_filter( 'rolewright_portability_sections', array( Portability_Section::class, 'register' ) );
 		add_filter(
 			'rolewright_role_change_veto',
 			function ( $veto, $op, $actor, $role, $new_caps = null ) {

@@ -114,6 +114,12 @@ try {
 	Caps::grant_to_administrator();
 
 	$admin    = $rw_make( 'rw_admin', 'administrator' );
+	// On multisite a site administrator is not the site's owner: core keeps edit_user for super admins and Rolewright keeps its manage caps for them. The single-site administrator maps to a super admin.
+	if ( is_multisite() ) {
+		grant_super_admin( $admin );
+		add_action( 'wpmu_delete_user', 'revoke_super_admin', 1 );
+		add_action( 'delete_user', 'revoke_super_admin', 1 );
+	}
 	$admin2   = $rw_make( 'rw_admin2', 'administrator' );
 	$promoter = $rw_make( 'rw_promoter', $rw_roles[0] );
 	$pu       = $rw_make( 'rw_pu', $rw_roles[1] );
@@ -303,9 +309,10 @@ try {
 		$rw_ok( is_wp_error( $res ) && ! user_can( $victim, $c ), 'user manager cannot grant ' . $c . ' without holding it' );
 	}
 	$res = Users::change_caps( $usermgr, $victim, array( 'read' ), array() );
-	$rw_ok( true === $res && isset( Users::direct_caps( $victim )['read'] ), 'user manager can grant a cap they hold' );
+	// On multisite core reserves edit_user on other accounts for super admins, and per-user caps follow it like the profile screen does.
+	$rw_ok( is_multisite() ? is_wp_error( $res ) : ( true === $res && isset( Users::direct_caps( $victim )['read'] ) ), 'user manager can grant a cap they hold (multisite: refused, core keeps edit_user for super admins)' );
 	$res = Users::change_caps( $usermgr, $victim, array(), array( 'read' ) );
-	$rw_ok( true === $res && array() === Users::direct_caps( $victim ), 'user manager can revoke it' );
+	$rw_ok( is_multisite() ? is_wp_error( $res ) : ( true === $res && array() === Users::direct_caps( $victim ) ), 'user manager can revoke it (multisite: refused)' );
 	$res = Users::change_caps( $usermgr, $admin, array( 'read' ), array() );
 	$rw_ok( is_wp_error( $res ), 'user manager cannot edit capabilities of an administrator' );
 	$res = Users::change_roles( $usermgr, $victim, array( 'editor' ), array() );
@@ -399,7 +406,9 @@ try {
 		$only = array_map( 'intval', get_users( array( 'role' => 'administrator', 'fields' => 'ID' ) ) );
 		$rw_ok( array( $rw_last ) === $only, 'last admin setup: exactly one administrator left' );
 		$res = Users::change_roles( $rw_actor, $rw_last, array(), array( 'administrator' ) );
-		$rw_ok( is_wp_error( $res ) && 'rolewright_last_admin' === $res->get_error_code() && in_array( 'administrator', $rw_roles_of( $rw_last ), true ), 'last admin: removing the Administrator role from the only administrator is refused' );
+		// With the role hierarchy on, an administrator clone ranks below the Administrator role and is refused before the last-admin check.
+		$rw_hier = \Rolewright\Core\Plugin::is_enabled( 'deny-hierarchy' );
+		$rw_ok( is_wp_error( $res ) && in_array( $res->get_error_code(), $rw_hier ? array( 'rolewright_user_above_actor', 'rolewright_cannot_promote' ) : array( 'rolewright_last_admin' ), true ) && in_array( 'administrator', $rw_roles_of( $rw_last ), true ), 'last admin: removing the Administrator role from the only administrator is refused' );
 		wp_set_current_user( $rw_actor );
 		$rw_post( array( '_wpnonce' => wp_create_nonce( 'bulk-users' ) ) );
 		$out = $rw_list->handle_bulk( admin_url( 'users.php' ), 'rolewright_remove:administrator', array( $rw_last ) );
@@ -407,7 +416,8 @@ try {
 		$rw_ok( '1' === ( $q['rolewright_skip'] ?? '' ) && in_array( 'administrator', $rw_roles_of( $rw_last ), true ), 'last admin: bulk remove skips the only administrator' );
 		$rw_post( array() );
 		$second = $rw_make( 'rw_t_secondadm', 'administrator' );
-		$rw_ok( true === Users::check_roles_change( $rw_actor, $rw_last, array(), array( 'administrator' ) ), 'last admin control: allowed once a second administrator exists' );
+		$res = Users::check_roles_change( $rw_actor, $rw_last, array(), array( 'administrator' ) );
+		$rw_ok( $rw_hier ? ( is_wp_error( $res ) && in_array( $res->get_error_code(), array( 'rolewright_user_above_actor', 'rolewright_cannot_promote' ), true ) ) : true === $res, 'last admin control: allowed once a second administrator exists (hierarchy: still refused, actor ranks below)' );
 		wp_delete_user( $second );
 	} finally {
 		remove_filter( 'wp_die_handler', $rw_die_la );

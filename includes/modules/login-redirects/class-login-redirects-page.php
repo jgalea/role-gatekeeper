@@ -83,7 +83,7 @@ final class Login_Redirects_Page {
 			printf(
 				'<td><input type="number" min="1" class="small-text" name="rw[priority][%1$s]" value="%2$d" /></td></tr>',
 				esc_attr( $slug ),
-				isset( $order[ $slug ] ) ? (int) $order[ $slug ] + 1 : 100 + $position
+				absint( isset( $order[ $slug ] ) ? (int) $order[ $slug ] + 1 : 100 + $position )
 			);
 			++$position;
 		}
