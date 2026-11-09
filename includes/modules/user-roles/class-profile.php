@@ -49,8 +49,9 @@ final class Profile {
 		if ( ! $user instanceof \WP_User || ! $actor || $user->ID === $actor ) {
 			return;
 		}
-		$can_roles = user_can( $actor, 'promote_user', $user->ID ) && Guard::can_act_on_user( $actor, $user->ID );
-		$can_caps  = user_can( $actor, Caps::MANAGE_USERS ) && user_can( $actor, 'edit_user', $user->ID ) && Guard::can_act_on_user( $actor, $user->ID );
+		$member    = true === Users::check_site_member( $actor, $user->ID );
+		$can_roles = $member && user_can( $actor, 'promote_user', $user->ID ) && Guard::can_act_on_user( $actor, $user->ID );
+		$can_caps  = $member && user_can( $actor, Caps::MANAGE_USERS ) && user_can( $actor, 'edit_user', $user->ID ) && Guard::can_act_on_user( $actor, $user->ID );
 		if ( ! $can_roles && ! $can_caps ) {
 			return;
 		}

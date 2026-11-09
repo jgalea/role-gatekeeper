@@ -361,6 +361,66 @@ try {
 	wp_set_current_user( $victim );
 	$rw_ok( array( 'a' => 1 ) === $rw_list->bulk_actions( array( 'a' => 1 ) ), 'users without promote_users get no bulk actions' );
 
+	// Multisite membership check is a no-op on single site.
+	$rw_ok( ! is_multisite() ? true === Users::check_site_member( $pu, $victim ) : true, 'single site: membership check never blocks' );
+
+	// Last administrator: the actor holds every administrator cap through a clone role, so the target is the only administrator.
+	$rw_clone = 'rw_t_clone_' . $rw_suffix;
+	$rw_roles[] = $rw_clone;
+	\Rolewright\Modules\Safety\Enforcer::as_system(
+		function () use ( $rw_clone ) {
+			add_role( $rw_clone, 'Clone', get_role( 'administrator' )->capabilities );
+		}
+	);
+	$rw_demoted = array();
+	wp_set_current_user( 0 );
+	$rw_last  = $rw_make( 'rw_t_lastadm', 'administrator' );
+	$rw_actor = $rw_make( 'rw_t_cloneadm', $rw_clone );
+	$rw_ready = in_array( 'administrator', $rw_roles_of( $rw_last ), true ) && in_array( $rw_clone, $rw_roles_of( $rw_actor ), true );
+	$rw_ok( $rw_ready, 'last admin setup: target is an administrator and actor holds the clone role' );
+	add_filter( 'wp_die_handler', $rw_die_la = function () {
+		return function ( $message ) {
+			throw new \RuntimeException( is_wp_error( $message ) ? $message->get_error_message() : wp_strip_all_tags( (string) $message ) );
+		};
+	} );
+	try {
+		if ( ! $rw_ready ) {
+			throw new \RuntimeException( 'last admin setup failed, nothing demoted' );
+		}
+		foreach ( get_users( array( 'role' => 'administrator', 'fields' => 'ID' ) ) as $other ) {
+			$other = (int) $other;
+			if ( $other !== $rw_last ) {
+				$u = get_userdata( $other );
+				$u->add_role( $rw_clone );
+				$u->remove_role( 'administrator' );
+				$rw_demoted[] = $other;
+			}
+		}
+		$only = array_map( 'intval', get_users( array( 'role' => 'administrator', 'fields' => 'ID' ) ) );
+		$rw_ok( array( $rw_last ) === $only, 'last admin setup: exactly one administrator left' );
+		$res = Users::change_roles( $rw_actor, $rw_last, array(), array( 'administrator' ) );
+		$rw_ok( is_wp_error( $res ) && 'rolewright_last_admin' === $res->get_error_code() && in_array( 'administrator', $rw_roles_of( $rw_last ), true ), 'last admin: removing the Administrator role from the only administrator is refused' );
+		wp_set_current_user( $rw_actor );
+		$rw_post( array( '_wpnonce' => wp_create_nonce( 'bulk-users' ) ) );
+		$out = $rw_list->handle_bulk( admin_url( 'users.php' ), 'rolewright_remove:administrator', array( $rw_last ) );
+		parse_str( (string) wp_parse_url( $out, PHP_URL_QUERY ), $q );
+		$rw_ok( '1' === ( $q['rolewright_skip'] ?? '' ) && in_array( 'administrator', $rw_roles_of( $rw_last ), true ), 'last admin: bulk remove skips the only administrator' );
+		$rw_post( array() );
+		$second = $rw_make( 'rw_t_secondadm', 'administrator' );
+		$rw_ok( true === Users::check_roles_change( $rw_actor, $rw_last, array(), array( 'administrator' ) ), 'last admin control: allowed once a second administrator exists' );
+		wp_delete_user( $second );
+	} finally {
+		remove_filter( 'wp_die_handler', $rw_die_la );
+		$rw_post( array() );
+		wp_set_current_user( 0 );
+		foreach ( $rw_demoted as $other ) {
+			$u = get_userdata( $other );
+			$u->add_role( 'administrator' );
+			$u->remove_role( $rw_clone );
+		}
+		wp_set_current_user( 0 );
+	}
+
 	// Module metadata.
 	$mod = new \Rolewright\Modules\User_Roles\User_Roles_Module();
 	$rw_ok( 'user-roles' === $mod->id() && $mod->default_enabled(), 'module id and default' );

@@ -5,7 +5,7 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Private-site mode. Front-end requests go through template_redirect, REST through
- * rest_authentication_errors. Scripts that never reach those hooks (wp-login.php, wp-cron.php,
+ * rest_authentication_errors (after core's cookie check) and rest_pre_dispatch. Scripts that never reach those hooks (wp-login.php, wp-cron.php,
  * admin-ajax.php, xmlrpc.php) are untouched; decide() also exempts them so a custom front-end
  * login page, the rescue route and password reset can't be caught by mistake.
  */
@@ -18,7 +18,103 @@ final class Gate {
 
 	public function register(): void {
 		add_action( 'template_redirect', array( $this, 'on_template_redirect' ), 0 );
-		add_filter( 'rest_authentication_errors', array( $this, 'on_rest_auth' ), 99 );
+		add_filter( 'request', array( __CLASS__, 'remember_request_vars' ), PHP_INT_MIN );
+		add_filter( 'rest_authentication_errors', array( $this, 'on_rest_auth' ), 101 );
+		add_filter( 'rest_pre_dispatch', array( $this, 'on_rest_pre_dispatch' ), 10, 3 );
+	}
+
+	/** @var array|null Query vars as WordPress parsed them, before other plugins filter them. */
+	private static $request_vars = null;
+
+	/**
+	 * @param array $vars
+	 * @return array
+	 */
+	public static function remember_request_vars( $vars ) {
+		self::$request_vars = is_array( $vars ) ? $vars : array();
+		return $vars;
+	}
+
+	/** Vars that only page through or flag the same resolved object. */
+	const NEUTRAL_QUERY_VARS = array( 'paged', 'page', 'cpage', 'error' );
+
+	/**
+	 * Public query vars the rewrite rule alone produces for a request, with the same
+	 * post-type and taxonomy handling WP::parse_request() applies.
+	 *
+	 * @param string   $matched_query Query string of the matched rewrite rule, empty when none matched.
+	 * @param string[] $public_vars
+	 */
+	public static function rewrite_query_vars( string $matched_query, array $public_vars ): array {
+		$perma = array();
+		if ( '' !== $matched_query ) {
+			parse_str( $matched_query, $perma );
+		}
+		$post_type_vars = array();
+		foreach ( get_post_types( array(), 'objects' ) as $type => $obj ) {
+			if ( is_post_type_viewable( $obj ) && $obj->query_var ) {
+				$post_type_vars[ $obj->query_var ] = $type;
+			}
+		}
+		$out = array();
+		foreach ( $public_vars as $var ) {
+			if ( ! isset( $perma[ $var ] ) ) {
+				continue;
+			}
+			$out[ $var ] = is_array( $perma[ $var ] ) ? $perma[ $var ] : (string) $perma[ $var ];
+			if ( '' !== $out[ $var ] && isset( $post_type_vars[ $var ] ) ) {
+				$out['post_type'] = $post_type_vars[ $var ];
+				$out['name']      = $out[ $var ];
+			}
+		}
+		foreach ( get_taxonomies( array(), 'objects' ) as $tax ) {
+			if ( $tax->query_var && isset( $out[ $tax->query_var ] ) && is_string( $out[ $tax->query_var ] ) ) {
+				$out[ $tax->query_var ] = str_replace( ' ', '+', $out[ $tax->query_var ] );
+			}
+		}
+		if ( isset( $out['post_type'] ) && ! is_array( $out['post_type'] ) && ! in_array( $out['post_type'], get_post_types( array( 'publicly_queryable' => true ) ), true ) ) {
+			unset( $out['post_type'] );
+		}
+		return function_exists( 'wp_resolve_numeric_slug_conflicts' ) ? wp_resolve_numeric_slug_conflicts( $out ) : $out;
+	}
+
+	/**
+	 * True when the resolved query vars point somewhere other than the rewrite of the path,
+	 * which only happens when they came from the query string or the POST body.
+	 *
+	 * @param array $resolved Query vars after parsing.
+	 * @param array $expected Output of rewrite_query_vars().
+	 */
+	public static function query_vars_differ( array $resolved, array $expected ): bool {
+		foreach ( array_unique( array_merge( array_keys( $resolved ), array_keys( $expected ) ) ) as $key ) {
+			if ( in_array( $key, self::NEUTRAL_QUERY_VARS, true ) ) {
+				continue;
+			}
+			$a = $resolved[ $key ] ?? '';
+			$b = $expected[ $key ] ?? '';
+			if ( is_array( $a ) || is_array( $b ) ) {
+				if ( (array) $a != (array) $b ) { // phpcs:ignore Universal.Operators.StrictComparisons
+					return true;
+				}
+				continue;
+			}
+			if ( (string) $a !== (string) $b ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public static function resolved_query_differs(): bool {
+		$wp = $GLOBALS['wp'] ?? null;
+		if ( ! $wp instanceof \WP ) {
+			return false;
+		}
+		$public   = (array) $wp->public_query_vars;
+		$resolved = null !== self::$request_vars ? self::$request_vars : (array) $wp->query_vars;
+		$resolved = array_intersect_key( $resolved, array_flip( $public ) );
+		$expected = self::rewrite_query_vars( (string) $wp->matched_query, $public );
+		return self::query_vars_differ( $resolved, $expected );
 	}
 
 	/**
@@ -106,7 +202,8 @@ final class Gate {
 	 *     @type bool        $is_rest
 	 *     @type string      $script     Basename of the PHP entry point, if known.
 	 *     @type string      $login_path Normalized path of the login page.
-	 *     @type string[]    $query_keys Keys present in the query string.
+	 *     @type string[]    $query_keys Keys present in the query string or the POST body.
+	 *     @type bool        $query_mismatch The parsed query vars differ from what the path's rewrite resolves to.
 	 *     @type bool        $xmlrpc_on
 	 * }
 	 */
@@ -134,7 +231,7 @@ final class Gate {
 			}
 			$exempt = isset( $req['exempt_paths'] ) ? (array) $req['exempt_paths'] : array();
 			$list   = array_merge( (array) $settings['allow_paths'], $exempt );
-			if ( self::path_allowed( $path, $list ) && ! self::query_vars_present( isset( $req['query_keys'] ) ? (array) $req['query_keys'] : array() ) ) {
+			if ( self::path_allowed( $path, $list ) && empty( $req['query_mismatch'] ) && ! self::query_vars_present( isset( $req['query_keys'] ) ? (array) $req['query_keys'] : array() ) ) {
 				return self::ALLOW;
 			}
 		}
@@ -162,7 +259,8 @@ final class Gate {
 			'is_rest'      => $is_rest,
 			'script'       => $script,
 			'login_path'   => self::login_path(),
-			'query_keys'   => array_keys( $_GET ), // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			'query_keys'   => array_values( array_unique( array_merge( array_map( 'strval', array_keys( $_GET ) ), array_map( 'strval', array_keys( $_POST ) ) ) ) ), // phpcs:ignore WordPress.Security.NonceVerification
+			'query_mismatch' => ! $is_rest && self::resolved_query_differs(),
 			'xmlrpc_on'    => (bool) apply_filters( 'xmlrpc_enabled', true ),
 			'exempt_paths' => array_filter( array_map( array( __CLASS__, 'normalize_path' ), (array) apply_filters( 'rolewright_site_access_exempt_paths', array() ) ) ),
 		);
@@ -194,27 +292,51 @@ final class Gate {
 	}
 
 	/**
+	 * Runs after core's cookie check (priority 100), which drops a cookie-authenticated user
+	 * without a valid REST nonce back to anonymous, so is_user_logged_in() is the final identity.
+	 *
 	 * @param mixed $result
 	 * @return mixed
 	 */
 	public function on_rest_auth( $result ) {
-		if ( is_wp_error( $result ) || true === $result ) {
+		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
+		$route = isset( $GLOBALS['wp']->query_vars['rest_route'] ) ? (string) $GLOBALS['wp']->query_vars['rest_route'] : '';
+		$error = self::rest_refusal( $route );
+		return $error ? $error : $result;
+	}
+
+	/**
+	 * Re-checks every dispatched REST request, including embedded and batched ones, once
+	 * authentication has finished.
+	 *
+	 * @param mixed            $result
+	 * @param \WP_REST_Server  $server
+	 * @param \WP_REST_Request $request
+	 * @return mixed
+	 */
+	public function on_rest_pre_dispatch( $result, $server, $request ) {
+		if ( null !== $result || ! defined( 'REST_REQUEST' ) || ! REST_REQUEST || ! $request instanceof \WP_REST_Request ) {
+			return $result;
+		}
+		$error = self::rest_refusal( (string) $request->get_route() );
+		return $error ? $error : $result;
+	}
+
+	private static function rest_refusal( string $route ): ?\WP_Error {
 		$settings = Site_Access_Settings::get();
 		if ( empty( $settings['private_enabled'] ) || empty( $settings['private_rest'] ) ) {
-			return $result;
+			return null;
 		}
-		$req          = self::context( true );
-		$route        = isset( $GLOBALS['wp']->query_vars['rest_route'] ) ? (string) $GLOBALS['wp']->query_vars['rest_route'] : '';
-		$req['path']  = self::normalize_path( '/' . rest_get_url_prefix() . '/' . ltrim( $route, '/' ) );
-		$req['query_keys'] = array();
-		$exempt_routes = array_filter( array_map( array( __CLASS__, 'normalize_path' ), (array) apply_filters( 'rolewright_site_access_exempt_rest_routes', array() ) ) );
-		$req['exempt_paths'] = $exempt_routes;
-		if ( self::DENY === self::decide( $req, $settings ) ) {
-			return new \WP_Error( 'rolewright_private_site', __( 'You need to be logged in to use this site.', 'rolewright' ), array( 'status' => 401 ) );
+		$req                 = self::context( true );
+		$req['path']         = self::normalize_path( '/' . rest_get_url_prefix() . '/' . ltrim( $route, '/' ) );
+		$req['query_keys']   = array();
+		$req['exempt_paths'] = array_filter( array_map( array( __CLASS__, 'normalize_path' ), (array) apply_filters( 'rolewright_site_access_exempt_rest_routes', array() ) ) );
+		if ( self::ALLOW === self::decide( $req, $settings ) ) {
+			return null;
 		}
-		return $result;
+		return new \WP_Error( 'rolewright_private_site', __( 'You need to be logged in to use this site.', 'rolewright' ), array( 'status' => 401 ) );
 	}
 
 	/** Used by the settings page to mention what the gate won't touch. */

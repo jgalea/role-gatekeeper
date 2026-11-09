@@ -136,6 +136,21 @@ final class Users {
 	}
 
 	/**
+	 * On multisite, only super admins may change users who don't belong to the current site.
+	 *
+	 * @return true|\WP_Error
+	 */
+	public static function check_site_member( int $actor, int $target ) {
+		if ( ! is_multisite() || $target <= 0 || Guard::is_super( $actor ) ) {
+			return true;
+		}
+		if ( ! is_user_member_of_blog( $target, get_current_blog_id() ) ) {
+			return new \WP_Error( 'rolewright_not_site_member', __( 'That user is not a member of this site.', 'rolewright' ) );
+		}
+		return true;
+	}
+
+	/**
 	 * @param string[] $add
 	 * @param string[] $remove
 	 * @return true|\WP_Error
@@ -143,6 +158,10 @@ final class Users {
 	public static function check_roles_change( int $actor, int $target, array $add, array $remove ) {
 		if ( $target > 0 && ! get_userdata( $target ) ) {
 			return new \WP_Error( 'rolewright_no_user', __( 'That user does not exist.', 'rolewright' ) );
+		}
+		$member = self::check_site_member( $actor, $target );
+		if ( true !== $member ) {
+			return $member;
 		}
 		if ( $actor > 0 && $target === $actor ) {
 			return new \WP_Error( 'rolewright_self_role', __( 'You can\'t change your own roles.', 'rolewright' ) );
@@ -245,6 +264,10 @@ final class Users {
 		}
 		if ( ! get_userdata( $target ) ) {
 			return new \WP_Error( 'rolewright_no_user', __( 'That user does not exist.', 'rolewright' ) );
+		}
+		$member = self::check_site_member( $actor, $target );
+		if ( true !== $member ) {
+			return $member;
 		}
 		if ( $target === $actor ) {
 			return new \WP_Error( 'rolewright_self_caps', __( 'You can\'t change your own capabilities.', 'rolewright' ) );
