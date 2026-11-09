@@ -394,6 +394,11 @@ final class Guard {
 	 * @return true|\WP_Error
 	 */
 	public static function assert_can_modify_role( int $actor_id, string $role, array $new_caps ) {
+		$veto = apply_filters( 'rolewright_role_change_veto', null, 'modify', $actor_id, $role );
+		if ( $veto instanceof \WP_Error ) {
+			return $veto;
+		}
+
 		$new     = self::normalize_caps( $new_caps );
 		$obj     = get_role( $role );
 		$current = $obj ? self::normalize_caps( (array) $obj->capabilities ) : array();
@@ -469,6 +474,11 @@ final class Guard {
 	 * @return true|\WP_Error
 	 */
 	public static function assert_can_delete_role( int $actor_id, string $role ) {
+		$veto = apply_filters( 'rolewright_role_change_veto', null, 'delete', $actor_id, $role );
+		if ( $veto instanceof \WP_Error ) {
+			return $veto;
+		}
+
 		if ( self::is_protected_role( $role ) ) {
 			return new \WP_Error(
 				'rolewright_protected_role',
@@ -498,6 +508,11 @@ final class Guard {
 	 * @return true|\WP_Error
 	 */
 	public static function assert_can_rename_role( int $actor_id, string $role ) {
+		$veto = apply_filters( 'rolewright_role_change_veto', null, 'rename', $actor_id, $role );
+		if ( $veto instanceof \WP_Error ) {
+			return $veto;
+		}
+
 		if ( 'administrator' === $role ) {
 			return new \WP_Error( 'rolewright_protected_role', __( 'The Administrator role can\'t be renamed.', 'rolewright' ) );
 		}
