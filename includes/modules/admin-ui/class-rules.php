@@ -113,6 +113,15 @@ final class Rules {
 		return $rule;
 	}
 
+	public static function is_manager_role( array $caps ): bool {
+		foreach ( Guard::normalize_caps( $caps ) as $cap => $grant ) {
+			if ( $grant && 0 === strpos( $cap, 'rolewright_manage_' ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/** Items no rule may block. Returns a WP_Error naming them. */
 	public static function validate( array $rule ) {
 		$bad = array();
@@ -193,8 +202,16 @@ final class Rules {
 			if ( 'administrator' === $target ) {
 				return new WP_Error( 'rolewright_protected_role', __( 'The Administrator role cannot be restricted.', 'rolewright' ) );
 			}
-			if ( ! get_role( $target ) ) {
+			$role_obj = get_role( $target );
+			if ( ! $role_obj ) {
 				return new WP_Error( 'rolewright_no_role', __( 'That role does not exist.', 'rolewright' ) );
+			}
+			$role_caps = (array) $role_obj->capabilities;
+			if ( ! is_super_admin( $actor_id ) && Guard::missing( Guard::critical_subset( $role_caps ), Guard::user_caps( $actor_id ) ) ) {
+				return new WP_Error( 'rolewright_role_above_actor', __( 'You cannot change rules for a role that holds capabilities you lack.', 'rolewright' ) );
+			}
+			if ( self::is_manager_role( $role_caps ) && ! Engine::is_empty( self::sanitize( $raw ) ) ) {
+				return new WP_Error( 'rolewright_manager_role', __( 'Roles that can manage Rolewright cannot be restricted.', 'rolewright' ) );
 			}
 		} elseif ( 'user' === $scope ) {
 			$uid  = absint( $target );

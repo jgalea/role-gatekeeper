@@ -10,6 +10,7 @@ final class Enforcer {
 	public function register(): void {
 		add_action( 'admin_menu', array( $this, 'hide_menu' ), 9999 );
 		add_action( 'admin_init', array( $this, 'guard_request' ), 1 );
+		add_action( 'admin_init', array( $this, 'guard_ajax' ), 1 );
 		add_action( 'add_meta_boxes', array( $this, 'hide_post_boxes' ), 9999, 1 );
 		add_action( 'wp_dashboard_setup', array( $this, 'hide_dashboard_widgets' ), 9999 );
 		add_action( 'admin_bar_menu', array( $this, 'hide_bar_nodes' ), 9999 );
@@ -120,6 +121,91 @@ final class Enforcer {
 		}
 	}
 
+	/**
+	 * Core ajax actions that perform the work of a blockable screen, as action => [ block id, screens ].
+	 * The action is refused when the block is on or any of the screens is blocked for the user.
+	 */
+	public static function ajax_actions(): array {
+		$widgets  = array( 'widgets', array( 'widgets.php' ) );
+		$menus    = array( 'nav_menus', array( 'nav-menus.php' ) );
+		$custom   = array( 'customizer', array( 'customize.php' ) );
+		$themes   = array( 'theme_browser', array( 'theme-install.php' ) );
+		$editors  = array( 'file_editors', array( 'theme-editor.php', 'plugin-editor.php' ) );
+		return array(
+			'save-widget'                            => $widgets,
+			'widgets-order'                          => $widgets,
+			'update-widget'                          => $widgets,
+			'delete-inactive-widgets'                => $widgets,
+			'add-menu-item'                          => $menus,
+			'menu-locations-save'                    => $menus,
+			'menu-quick-search'                      => $menus,
+			'menu-get-metabox'                       => $menus,
+			'load-available-menu-items-customizer'   => $menus,
+			'search-available-menu-items-customizer' => $menus,
+			'customize-nav-menus-insert-auto-draft'  => $menus,
+			'customize_save'                         => $custom,
+			'customize_trash'                        => $custom,
+			'customize_override_changeset_lock'      => $custom,
+			'customize_dismiss_autosave_or_lock'     => $custom,
+			'customize_load_themes'                  => $custom,
+			'install-theme'                          => $themes,
+			'update-theme'                           => $themes,
+			'delete-theme'                           => $themes,
+			'edit-theme-plugin-file'                 => $editors,
+		);
+	}
+
+	/** Plugin ajax actions that act on the plugin file posted as `plugin`. */
+	public static function plugin_ajax_actions(): array {
+		return array( 'activate-plugin', 'update-plugin', 'delete-plugin', 'toggle-auto-updates' );
+	}
+
+	/** Refuse core ajax actions that reach a feature blocked for the user. */
+	public function guard_ajax(): void {
+		if ( ! wp_doing_ajax() || ! isset( $_REQUEST['action'] ) || ! is_scalar( $_REQUEST['action'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			return;
+		}
+		$eff = self::eff();
+		if ( null === $eff ) {
+			return;
+		}
+		$action = sanitize_text_field( wp_unslash( (string) $_REQUEST['action'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( self::ajax_blocked( $action, $eff ) ) {
+			wp_die( -1, 403 );
+		}
+	}
+
+	private static function ajax_blocked( string $action, array $eff ): bool {
+		$can_manage = self::can_manage();
+		$screen_blocked = function ( array $pages ) use ( $eff, $can_manage ): bool {
+			foreach ( $pages as $page ) {
+				if ( null !== Engine::decide( $page, null, array(), Discovery::menu(), Discovery::submenu(), $eff, $can_manage ) ) {
+					return true;
+				}
+			}
+			return false;
+		};
+
+		$map = self::ajax_actions();
+		if ( isset( $map[ $action ] ) ) {
+			return in_array( $map[ $action ][0], $eff['blocks'], true ) || $screen_blocked( $map[ $action ][1] );
+		}
+		if ( 'install-plugin' === $action ) {
+			return null !== $eff['plugins_allow'] || $screen_blocked( array( 'plugin-install.php' ) );
+		}
+		if ( in_array( $action, self::plugin_ajax_actions(), true ) ) {
+			// phpcs:disable WordPress.Security.NonceVerification.Missing -- core verifies the nonce after this check.
+			if ( 'toggle-auto-updates' === $action && ( ! isset( $_POST['type'] ) || 'plugin' !== $_POST['type'] ) ) {
+				return false;
+			}
+			$key    = 'toggle-auto-updates' === $action ? 'asset' : 'plugin';
+			$plugin = isset( $_POST[ $key ] ) && is_scalar( $_POST[ $key ] ) ? plugin_basename( sanitize_text_field( wp_unslash( (string) $_POST[ $key ] ) ) ) : '';
+			// phpcs:enable
+			return '' !== $plugin && self::plugin_blocked( $plugin, $eff );
+		}
+		return false;
+	}
+
 	public function hide_post_boxes( $post_type ): void {
 		$eff = self::eff();
 		if ( null === $eff || ! is_string( $post_type ) || empty( $eff['metaboxes'][ $post_type ] ) ) {
@@ -216,20 +302,28 @@ final class Enforcer {
 		return $components;
 	}
 
+	/** WordPress matches REST routes case-insensitively and strips extra slashes, so compare the same way. */
+	public static function normalize_route( string $route ): string {
+		$route = strtolower( (string) preg_replace( '#/+#', '/', $route ) );
+		$route = untrailingslashit( $route );
+		return '' === $route ? '/' : ( '/' === $route[0] ? $route : '/' . $route );
+	}
+
 	public function rest_guard( $response, $handler, $request ) {
 		$eff = self::eff();
 		if ( null === $eff || ! $request instanceof \WP_REST_Request ) {
 			return $response;
 		}
-		$route = $request->get_route();
+		$route = self::normalize_route( (string) $request->get_route() );
 		foreach ( Engine::blocked_rest_prefixes( $eff ) as $prefix ) {
+			$prefix = strtolower( $prefix );
 			if ( $route === $prefix || 0 === strpos( $route, $prefix . '/' ) ) {
 				return new WP_Error( 'rolewright_blocked', __( 'This area is not available to your account.', 'rolewright' ), array( 'status' => 403 ) );
 			}
 		}
-		if ( preg_match( '#^/wp/v2/plugins/(.+)$#', $route, $m ) ) {
-			$file = rawurldecode( $m[1] ) . '.php';
-			if ( in_array( $file, $eff['plugins_hide'], true ) ) {
+		if ( preg_match( '#^/wp/v2/plugins/(.+)$#i', $route, $m ) ) {
+			$file = strtolower( rawurldecode( $m[1] ) ) . '.php';
+			if ( in_array( $file, array_map( 'strtolower', $eff['plugins_hide'] ), true ) ) {
 				return new WP_Error( 'rest_plugin_not_found', __( 'Plugin not found.', 'rolewright' ), array( 'status' => 404 ) );
 			}
 		}
@@ -238,7 +332,7 @@ final class Enforcer {
 
 	public function rest_filter_plugin_list( $result, $handler, $request ) {
 		$eff = self::eff();
-		if ( null === $eff || ! $eff['plugins_hide'] || ! $request instanceof \WP_REST_Request || '/wp/v2/plugins' !== $request->get_route() || ! $result instanceof \WP_REST_Response ) {
+		if ( null === $eff || ! $eff['plugins_hide'] || ! $request instanceof \WP_REST_Request || '/wp/v2/plugins' !== self::normalize_route( (string) $request->get_route() ) || ! $result instanceof \WP_REST_Response ) {
 			return $result;
 		}
 		$data = $result->get_data();

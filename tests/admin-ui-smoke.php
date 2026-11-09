@@ -31,6 +31,8 @@ $rw_ok   = function ( $cond, $label ) use ( &$rw_pass, &$rw_fail ) {
 $sfx     = substr( md5( (string) microtime( true ) ), 0, 6 );
 $r_mgr   = 'rw_t_mgr_' . $sfx;
 $r_rest  = 'rw_t_rest_' . $sfx;
+$r_view  = 'rw_t_view_' . $sfx;
+$r_high  = 'rw_t_high_' . $sfx;
 $users   = array();
 $make    = function ( $login, $role ) use ( &$users, $sfx ) {
 	$id = wp_insert_user(
@@ -123,7 +125,10 @@ try {
 			'edit_theme_options' => true,
 		)
 	);
+	add_role( $r_view, 'RW viewer', array( 'read' => true, Caps::MANAGE => true, 'edit_posts' => true ) );
+	add_role( $r_high, 'RW high', array( 'read' => true, 'manage_options' => true ) );
 	$mgr     = $make( 'rw_mgr', $r_mgr );
+	get_userdata( $mgr )->add_role( $r_view );
 	$rest    = $make( 'rw_rest', $r_rest );
 	$rest2   = $make( 'rw_rest2', $r_rest );
 	$editor  = $make( 'rw_editor', 'editor' );
@@ -176,16 +181,16 @@ try {
 	$rw_ok( false === get_option( Rules::OPTION, false ), 'refused saves stored nothing' );
 
 	// Lockout pre-check.
-	$empty_allow = Rules::save( $mgr, 'role', $r_mgr, array( 'menu' => array( 'model' => 'allow', 'items' => array() ) ) );
+	$empty_allow = Rules::save( $mgr, 'role', $r_view, array( 'menu' => array( 'model' => 'allow', 'items' => array() ) ) );
 	$rw_ok( 'rolewright_lockout' === $code_of( $empty_allow ) && in_array( 'empty_allow_list', (array) $empty_allow->get_error_data()['reasons'], true ), 'allow model with nothing selected refused for the actor own role (lockout)' );
 	$self_user = Rules::save( $mgr, 'user', (string) $mgr, array( 'menu' => array( 'model' => 'allow', 'items' => array( 'rolewright' ) ) ) );
 	$rw_ok( 'rolewright_lockout' === $code_of( $self_user ), 'allow list with only the Rolewright entry refused for the actor own user rule' );
 	$rw_ok( false === get_option( Rules::OPTION, false ), 'lockout refusals stored nothing' );
 	$rw_ok( 'ok' === $code_of( Rules::save( $mgr, 'role', $r_rest, array( 'menu' => array( 'model' => 'allow', 'items' => array() ) ) ) ), 'empty allow list is fine for a role the actor does not hold' );
 	Rules::save( $mgr, 'role', $r_rest, array() );
-	$rw_ok( 'ok' === $code_of( Rules::save( $mgr, 'role', $r_mgr, array( 'menu' => array( 'model' => 'allow', 'items' => array( 'index.php', 'edit.php' ) ) ) ) ), 'allow list with real entries accepted for the actor own role' );
-	Rules::save( $mgr, 'role', $r_mgr, array() );
-	$rw_ok( 'ok' === $code_of( Rules::save( $mgr, 'role', $r_mgr, array( 'menu' => array( 'model' => 'deny', 'items' => array( 'rolewright', 'rolewright|rolewright-admin-ui', 'users.php' ) ) ) ) ), 'denying the Rolewright menu for a role holding the manage cap is accepted but never enforced' );
+	$rw_ok( 'ok' === $code_of( Rules::save( $mgr, 'role', $r_view, array( 'menu' => array( 'model' => 'allow', 'items' => array( 'index.php', 'edit.php' ) ) ) ) ), 'allow list with real entries accepted for the actor own role' );
+	Rules::save( $mgr, 'role', $r_view, array() );
+	$rw_ok( 'ok' === $code_of( Rules::save( $mgr, 'role', $r_view, array( 'menu' => array( 'model' => 'deny', 'items' => array( 'rolewright', 'rolewright|rolewright-admin-ui', 'users.php' ) ) ) ) ), 'denying the Rolewright menu for a role holding the manage cap is accepted but never enforced' );
 
 	$eff_mgr = Rules::effective_for_user( $mgr );
 	$rw_ok( null !== $eff_mgr, 'effective rules computed for the manager' );
@@ -208,7 +213,7 @@ try {
 	wp_set_current_user( $admin );
 	$GLOBALS['menu']    = $menu;
 	$GLOBALS['submenu'] = $submenu;
-	Rules::save( $mgr, 'role', $r_mgr, array() );
+	Rules::save( $mgr, 'role', $r_view, array() );
 
 	// Change event with before/after.
 	$events = array();
@@ -221,6 +226,24 @@ try {
 	$events = array();
 	Rules::save( $mgr, 'role', $r_rest, array( 'menu' => array( 'model' => 'deny', 'items' => array( 'users.php' ) ), 'blocks' => array( 'widgets' ), 'themes_locked' => 1 ) );
 	$rw_ok( ! $events, 'unchanged save fires no event' );
+
+	// Role rules need authority over the target role.
+	$rw_ok( 'rolewright_role_above_actor' === $code_of( Rules::save( $mgr, 'role', $r_high, array( 'blocks' => array( 'widgets' ) ) ) ), 'role holding a critical cap the actor lacks (manage_options) cannot be restricted' );
+	$rw_ok( 'rolewright_manager_role' === $code_of( Rules::save( $admin, 'role', $r_mgr, array( 'blocks' => array( 'widgets' ) ) ) ), 'role holding a rolewright_manage_* cap cannot be restricted, even by an administrator' );
+	$rw_ok( 'rolewright_manager_role' === $code_of( Rules::save( $mgr, 'role', $r_mgr, array( 'blocks' => array( 'widgets' ) ) ) ), 'actor cannot restrict their own manager role' );
+	$planted                       = Rules::all();
+	$planted['roles'][ $r_high ]   = array_replace_recursive( Engine::empty_rule(), array( 'blocks' => array( 'widgets' ) ) );
+	$planted['roles'][ $r_mgr ]    = array_replace_recursive( Engine::empty_rule(), array( 'blocks' => array( 'widgets' ) ) );
+	update_option( Rules::OPTION, $planted );
+	Rules::flush_cache();
+	$rw_ok( 'rolewright_role_above_actor' === $code_of( Rules::save( $mgr, 'role', $r_high, array( 'blocks' => array( 'nav_menus' ) ) ) ), 'existing rule on a higher role cannot be updated by the actor' );
+	$rw_ok( 'rolewright_role_above_actor' === $code_of( Rules::save( $mgr, 'role', $r_high, array() ) ), 'existing rule on a higher role cannot be deleted by the actor' );
+	$rw_ok( isset( Rules::all()['roles'][ $r_high ] ), 'refused update/delete left the stored rule untouched' );
+	$rw_ok( 'rolewright_manager_role' === $code_of( Rules::save( $admin, 'role', $r_mgr, array( 'blocks' => array( 'nav_menus' ) ) ) ), 'existing rule on a manager role cannot be changed' );
+	$rw_ok( 'ok' === $code_of( Rules::save( $mgr, 'role', $r_mgr, array() ) ) && ! isset( Rules::all()['roles'][ $r_mgr ] ), 'a stale rule on a manager role can still be cleared by someone with authority over it' );
+	$rw_ok( 'ok' === $code_of( Rules::save( $admin, 'role', $r_high, array() ) ) && ! isset( Rules::all()['roles'][ $r_high ] ), 'control: administrator can clear the higher role rule' );
+	$rw_ok( 'ok' === $code_of( Rules::save( $admin, 'role', $r_high, array( 'blocks' => array( 'widgets' ) ) ) ), 'control: administrator can restrict a role holding manage_options' );
+	Rules::save( $admin, 'role', $r_high, array() );
 
 	// Direct-URL enforcement.
 	wp_set_current_user( $rest );
@@ -443,6 +466,79 @@ try {
 	$resp = rest_do_request( new WP_REST_Request( 'GET', '/wp/v2/plugins' ) );
 	$rw_ok( 200 === $resp->get_status() && in_array( 'hello', wp_list_pluck( (array) $resp->get_data(), 'plugin' ), true ), 'control: administrator still sees the plugin over REST' );
 
+	$rw_ok( '/wp/v2/widgets' === Enforcer::normalize_route( '//WP/v2//Widgets/' ), 'route normaliser lowercases, collapses slashes and strips the trailing slash' );
+	wp_set_current_user( $rest );
+	$resp = rest_do_request( new WP_REST_Request( 'GET', '/WP/V2/Widgets' ) );
+	$rw_ok( 403 === $resp->get_status(), 'REST /WP/V2/Widgets (mixed case) refused with 403, got ' . $resp->get_status() );
+	$guarded = $enf->rest_guard( null, array(), new WP_REST_Request( 'GET', '//wp/v2/widgets/' ) );
+	$rw_ok( is_wp_error( $guarded ) && 403 === ( $guarded->get_error_data()['status'] ?? 0 ), 'REST //wp/v2/widgets/ (extra slashes) refused with 403' );
+	$guarded = $enf->rest_guard( null, array(), new WP_REST_Request( 'GET', '/wp/v2/Menu-Items/5' ) );
+	$rw_ok( is_wp_error( $guarded ), 'REST /wp/v2/Menu-Items/5 refused' );
+	$resp = rest_do_request( new WP_REST_Request( 'GET', '/wp/v2/Plugins/hello' ) );
+	$rw_ok( 404 === $resp->get_status(), 'REST /wp/v2/Plugins/hello (mixed case) returns 404 for a hidden plugin, got ' . $resp->get_status() );
+	$guarded = $enf->rest_guard( null, array(), new WP_REST_Request( 'POST', '//wp/v2/plugins/Hello/' ) );
+	$rw_ok( is_wp_error( $guarded ), 'REST //wp/v2/plugins/Hello/ refused' );
+	$resp = rest_do_request( new WP_REST_Request( 'GET', '/wp/v2/Plugins' ) );
+	$ids  = wp_list_pluck( (array) $resp->get_data(), 'plugin' );
+	$rw_ok( 200 === $resp->get_status() && $ids && ! in_array( 'hello', $ids, true ), 'REST /wp/v2/Plugins (mixed case) list omits the hidden plugin (' . count( $ids ) . ' listed)' );
+	$guarded = $enf->rest_guard( null, array(), new WP_REST_Request( 'GET', '/wp/v2/posts' ) );
+	$rw_ok( null === $guarded, 'control: unrelated REST route passes the guard' );
+	wp_set_current_user( $admin );
+	$resp = rest_do_request( new WP_REST_Request( 'GET', '/WP/V2/Widgets' ) );
+	$rw_ok( 200 === $resp->get_status(), 'control: administrator reaches /WP/V2/Widgets' );
+
+	// Core ajax actions behind blocked features.
+	$ajax = function ( $user, $action, $post = array() ) use ( $enf ) {
+		wp_set_current_user( $user );
+		$_REQUEST['action'] = $action;
+		$_POST              = $post;
+		$code               = 'ok';
+		add_filter( 'wp_doing_ajax', '__return_true' );
+		$h = function () {
+			return function ( $message, $title = '', $args = array() ) {
+				throw new \DomainException( 'ajax', is_int( $title ) ? $title : (int) ( $args['response'] ?? 0 ) );
+			};
+		};
+		add_filter( 'wp_die_ajax_handler', $h );
+		try {
+			$enf->guard_ajax();
+		} catch ( \DomainException $e ) {
+			$code = 'die:' . $e->getCode();
+		}
+		remove_filter( 'wp_die_ajax_handler', $h );
+		remove_filter( 'wp_doing_ajax', '__return_true' );
+		unset( $_REQUEST['action'] );
+		$_POST = array();
+		return $code;
+	};
+	Rules::save( $mgr, 'role', $r_rest, array( 'blocks' => array( 'widgets', 'nav_menus', 'customizer' ), 'plugins' => array( 'model' => 'deny', 'locked' => array( 'hello.php' ) ) ) );
+	foreach ( array( 'save-widget', 'widgets-order', 'update-widget', 'add-menu-item', 'menu-locations-save', 'menu-quick-search', 'menu-get-metabox', 'customize_save' ) as $act ) {
+		$rw_ok( 'die:403' === $ajax( $rest, $act ), "ajax $act refused with 403 while its block is on" );
+	}
+	foreach ( array( 'update-plugin', 'delete-plugin', 'activate-plugin' ) as $act ) {
+		$rw_ok( 'die:403' === $ajax( $rest, $act, array( 'plugin' => 'hello.php', 'slug' => 'hello-dolly' ) ), "ajax $act refused for a locked plugin" );
+	}
+	$rw_ok( 'die:403' === $ajax( $rest, 'toggle-auto-updates', array( 'type' => 'plugin', 'asset' => 'hello.php' ) ), 'ajax toggle-auto-updates refused for a locked plugin' );
+	$rw_ok( 'ok' === $ajax( $rest, 'update-plugin', array( 'plugin' => 'akismet/akismet.php', 'slug' => 'akismet' ) ), 'control: ajax update-plugin allowed for an unlocked plugin' );
+	$rw_ok( 'ok' === $ajax( $rest, 'install-plugin', array( 'slug' => 'akismet' ) ), 'control: ajax install-plugin allowed under the deny model' );
+	$rw_ok( 'ok' === $ajax( $rest, 'heartbeat' ), 'control: unrelated ajax action allowed' );
+	$rw_ok( 'ok' === $ajax( $admin, 'save-widget' ), 'control: administrator ajax save-widget allowed' );
+	Rules::save( $mgr, 'role', $r_rest, array( 'plugins' => array( 'model' => 'allow', 'locked' => array( 'akismet/akismet.php' ) ) ) );
+	$rw_ok( 'die:403' === $ajax( $rest, 'install-plugin', array( 'slug' => 'akismet' ) ), 'ajax install-plugin refused under the plugin allow model' );
+	$rw_ok( 'ok' === $ajax( $rest, 'save-widget' ), 'control: ajax save-widget allowed once the widgets block is gone' );
+	Rules::save( $mgr, 'role', $r_rest, array( 'menu' => array( 'model' => 'deny', 'items' => array( 'themes.php' ) ) ) );
+	$rw_ok( 'die:403' === $ajax( $rest, 'save-widget' ) && 'die:403' === $ajax( $rest, 'add-menu-item' ), 'ajax widget and menu actions refused when the Appearance menu (their screens) is denied' );
+	wp_set_current_user( $rest );
+	$_REQUEST['action'] = 'save-widget';
+	$threw              = false;
+	try {
+		$enf->guard_ajax();
+	} catch ( \Throwable $e ) {
+		$threw = true;
+	}
+	unset( $_REQUEST['action'] );
+	$rw_ok( ! $threw, 'guard_ajax is a no-op outside ajax requests' );
+
 	// Theme switching and customizer.
 	Rules::save( $mgr, 'role', $r_rest, array( 'themes_locked' => 1, 'blocks' => array( 'widgets', 'nav_menus' ) ) );
 	wp_set_current_user( $rest );
@@ -477,6 +573,8 @@ foreach ( $users as $uid ) {
 }
 remove_role( $r_mgr );
 remove_role( $r_rest );
+remove_role( $r_view );
+remove_role( $r_high );
 foreach ( array( Rules::OPTION => 'rules', Discovery::OPTION => 'seen' ) as $opt => $k ) {
 	if ( null === $saved_globals[ $k ] ) {
 		delete_option( $opt );
