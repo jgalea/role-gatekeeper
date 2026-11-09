@@ -201,9 +201,18 @@ final class Enforcer {
 			}
 			$key    = 'toggle-auto-updates' === $action ? 'asset' : 'plugin';
 			$raw    = isset( $_POST[ $key ] ) && is_scalar( $_POST[ $key ] ) ? wp_unslash( (string) $_POST[ $key ] ) : '';
-			$plugin = '' === $raw ? '' : plugin_basename( sanitize_text_field( urldecode( $raw ) ) );
 			// phpcs:enable
-			return '' !== $plugin && self::plugin_blocked( $plugin, $eff );
+			if ( '' === $raw ) {
+				return false;
+			}
+			// Core decodes the name in some handlers and not in others, so refuse when either form is locked.
+			foreach ( array_unique( array( sanitize_text_field( $raw ), sanitize_text_field( urldecode( $raw ) ) ) ) as $candidate ) {
+				$plugin = plugin_basename( $candidate );
+				if ( '' !== $plugin && self::plugin_blocked( $plugin, $eff ) ) {
+					return true;
+				}
+			}
+			return false;
 		}
 		return false;
 	}
