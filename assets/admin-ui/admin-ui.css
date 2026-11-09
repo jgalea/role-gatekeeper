@@ -7,3 +7,4 @@
 .rw-admin-ui .rw-box-group ul { margin-left: 1.5em; }
 .rw-admin-ui .rw-plugins { max-width: 720px; }
 .rw-admin-ui .rw-plugins th:not(:first-child), .rw-admin-ui .rw-plugins td:not(:first-child) { text-align: center; width: 140px; }
+.rw-box-group summary { padding: 8px 0; cursor: pointer; }

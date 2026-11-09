@@ -287,20 +287,24 @@ final class Admin_Page {
 		echo '<h2>' . esc_html__( 'Plugins', 'rolewright' ) . '</h2>';
 		echo '<p class="description">' . esc_html__( 'Hidden plugins disappear from the plugin list. Locked plugins cannot be activated, deactivated or deleted, in the admin or over REST.', 'rolewright' ) . '</p>';
 		$this->model_radios( 'rule[plugins][model]', $rule['plugins']['model'], __( 'Lock the selected plugins', 'rolewright' ), __( 'Lock every plugin except the selected ones', 'rolewright' ) );
-		echo '<table class="widefat striped rw-plugins"><thead><tr><th>' . esc_html__( 'Plugin', 'rolewright' ) . '</th><th>' . esc_html__( 'Locked / allowed', 'rolewright' ) . '</th><th>' . esc_html__( 'Hidden', 'rolewright' ) . '</th></tr></thead><tbody>';
+		echo '<div class="rw-scroll" style="overflow-x:auto"><table class="widefat striped rw-plugins"><thead><tr><th>' . esc_html__( 'Plugin', 'rolewright' ) . '</th><th>' . esc_html__( 'Locked / allowed', 'rolewright' ) . '</th><th>' . esc_html__( 'Hidden', 'rolewright' ) . '</th></tr></thead><tbody>';
 		foreach ( get_plugins() as $file => $data ) {
 			if ( $file === $own ) {
 				continue;
 			}
 			printf(
-				'<tr><td>%1$s</td><td><input type="checkbox" name="rule[plugins][locked][]" value="%2$s" %3$s /></td><td><input type="checkbox" name="rule[plugins][hidden][]" value="%2$s" %4$s /></td></tr>',
+				'<tr><td>%1$s</td><td><input type="checkbox" name="rule[plugins][locked][]" value="%2$s" %3$s aria-label="%5$s" /></td><td><input type="checkbox" name="rule[plugins][hidden][]" value="%2$s" %4$s aria-label="%6$s" /></td></tr>',
 				esc_html( $data['Name'] ),
 				esc_attr( $file ),
 				checked( in_array( $file, $rule['plugins']['locked'], true ), true, false ),
-				checked( in_array( $file, $rule['plugins']['hidden'], true ), true, false )
+				checked( in_array( $file, $rule['plugins']['hidden'], true ), true, false ),
+				/* translators: %s: plugin name */
+				esc_attr( sprintf( __( 'Locked or allowed: %s', 'rolewright' ), $data['Name'] ) ),
+				/* translators: %s: plugin name */
+				esc_attr( sprintf( __( 'Hidden: %s', 'rolewright' ), $data['Name'] ) )
 			);
 		}
-		echo '</tbody></table>';
+		echo '</tbody></table></div>';
 	}
 
 	private function section_theme_and_bar( array $rule ): void {

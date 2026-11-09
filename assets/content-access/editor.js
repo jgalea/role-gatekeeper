@@ -94,9 +94,13 @@
 			Panel,
 			{ name: 'rolewright-access', title: __( 'Access', 'rolewright' ) },
 			el( 'p', null, __( 'Only these roles can view this content. Leave all unchecked for everyone.', 'rolewright' ) ),
-			roleBoxes( roles, function ( next ) {
-				set( META_ROLES, next );
-			} ),
+			el(
+				'div',
+				{ style: { display: 'grid', gap: '12px', marginBottom: '16px' } },
+				roleBoxes( roles, function ( next ) {
+					set( META_ROLES, next );
+				} )
+			),
 			el( c.TextareaControl, {
 				label: __( 'Message for people without access', 'rolewright' ),
 				value: message,

@@ -76,7 +76,7 @@ final class Role_List {
 		$this->form_open( 'bulk_delete', 'id="rw-bulk"' );
 		echo '<p><button type="submit" class="button action" onclick="return confirm(\'' . esc_js( __( 'Delete the selected roles?', 'rolewright' ) ) . '\');">' . esc_html__( 'Delete selected', 'rolewright' ) . '</button> ';
 		echo '<span class="description">' . esc_html__( 'Only roles without users can be deleted.', 'rolewright' ) . '</span></p>';
-		echo '<table class="wp-list-table widefat fixed striped"><thead><tr>';
+		echo '<div class="rw-scroll" style="overflow-x:auto"><table class="widefat striped rw-roles-table" style="min-width:600px"><thead><tr>';
 		echo '<td class="manage-column check-column"></td>';
 		echo '<th>' . esc_html__( 'Role', 'rolewright' ) . '</th><th>' . esc_html__( 'Slug', 'rolewright' ) . '</th>';
 		echo '<th>' . esc_html__( 'Users', 'rolewright' ) . '</th><th>' . esc_html__( 'Capabilities', 'rolewright' ) . '</th><th>' . esc_html__( 'Actions', 'rolewright' ) . '</th>';
@@ -127,11 +127,11 @@ final class Role_List {
 			) . '">' . esc_html__( 'Clone', 'rolewright' ) . '</a>';
 			echo implode( ' | ', $links ); // phpcs:ignore WordPress.Security.EscapeOutput -- built from escaped parts.
 			if ( $deletable ) {
-				echo ' | <button type="submit" form="rw-del-' . esc_attr( $slug ) . '" class="button-link button-link-delete" onclick="return confirm(\'' . esc_js( __( 'Delete this role?', 'rolewright' ) ) . '\');">' . esc_html__( 'Delete', 'rolewright' ) . '</button>';
+				echo ' | <button type="submit" form="rw-del-' . esc_attr( $slug ) . '" class="button-link button-link-delete" style="min-height:32px" onclick="return confirm(\'' . esc_js( __( 'Delete this role?', 'rolewright' ) ) . '\');">' . esc_html__( 'Delete', 'rolewright' ) . '</button>';
 			}
 			echo '</td></tr>';
 		}
-		echo '</tbody></table></form>';
+		echo '</tbody></table></div></form>';
 
 		foreach ( $roles as $slug => $data ) {
 			if ( ! Guard::is_protected_role( $slug ) && empty( $counts[ $slug ] ) ) {

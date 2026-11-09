@@ -118,7 +118,7 @@ final class Admin_Page {
 		$map = Denials::map();
 		if ( $map ) {
 			echo '<h2>' . esc_html__( 'Current denials', 'rolewright' ) . '</h2>';
-			echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Role', 'rolewright' ) . '</th><th>' . esc_html__( 'Denied capabilities', 'rolewright' ) . '</th></tr></thead><tbody>';
+			echo '<div class="rw-scroll" style="overflow-x:auto"><table class="widefat striped"><thead><tr><th>' . esc_html__( 'Role', 'rolewright' ) . '</th><th>' . esc_html__( 'Denied capabilities', 'rolewright' ) . '</th></tr></thead><tbody>';
 			foreach ( $map as $role => $caps ) {
 				printf(
 					'<tr><td><a href="%1$s">%2$s</a></td><td><code>%3$s</code></td></tr>',
@@ -127,7 +127,7 @@ final class Admin_Page {
 					esc_html( implode( ', ', $caps ) )
 				);
 			}
-			echo '</tbody></table>';
+			echo '</tbody></table></div>';
 		}
 
 		if ( ! $roles ) {
@@ -158,7 +158,7 @@ final class Admin_Page {
 		echo '<input type="hidden" name="action" value="rolewright_save_denials" />';
 		echo '<input type="hidden" name="role" value="' . esc_attr( $role ) . '" />';
 		wp_nonce_field( 'rolewright_save_denials_' . $role );
-		echo '<table class="widefat striped" style="max-width:48rem"><thead><tr><th>' . esc_html__( 'Capability', 'rolewright' ) . '</th><th>' . esc_html__( 'This role grants it', 'rolewright' ) . '</th><th>' . esc_html__( 'Deny', 'rolewright' ) . '</th></tr></thead><tbody>';
+		echo '<div class="rw-scroll" style="overflow-x:auto"><table class="widefat striped" style="max-width:48rem"><thead><tr><th>' . esc_html__( 'Capability', 'rolewright' ) . '</th><th>' . esc_html__( 'This role grants it', 'rolewright' ) . '</th><th>' . esc_html__( 'Deny', 'rolewright' ) . '</th></tr></thead><tbody>';
 		foreach ( self::all_caps() as $cap ) {
 			$locked = Denials::is_protected( $role, $cap ) || ( $own && 'read' === $cap );
 			$id     = 'rw-dh-cap-' . md5( $cap );
@@ -173,7 +173,7 @@ final class Admin_Page {
 				$locked ? ' <span class="description">' . esc_html__( 'protected', 'rolewright' ) . '</span>' : ''
 			);
 		}
-		echo '</tbody></table>';
+		echo '</tbody></table></div>';
 		submit_button( __( 'Save denials', 'rolewright' ) );
 		echo '</form>';
 	}
@@ -191,7 +191,7 @@ final class Admin_Page {
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 		echo '<input type="hidden" name="action" value="rolewright_save_positions" />';
 		wp_nonce_field( 'rolewright_save_positions' );
-		echo '<table class="widefat striped" style="max-width:40rem"><thead><tr><th>' . esc_html__( 'Role', 'rolewright' ) . '</th><th>' . esc_html__( 'Position', 'rolewright' ) . '</th><th>' . esc_html__( 'Source', 'rolewright' ) . '</th></tr></thead><tbody>';
+		echo '<div class="rw-scroll" style="overflow-x:auto"><table class="widefat striped" style="max-width:40rem"><thead><tr><th>' . esc_html__( 'Role', 'rolewright' ) . '</th><th>' . esc_html__( 'Position', 'rolewright' ) . '</th><th>' . esc_html__( 'Source', 'rolewright' ) . '</th></tr></thead><tbody>';
 		foreach ( Hierarchy::positions() as $role => $pos ) {
 			$editable = 'administrator' !== $role && ( $top || $pos < $mine );
 			$max      = $top ? Hierarchy::MAX_EDITABLE : max( 0, $mine - 1 );
@@ -205,7 +205,7 @@ final class Admin_Page {
 			}
 			printf( '<tr><td>%1$s <code>%2$s</code></td><td>%3$s</td><td>%4$s</td></tr>', esc_html( self::role_name( $role ) ), esc_html( $role ), $input, esc_html( $source ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $input is built from escaped parts above.
 		}
-		echo '</tbody></table>';
+		echo '</tbody></table></div>';
 		submit_button( __( 'Save positions', 'rolewright' ) );
 		echo '</form>';
 	}
@@ -244,7 +244,7 @@ final class Admin_Page {
 		if ( $view['super'] ) {
 			echo '<p>' . esc_html__( 'This user is a super admin and passes every capability check except do_not_allow.', 'rolewright' ) . '</p>';
 		}
-		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Capability', 'rolewright' ) . '</th><th>' . esc_html__( 'Granted by', 'rolewright' ) . '</th><th>' . esc_html__( 'Denied by', 'rolewright' ) . '</th><th>' . esc_html__( 'Effective', 'rolewright' ) . '</th></tr></thead><tbody>';
+		echo '<div class="rw-scroll" style="overflow-x:auto"><table class="widefat striped"><thead><tr><th>' . esc_html__( 'Capability', 'rolewright' ) . '</th><th>' . esc_html__( 'Granted by', 'rolewright' ) . '</th><th>' . esc_html__( 'Denied by', 'rolewright' ) . '</th><th>' . esc_html__( 'Effective', 'rolewright' ) . '</th></tr></thead><tbody>';
 		foreach ( $view['caps'] as $cap => $row ) {
 			$granted = array_map( array( __CLASS__, 'role_name' ), $row['granted_by'] );
 			if ( $row['user_grant'] ) {
@@ -262,7 +262,7 @@ final class Admin_Page {
 				$row['effective'] ? '<span style="color:#008a20">' . esc_html__( 'Yes', 'rolewright' ) . '</span>' : '<span style="color:#b32d2e">' . esc_html__( 'No', 'rolewright' ) . '</span>'
 			);
 		}
-		echo '</tbody></table>';
+		echo '</tbody></table></div>';
 	}
 
 	private static function back( string $tab, $result, array $args = array() ): void {

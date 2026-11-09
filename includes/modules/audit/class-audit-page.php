@@ -149,7 +149,7 @@ final class Audit_Page {
 			self::PER_PAGE
 		);
 
-		echo '<table class="widefat striped"><thead><tr>';
+		echo '<div class="rw-scroll" style="overflow-x:auto"><table class="widefat striped" style="min-width:640px"><thead><tr>';
 		foreach ( array( __( 'When', 'rolewright' ), __( 'Type', 'rolewright' ), __( 'Actor', 'rolewright' ), __( 'Target', 'rolewright' ), __( 'Changes', 'rolewright' ), '' ) as $head ) {
 			echo '<th scope="col">' . esc_html( $head ) . '</th>';
 		}
@@ -159,8 +159,8 @@ final class Audit_Page {
 		}
 		foreach ( $result['rows'] as $row ) {
 			echo '<tr>';
-			echo '<td>' . esc_html( get_date_from_gmt( $row->created_at, 'Y-m-d H:i' ) ) . '</td>';
-			echo '<td><code>' . esc_html( $row->type ) . '</code>' . ( '' !== self::type_label( (string) $row->type ) ? '<br>' . esc_html( self::type_label( (string) $row->type ) ) : '' ) . ( (int) $row->reverted_by ? ' <em>' . esc_html__( '(reverted)', 'rolewright' ) . '</em>' : '' ) . ( (int) $row->reverted_of ? ' <em>' . esc_html__( '(revert)', 'rolewright' ) . '</em>' : '' ) . '</td>';
+			echo '<td style="white-space:nowrap">' . esc_html( get_date_from_gmt( $row->created_at, 'Y-m-d H:i' ) ) . '</td>';
+			echo '<td><code style="white-space:nowrap">' . esc_html( $row->type ) . '</code>' . ( '' !== self::type_label( (string) $row->type ) ? '<br>' . esc_html( self::type_label( (string) $row->type ) ) : '' ) . ( (int) $row->reverted_by ? ' <em>' . esc_html__( '(reverted)', 'rolewright' ) . '</em>' : '' ) . ( (int) $row->reverted_of ? ' <em>' . esc_html__( '(revert)', 'rolewright' ) . '</em>' : '' ) . '</td>';
 			echo '<td>' . esc_html( $this->actor_label( (int) $row->actor_id ) ) . '</td>';
 			echo '<td>' . esc_html( $this->target_label( $row ) ) . '</td>';
 			echo '<td>' . wp_kses(
@@ -180,7 +180,7 @@ final class Audit_Page {
 			}
 			echo '</td></tr>';
 		}
-		echo '</tbody></table>';
+		echo '</tbody></table></div>';
 
 		$pages = (int) ceil( $result['total'] / self::PER_PAGE );
 		if ( $pages > 1 ) {
@@ -222,18 +222,18 @@ final class Audit_Page {
 		if ( ! $data['roles'] ) {
 			echo '<p>' . esc_html__( 'No role lists this capability.', 'rolewright' ) . '</p>';
 		} else {
-			echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Role', 'rolewright' ) . '</th><th>' . esc_html__( 'Slug', 'rolewright' ) . '</th><th>' . esc_html__( 'State', 'rolewright' ) . '</th></tr></thead><tbody>';
+			echo '<div class="rw-scroll" style="overflow-x:auto"><table class="widefat striped"><thead><tr><th>' . esc_html__( 'Role', 'rolewright' ) . '</th><th>' . esc_html__( 'Slug', 'rolewright' ) . '</th><th>' . esc_html__( 'State', 'rolewright' ) . '</th></tr></thead><tbody>';
 			foreach ( $data['roles'] as $role ) {
 				printf( '<tr><td>%1$s</td><td><code>%2$s</code></td><td>%3$s</td></tr>', esc_html( $role['name'] ), esc_html( $role['slug'] ), esc_html( 'granted' === $role['state'] ? __( 'Granted', 'rolewright' ) : __( 'Denied', 'rolewright' ) ) );
 			}
-			echo '</tbody></table>';
+			echo '</tbody></table></div>';
 		}
 
 		echo '<h2>' . esc_html__( 'Users', 'rolewright' ) . '</h2>';
 		if ( ! $data['users'] ) {
 			echo '<p>' . esc_html__( 'No user holds this capability.', 'rolewright' ) . '</p>';
 		} else {
-			echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'User', 'rolewright' ) . '</th><th>' . esc_html__( 'Source', 'rolewright' ) . '</th><th>' . esc_html__( 'Effective now', 'rolewright' ) . '</th></tr></thead><tbody>';
+			echo '<div class="rw-scroll" style="overflow-x:auto"><table class="widefat striped"><thead><tr><th>' . esc_html__( 'User', 'rolewright' ) . '</th><th>' . esc_html__( 'Source', 'rolewright' ) . '</th><th>' . esc_html__( 'Effective now', 'rolewright' ) . '</th></tr></thead><tbody>';
 			foreach ( $data['users'] as $user ) {
 				$sources = array();
 				foreach ( $user['sources'] as $source ) {
@@ -247,7 +247,7 @@ final class Audit_Page {
 					esc_html( $user['effective'] ? __( 'Yes', 'rolewright' ) : __( 'No (denied)', 'rolewright' ) )
 				);
 			}
-			echo '</tbody></table>';
+			echo '</tbody></table></div>';
 			if ( $data['truncated'] ) {
 				/* translators: %d: number of users shown */
 				echo '<p>' . esc_html( sprintf( __( 'Showing the first %d users.', 'rolewright' ), Permissions::USER_LIMIT ) ) . '</p>';

@@ -66,28 +66,35 @@ final class Login_Redirects_Page {
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 		echo '<input type="hidden" name="action" value="' . esc_attr( self::ACTION ) . '" />';
 		wp_nonce_field( self::ACTION );
-		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Role', 'rolewright' ) . '</th><th>' . esc_html__( 'After login', 'rolewright' ) . '</th><th>' . esc_html__( 'After logout', 'rolewright' ) . '</th><th>' . esc_html__( 'Default landing page', 'rolewright' ) . '</th><th>' . esc_html__( 'Priority', 'rolewright' ) . '</th></tr></thead><tbody>';
+		echo '<div class="rw-scroll" style="overflow-x:auto"><table class="widefat striped"><thead><tr><th>' . esc_html__( 'Role', 'rolewright' ) . '</th><th>' . esc_html__( 'After login', 'rolewright' ) . '</th><th>' . esc_html__( 'After logout', 'rolewright' ) . '</th><th>' . esc_html__( 'Default landing page', 'rolewright' ) . '</th><th>' . esc_html__( 'Priority', 'rolewright' ) . '</th></tr></thead><tbody>';
 		$position = 1;
 		$order    = array_flip( (array) $s['priority'] );
+		$field_labels = array(
+			'login'   => __( 'After login', 'rolewright' ),
+			'logout'  => __( 'After logout', 'rolewright' ),
+			'landing' => __( 'Default landing page', 'rolewright' ),
+		);
 		foreach ( wp_roles()->get_names() as $slug => $name ) {
 			printf( '<tr><td>%s</td>', esc_html( translate_user_role( $name ) ) );
 			foreach ( Login_Redirects_Settings::FIELDS as $field ) {
 				$value = isset( $s['rules'][ $slug ][ $field ] ) ? (string) $s['rules'][ $slug ][ $field ] : '';
 				printf(
-					'<td><input type="text" class="regular-text" name="rw[rules][%1$s][%2$s]" value="%3$s" /></td>',
+					'<td><input type="text" class="regular-text" name="rw[rules][%1$s][%2$s]" value="%3$s" aria-label="%4$s" /></td>',
 					esc_attr( $slug ),
 					esc_attr( $field ),
-					esc_attr( $value )
+					esc_attr( $value ),
+					esc_attr( translate_user_role( $name ) . ': ' . $field_labels[ $field ] )
 				);
 			}
 			printf(
-				'<td><input type="number" min="1" class="small-text" name="rw[priority][%1$s]" value="%2$d" /></td></tr>',
+				'<td><input type="number" min="1" class="small-text" name="rw[priority][%1$s]" value="%2$d" aria-label="%3$s" /></td></tr>',
 				esc_attr( $slug ),
-				absint( isset( $order[ $slug ] ) ? (int) $order[ $slug ] + 1 : 100 + $position )
+				absint( isset( $order[ $slug ] ) ? (int) $order[ $slug ] + 1 : 100 + $position ),
+				esc_attr( translate_user_role( $name ) . ': ' . __( 'Priority', 'rolewright' ) )
 			);
 			++$position;
 		}
-		echo '</tbody></table>';
+		echo '</tbody></table></div>';
 		printf(
 			'<p><label><input type="checkbox" name="rw[override]" value="1" %s /> %s</label></p>',
 			checked( ! empty( $s['override'] ), true, false ),

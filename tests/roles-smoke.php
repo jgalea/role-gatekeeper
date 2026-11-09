@@ -209,7 +209,7 @@ $rw_idle = Role_Service::create( $rw_admin, 'RW Idle ' . $rw_suffix );
 ob_start();
 ( new Role_List() )->render();
 $html = ob_get_clean();
-$rw_ok( false !== strpos( $html, 'wp-list-table' ) && false !== strpos( $html, esc_html( 'RW Renamed ' . $rw_suffix ) ), 'page: list table renders with the role name' );
+$rw_ok( false !== strpos( $html, 'rw-roles-table' ) && false !== strpos( $html, esc_html( 'RW Renamed ' . $rw_suffix ) ), 'page: list table renders with the role name' );
 $rw_ok( false !== strpos( $html, 'name="op" value="reset"' ) && false !== strpos( $html, 'confirm_reset' ), 'page: reset form with confirmation box' );
 $rw_ok( false !== strpos( $html, '_wpnonce' ), 'page: forms carry a nonce' );
 $rw_ok( 1 === preg_match( '/name="roles\[\]" value="' . preg_quote( $rw_idle, '/' ) . '"/', $html ) && 0 === preg_match( '/name="roles\[\]" value="administrator"/', $html ), 'page: only deletable roles get a bulk checkbox' );

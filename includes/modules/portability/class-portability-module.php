@@ -231,7 +231,7 @@ final class Portability_Module extends Module {
 		}
 		echo '</td></tr>';
 		echo '<tr><th scope="row"><label for="rolewright-file">' . esc_html__( 'File', 'rolewright' ) . '</label></th><td>';
-		echo '<input type="file" id="rolewright-file" name="rolewright_file" accept=".json,application/json" />';
+		echo '<input type="file" id="rolewright-file" style="width:100%;max-width:30em;min-height:32px;box-sizing:border-box" name="rolewright_file" accept=".json,application/json" />';
 		/* translators: %s: size limit */
 		echo '<p class="description">' . esc_html( sprintf( __( 'Up to %s.', 'rolewright' ), size_format( Importer::max_bytes() ) ) ) . '</p>';
 		echo '<p><label for="rolewright-json">' . esc_html__( 'Or paste the JSON:', 'rolewright' ) . '</label><br /><textarea id="rolewright-json" name="rolewright_json" rows="6" class="large-text code"></textarea></p>';
@@ -282,7 +282,7 @@ final class Portability_Module extends Module {
 		echo '<input type="hidden" name="token" value="' . esc_attr( $token ) . '" />';
 		wp_nonce_field( 'rolewright_portability_apply_' . $token );
 
-		echo '<table class="widefat striped"><thead><tr>';
+		echo '<div class="rw-scroll" style="overflow-x:auto"><table class="widefat striped"><thead><tr>';
 		foreach ( array( __( 'Import', 'rolewright' ), __( 'Role', 'rolewright' ), __( 'Action', 'rolewright' ), __( 'Added', 'rolewright' ), __( 'Removed', 'rolewright' ), __( 'New custom capabilities', 'rolewright' ), __( 'Critical capabilities', 'rolewright' ) ) as $head ) {
 			echo '<th scope="col">' . esc_html( $head ) . '</th>';
 		}
@@ -318,7 +318,7 @@ final class Portability_Module extends Module {
 			}
 			echo '</td></tr>';
 		}
-		echo '</tbody></table>';
+		echo '</tbody></table></div>';
 
 		foreach ( $plan['sections'] as $id => $section ) {
 			echo '<h3>' . esc_html( $section['label'] ) . '</h3>';

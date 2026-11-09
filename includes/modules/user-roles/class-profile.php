@@ -71,7 +71,7 @@ final class Profile {
 					continue;
 				}
 				printf(
-					'<label style="display:block;margin:2px 0"><input type="checkbox" name="rolewright_user_roles[]" value="%1$s" %2$s /> %3$s</label>',
+					'<label style="display:block;padding:6px 0"><input type="checkbox" name="rolewright_user_roles[]" value="%1$s" %2$s /> %3$s</label>',
 					esc_attr( $role ),
 					checked( in_array( $role, $held, true ), true, false ),
 					esc_html( translate_user_role( $names[ $role ] ?? $role ) )
@@ -127,7 +127,7 @@ final class Profile {
 			$is_direct = isset( $direct[ $cap ] );
 			$grantable = $is_direct || Guard::can_grant_cap( $actor, $cap );
 			printf(
-				'<label style="display:block;break-inside:avoid;margin:1px 0"><input type="checkbox" name="rolewright_user_caps[]" value="%1$s" %2$s %3$s /> %4$s%5$s</label>',
+				'<label style="display:block;break-inside:avoid;padding:6px 0"><input type="checkbox" name="rolewright_user_caps[]" value="%1$s" %2$s %3$s /> %4$s%5$s</label>',
 				esc_attr( $cap ),
 				checked( $is_direct, true, false ),
 				disabled( ! $grantable || ( $is_direct && ! Guard::can_grant_cap( $actor, $cap ) ), true, false ),
@@ -157,7 +157,7 @@ final class Profile {
 		echo '<table class="form-table" role="presentation"><tr><th scope="row">' . esc_html__( 'Additional roles', 'rolewright' ) . '</th><td>';
 		foreach ( $assignable as $role ) {
 			printf(
-				'<label style="display:block;margin:2px 0"><input type="checkbox" name="rolewright_user_roles[]" value="%1$s" /> %2$s</label>',
+				'<label style="display:block;padding:6px 0"><input type="checkbox" name="rolewright_user_roles[]" value="%1$s" /> %2$s</label>',
 				esc_attr( $role ),
 				esc_html( translate_user_role( $names[ $role ] ?? $role ) )
 			);

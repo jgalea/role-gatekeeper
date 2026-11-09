@@ -135,7 +135,7 @@ final class Admin_Page {
 			echo '<p>' . esc_html__( 'No rules yet.', 'rolewright' ) . '</p>';
 			return;
 		}
-		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Applies to', 'rolewright' ) . '</th><th>' . esc_html__( 'Mode', 'rolewright' ) . '</th><th>' . esc_html__( 'Type', 'rolewright' ) . '</th><th>' . esc_html__( 'IDs', 'rolewright' ) . '</th><th></th></tr></thead><tbody>';
+		echo '<div class="rw-scroll" style="overflow-x:auto"><table class="widefat striped"><thead><tr><th>' . esc_html__( 'Applies to', 'rolewright' ) . '</th><th>' . esc_html__( 'Mode', 'rolewright' ) . '</th><th>' . esc_html__( 'Type', 'rolewright' ) . '</th><th>' . esc_html__( 'IDs', 'rolewright' ) . '</th><th></th></tr></thead><tbody>';
 		foreach ( $rules as $rule ) {
 			$type = 'role' === $rule['subject_type'] ? __( 'Role', 'rolewright' ) : __( 'User', 'rolewright' );
 			$kind = $this->kind_label( $rule['by'] );
@@ -154,7 +154,7 @@ final class Admin_Page {
 			submit_button( __( 'Delete', 'rolewright' ), 'small', '', false );
 			echo '</form></td></tr>';
 		}
-		echo '</tbody></table>';
+		echo '</tbody></table></div>';
 	}
 
 	private function render_add_form(): void {
@@ -165,14 +165,14 @@ final class Admin_Page {
 
 		echo '<tr><th scope="row"><label for="rw-es-type">' . esc_html__( 'Applies to', 'rolewright' ) . '</label></th><td>';
 		echo '<select name="subject_type" id="rw-es-type"><option value="role">' . esc_html__( 'Role', 'rolewright' ) . '</option><option value="user">' . esc_html__( 'User', 'rolewright' ) . '</option></select> ';
-		echo '<select name="role">';
+		echo '<select name="role" aria-label="' . esc_attr__( 'Role', 'rolewright' ) . '">';
 		foreach ( wp_roles()->roles as $slug => $role ) {
 			if ( ! empty( $role['capabilities'][ Caps::MANAGE_ACCESS ] ) ) {
 				continue;
 			}
 			echo '<option value="' . esc_attr( $slug ) . '">' . esc_html( translate_user_role( $role['name'] ) ) . '</option>';
 		}
-		echo '</select> <input type="text" name="user" placeholder="' . esc_attr__( 'Username or user ID', 'rolewright' ) . '" />';
+		echo '</select> <input type="text" name="user" aria-label="' . esc_attr__( 'User', 'rolewright' ) . '" placeholder="' . esc_attr__( 'Username or user ID', 'rolewright' ) . '" />';
 		echo '<p class="description">' . esc_html__( 'Use the role field for a role, the user field for a single user.', 'rolewright' ) . '</p></td></tr>';
 
 		echo '<tr><th scope="row"><label for="rw-es-mode">' . esc_html__( 'Mode', 'rolewright' ) . '</label></th><td><select name="mode" id="rw-es-mode"><option value="allow">' . esc_html__( 'Allow only these', 'rolewright' ) . '</option><option value="block">' . esc_html__( 'Block these', 'rolewright' ) . '</option></select></td></tr>';
@@ -181,7 +181,7 @@ final class Admin_Page {
 		foreach ( Rules::allowed_kinds() as $kind ) {
 			echo '<option value="' . esc_attr( $kind ) . '">' . esc_html( $this->kind_label( $kind ) ) . '</option>';
 		}
-		echo '</select> <select name="taxonomy"><option value="">' . esc_html__( 'Taxonomy (assignable terms only)', 'rolewright' ) . '</option>';
+		echo '</select> <select name="taxonomy" aria-label="' . esc_attr__( 'Taxonomy', 'rolewright' ) . '"><option value="">' . esc_html__( 'Taxonomy (assignable terms only)', 'rolewright' ) . '</option>';
 		foreach ( get_taxonomies( array( 'show_ui' => true ), 'objects' ) as $tax ) {
 			echo '<option value="' . esc_attr( $tax->name ) . '">' . esc_html( $tax->label ) . '</option>';
 		}
