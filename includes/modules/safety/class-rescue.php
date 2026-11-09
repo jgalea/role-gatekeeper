@@ -72,14 +72,19 @@ final class Rescue {
 		$token  = bin2hex( random_bytes( 32 ) );
 		$hash   = hash( 'sha256', $token );
 		$acct   = self::hit( 'acct|' . ( $user ? $user->ID : 'none|' . hash( 'sha256', strtolower( $email ) ) ) );
+		$defer      = (bool) apply_filters( 'rolewright_rescue_defer_mail', ! ( defined( 'WP_CLI' ) && WP_CLI ) );
+		$can_detach = (bool) apply_filters( 'rolewright_rescue_can_detach', function_exists( 'fastcgi_finish_request' ) || function_exists( 'litespeed_finish_request' ) );
 		if ( ! $within || ! $user || ! $acct || ! self::is_eligible( $user ) ) {
+			if ( $within && $defer && ! $can_detach ) {
+				// Same write as the eligible path, so scheduling cost doesn't reveal which addresses are admins. The handler ignores user 0.
+				wp_schedule_single_event( time(), self::HOOK_DELIVER, array( 0 ) );
+			}
 			return false;
 		}
-		if ( ! apply_filters( 'rolewright_rescue_defer_mail', ! ( defined( 'WP_CLI' ) && WP_CLI ) ) ) {
+		if ( ! $defer ) {
 			return self::deliver( $user );
 		}
 		// Token creation and mail delivery depend on the address, so on web requests they never run before the response.
-		$can_detach = apply_filters( 'rolewright_rescue_can_detach', function_exists( 'fastcgi_finish_request' ) || function_exists( 'litespeed_finish_request' ) );
 		if ( $can_detach ) {
 			add_action(
 				'shutdown',
