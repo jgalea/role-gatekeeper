@@ -38,7 +38,14 @@ final class Scope_Enforcer {
 		if ( $old && $old->ID && ! Evaluator::post_allowed( $user_id, $old ) ) {
 			return false;
 		}
-		$after              = $old ? clone $old : new \WP_Post( (object) array( 'ID' => 0, 'post_type' => 'post', 'post_status' => 'draft', 'filter' => 'raw' ) );
+		$after              = $old ? clone $old : new \WP_Post(
+			(object) array(
+				'ID'          => 0,
+				'post_type'   => 'post',
+				'post_status' => 'draft',
+				'filter'      => 'raw',
+			)
+		);
 		$after->post_author = (string) $new_author;
 		if ( '' !== $new_status && 'auto-draft' !== $new_status ) {
 			$after->post_status = $new_status;
@@ -129,7 +136,7 @@ final class Scope_Enforcer {
 			}
 		}
 		foreach ( array_keys( get_object_vars( $counts ) ) as $status ) {
-			$n                 = isset( $by[ $status ] ) ? $by[ $status ] : 0;
+			$n               = isset( $by[ $status ] ) ? $by[ $status ] : 0;
 			$counts->$status = isset( $c['post__in'] ) ? $n : max( 0, (int) $counts->$status - $n );
 		}
 		return $counts;
@@ -219,7 +226,14 @@ final class Scope_Enforcer {
 		}
 		// phpcs:enable
 		if ( $id && ! Evaluator::post_allowed( get_current_user_id(), $id ) ) {
-			wp_die( esc_html( self::blocked_message() ), esc_html__( 'Not allowed', 'rolewright' ), array( 'response' => 403, 'back_link' => true ) );
+			wp_die(
+				esc_html( self::blocked_message() ),
+				esc_html__( 'Not allowed', 'rolewright' ),
+				array(
+					'response'  => 403,
+					'back_link' => true,
+				)
+			);
 		}
 	}
 

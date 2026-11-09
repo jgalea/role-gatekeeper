@@ -108,9 +108,23 @@ final class Role_List {
 				$links[] = '<a href="' . esc_url( admin_url( 'admin.php?page=rolewright-capabilities&role=' . rawurlencode( $slug ) ) ) . '">' . esc_html__( 'Capabilities', 'rolewright' ) . '</a>';
 			}
 			if ( 'administrator' !== $slug ) {
-				$links[] = '<a href="' . esc_url( Roles_Module::page_url( array( 'do' => 'rename', 'role' => $slug ) ) ) . '">' . esc_html__( 'Rename', 'rolewright' ) . '</a>';
+				$links[] = '<a href="' . esc_url(
+					Roles_Module::page_url(
+						array(
+							'do'   => 'rename',
+							'role' => $slug,
+						)
+					)
+				) . '">' . esc_html__( 'Rename', 'rolewright' ) . '</a>';
 			}
-			$links[] = '<a href="' . esc_url( Roles_Module::page_url( array( 'do' => 'clone', 'role' => $slug ) ) ) . '">' . esc_html__( 'Clone', 'rolewright' ) . '</a>';
+			$links[] = '<a href="' . esc_url(
+				Roles_Module::page_url(
+					array(
+						'do'   => 'clone',
+						'role' => $slug,
+					)
+				)
+			) . '">' . esc_html__( 'Clone', 'rolewright' ) . '</a>';
 			echo implode( ' | ', $links ); // phpcs:ignore WordPress.Security.EscapeOutput -- built from escaped parts.
 			if ( $deletable ) {
 				echo ' | <button type="submit" form="rw-del-' . esc_attr( $slug ) . '" class="button-link button-link-delete" onclick="return confirm(\'' . esc_js( __( 'Delete this role?', 'rolewright' ) ) . '\');">' . esc_html__( 'Delete', 'rolewright' ) . '</button>';

@@ -15,6 +15,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
 }
 
+// Multisite: site administrators hold rolewright_* caps only when the network grants it; these checks are about role-based access, so grant it.
+if ( is_multisite() ) {
+	add_filter( 'rolewright_multisite_site_admin_access', '__return_true', 20 );
+}
+
 require_once ABSPATH . 'wp-admin/includes/user.php';
 require_once ABSPATH . 'wp-admin/includes/admin.php';
 
@@ -107,6 +112,10 @@ try {
 		'create_users'  => true,
 		'delete_users'  => true,
 	);
+	if ( is_multisite() ) {
+		// Core maps edit_user and delete_user to manage_network_users on a network, so a site-level user manager needs it for the hierarchy to be what limits them.
+		$manager_caps['manage_network_users'] = true;
+	}
 	$r_manager = $rw_role( 'manager', $manager_caps );
 	$r_peer    = $rw_role( 'peer', array( 'read' => true ) );
 	$r_senior  = $rw_role( 'senior', array( 'read' => true, 'edit_posts' => true ) );
@@ -115,6 +124,10 @@ try {
 	$r_ops     = $rw_role( 'ops', array( 'read' => true, Caps::MANAGE => true, Caps::MANAGE_ACCESS => true ) );
 
 	$admin   = $rw_make( 'rw_admin', array( 'administrator' ) );
+	// On multisite a site administrator is not the site's owner; the owner is a super admin.
+	if ( is_multisite() ) {
+		grant_super_admin( $admin );
+	}
 	$admin2  = $rw_make( 'rw_admin2', array( 'administrator', $r_junior ) );
 	$manager = $rw_make( 'rw_manager', array( $r_manager ) );
 	$peer    = $rw_make( 'rw_peer', array( $r_peer ) );
@@ -350,7 +363,12 @@ try {
 	$r = $rw_rest( 'POST', '/wp/v2/users/' . $junior2, array( 'roles' => array( 'subscriber' ) ) );
 	$rw_ok( ! $r->is_error() && $rw_has_role( $junior2, 'subscriber' ), 'REST control: manager can still assign a lower role to a lower user' );
 	$r = $rw_rest( 'DELETE', '/wp/v2/users/' . $junior2, array( 'force' => true, 'reassign' => $manager ) );
-	$rw_ok( ! $r->is_error() && ! get_userdata( $junior2 ), 'REST control: manager can still delete a lower user' );
+	if ( is_multisite() ) {
+		// Core allows only super admins to delete users on a network, whatever the hierarchy says.
+		$rw_ok( $r->is_error() && 'rest_user_cannot_delete' === $r->get_data()['code'] && get_userdata( $junior2 ), 'REST: multisite delete is refused by core for a site-level manager, lower user kept' );
+	} else {
+		$rw_ok( ! $r->is_error() && ! get_userdata( $junior2 ), 'REST control: manager can still delete a lower user' );
+	}
 
 	// Top of the hierarchy is unaffected.
 	wp_set_current_user( $admin );
@@ -367,7 +385,12 @@ unset( $GLOBALS['current_screen'] );
 remove_action( 'rolewright_changed', $rw_listener, 10 );
 foreach ( array_unique( $rw_users ) as $uid ) {
 	if ( get_userdata( $uid ) ) {
-		wp_delete_user( $uid );
+		if ( is_multisite() ) {
+			revoke_super_admin( $uid );
+			wpmu_delete_user( $uid );
+		} else {
+			wp_delete_user( $uid );
+		}
 	}
 }
 foreach ( $rw_roles as $r ) {

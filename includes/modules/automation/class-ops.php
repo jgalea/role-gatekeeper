@@ -61,7 +61,7 @@ final class Ops {
 		if ( get_role( $slug ) || Guard::cap_exists( $slug ) ) {
 			return new \WP_Error( 'rolewright_role_exists', __( 'A role or capability with that name already exists.', 'rolewright' ) );
 		}
-		if ( $slug !== Guard::sanitize_cap_name( $slug ) ) {
+		if ( Guard::sanitize_cap_name( $slug ) !== $slug ) {
 			return new \WP_Error( 'rolewright_invalid_name', __( 'Role slugs use lowercase letters, numbers, underscores, hyphens and colons.', 'rolewright' ) );
 		}
 		$caps = Guard::normalize_caps( $caps );
@@ -351,7 +351,7 @@ final class Ops {
 				continue;
 			}
 			$exists = (bool) get_role( $slug );
-			if ( ! $exists && $slug !== Guard::sanitize_cap_name( $slug ) ) {
+			if ( ! $exists && Guard::sanitize_cap_name( $slug ) !== $slug ) {
 				$rejected[] = $slug . ': not a valid role name';
 				continue;
 			}

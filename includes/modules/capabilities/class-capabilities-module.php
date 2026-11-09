@@ -8,8 +8,8 @@ use Rolewright\Modules\Safety\Caps;
 defined( 'ABSPATH' ) || exit;
 
 final class Capabilities_Module extends Module {
-	const SLUG   = 'rolewright-capabilities';
-	const NONCE  = 'rolewright_caps';
+	const SLUG  = 'rolewright-capabilities';
+	const NONCE = 'rolewright_caps';
 
 	/** @var Cap_Editor */
 	private $editor;

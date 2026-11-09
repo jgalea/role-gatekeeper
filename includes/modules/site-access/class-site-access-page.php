@@ -31,10 +31,10 @@ final class Site_Access_Page {
 			wp_die( esc_html__( 'You do not have permission to do that.', 'rolewright' ), '', array( 'response' => 403 ) );
 		}
 		check_admin_referer( self::ACTION );
-		$raw     = isset( $_POST['rw'] ) && is_array( $_POST['rw'] ) ? wp_unslash( $_POST['rw'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
-		$actor   = get_current_user_id();
-		$clean   = Site_Access_Settings::sanitize( $raw, Site_Access_Settings::get(), $actor );
-		$page    = admin_url( 'admin.php?page=' . self::SLUG );
+		$raw   = isset( $_POST['rw'] ) && is_array( $_POST['rw'] ) ? wp_unslash( $_POST['rw'] ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+		$actor = get_current_user_id();
+		$clean = Site_Access_Settings::sanitize( $raw, Site_Access_Settings::get(), $actor );
+		$page  = admin_url( 'admin.php?page=' . self::SLUG );
 		if ( is_wp_error( $clean ) ) {
 			set_transient( 'rolewright_sa_err_' . $actor, $clean->get_error_message(), 60 );
 			wp_safe_redirect( add_query_arg( 'rw_error', '1', $page ) );

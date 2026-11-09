@@ -309,7 +309,7 @@ final class Enforcer {
 					$actor_now = array_values( array_unique( array_merge( $actor_now, Guard::critical_subset( $caps_of( $old, 'administrator' ) ) ) ) );
 				}
 				foreach ( $value as $name => $data ) {
-					$gained = array_diff( Guard::critical_subset( $caps_of( $value, (string) $name ) ), Guard::critical_subset( $caps_of( $old, (string) $name ) ) );
+					$gained  = array_diff( Guard::critical_subset( $caps_of( $value, (string) $name ) ), Guard::critical_subset( $caps_of( $old, (string) $name ) ) );
 					$missing = Guard::missing( $gained, $actor_now );
 					if ( $missing ) {
 						$reason = 'escalation';

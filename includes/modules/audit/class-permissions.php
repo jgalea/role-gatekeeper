@@ -110,7 +110,7 @@ final class Permissions {
 			if ( ! $sources ) {
 				continue;
 			}
-			$held             = Guard::user_caps( $id );
+			$held           = Guard::user_caps( $id );
 			$out['users'][] = array(
 				'id'        => $id,
 				'login'     => (string) $user->user_login,

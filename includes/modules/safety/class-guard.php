@@ -232,8 +232,8 @@ final class Guard {
 
 	/** @return string[] */
 	public static function protected_roles(): array {
-		$roles = apply_filters( 'rolewright_protected_roles', array( 'administrator', (string) get_option( 'default_role', 'subscriber' ) ) );
-		$roles = is_array( $roles ) ? array_map( 'strval', $roles ) : array();
+		$roles   = apply_filters( 'rolewright_protected_roles', array( 'administrator', (string) get_option( 'default_role', 'subscriber' ) ) );
+		$roles   = is_array( $roles ) ? array_map( 'strval', $roles ) : array();
 		$roles[] = 'administrator';
 		return array_values( array_unique( $roles ) );
 	}
@@ -532,7 +532,7 @@ final class Guard {
 	 * @param string[] $reasons
 	 */
 	private static function lockout_error( array $reasons ): \WP_Error {
-		$text = array(
+		$text  = array(
 			'read'            => __( 'you would lose the read capability', 'rolewright' ),
 			'manage'          => __( 'you would lose access to Rolewright (rolewright_manage)', 'rolewright' ),
 			'no_manager_role' => __( 'no role would be left that can manage roles (rolewright_manage_roles)', 'rolewright' ),

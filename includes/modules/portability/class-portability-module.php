@@ -123,7 +123,7 @@ final class Portability_Module extends Module {
 		if ( ! current_user_can( Caps::IMPORT ) ) {
 			$this->deny();
 		}
-		$token = isset( $_POST['token'] ) ? preg_replace( '/[^A-Za-z0-9]/', '', (string) wp_unslash( $_POST['token'] ) ) : '';
+		$token = isset( $_POST['token'] ) ? preg_replace( '/[^A-Za-z0-9]/', '', (string) wp_unslash( $_POST['token'] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- reduced to letters and digits by preg_replace.
 		check_admin_referer( 'rolewright_portability_apply_' . $token );
 		$pending = '' === $token ? false : get_transient( $this->pending_key( $token ) );
 		if ( ! is_array( $pending ) || ! isset( $pending['payload'] ) ) {
@@ -173,7 +173,7 @@ final class Portability_Module extends Module {
 			delete_transient( self::NOTICE_KEY . get_current_user_id() );
 			printf( '<div class="notice notice-%1$s"><p>%2$s</p></div>', esc_attr( $notice[0] ), esc_html( $notice[1] ) );
 		}
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only view; applying checks a nonce.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- read-only view; applying checks a nonce. Reduced to letters and digits by preg_replace.
 		$token = isset( $_GET['preview'] ) ? preg_replace( '/[^A-Za-z0-9]/', '', (string) wp_unslash( $_GET['preview'] ) ) : '';
 		if ( $token ) {
 			$pending = get_transient( $this->pending_key( $token ) );
@@ -248,9 +248,15 @@ final class Portability_Module extends Module {
 		if ( ! $caps ) {
 			return '&mdash;';
 		}
-		return implode( ', ', array_map( function ( $cap ) {
-			return '<code>' . esc_html( $cap ) . '</code>';
-		}, $caps ) );
+		return implode(
+			', ',
+			array_map(
+				function ( $cap ) {
+					return '<code>' . esc_html( $cap ) . '</code>';
+				},
+				$caps
+			)
+		);
 	}
 
 	private function render_preview( string $token, array $pending ): void {

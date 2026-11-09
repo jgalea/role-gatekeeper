@@ -163,7 +163,13 @@ final class Audit_Page {
 			echo '<td><code>' . esc_html( $row->type ) . '</code>' . ( (int) $row->reverted_by ? ' <em>' . esc_html__( '(reverted)', 'rolewright' ) . '</em>' : '' ) . ( (int) $row->reverted_of ? ' <em>' . esc_html__( '(revert)', 'rolewright' ) . '</em>' : '' ) . '</td>';
 			echo '<td>' . esc_html( $this->actor_label( (int) $row->actor_id ) ) . '</td>';
 			echo '<td>' . esc_html( $this->target_label( $row ) ) . '</td>';
-			echo '<td>' . wp_kses( $this->changes_html( $row ), array( 'code' => array(), 'br' => array() ) ) . '</td>';
+			echo '<td>' . wp_kses(
+				$this->changes_html( $row ),
+				array(
+					'code' => array(),
+					'br'   => array(),
+				)
+			) . '</td>';
 			echo '<td>';
 			if ( Reverter::can_revert_row( $row ) ) {
 				echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';

@@ -45,7 +45,14 @@ final class Gravity_Forms {
 		$form_id = isset( $_GET['id'] ) ? absint( $_GET['id'] ) : 0;
 		// phpcs:enable
 		if ( ! self::form_allowed( get_current_user_id(), $form_id ) ) {
-			wp_die( esc_html( Scope_Enforcer::blocked_message() ), esc_html__( 'Not allowed', 'rolewright' ), array( 'response' => 403, 'back_link' => true ) );
+			wp_die(
+				esc_html( Scope_Enforcer::blocked_message() ),
+				esc_html__( 'Not allowed', 'rolewright' ),
+				array(
+					'response'  => 403,
+					'back_link' => true,
+				)
+			);
 		}
 	}
 

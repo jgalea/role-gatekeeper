@@ -16,6 +16,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
 }
 
+// Multisite: site administrators hold rolewright_* caps only when the network grants it; these checks are about role-based access, so grant it.
+if ( is_multisite() ) {
+	add_filter( 'rolewright_multisite_site_admin_access', '__return_true', 20 );
+}
+
 require_once ABSPATH . 'wp-admin/includes/user.php';
 require_once ABSPATH . 'wp-admin/includes/admin.php';
 
@@ -165,7 +170,7 @@ $rw_ok( ! empty( $ed['create_posts'] ) && ! empty( $ed['create_pages'] ) && ! em
 $au = Role_Store::caps( 'author' );
 $rw_ok( ! empty( $au['create_posts'] ) && empty( $au['create_pages'] ) && ! empty( $au['assign_categories'] ) && empty( $au['edit_categories'] ), 'options: author got only what its core caps justify' );
 $ad = Role_Store::caps( 'administrator' );
-$rw_ok( ! empty( $ad['manage_privacy_options'] ) && ! empty( $ad['export_others_personal_data'] ) && empty( $ed['manage_privacy_options'] ), 'options: privacy caps went to roles with manage_options only' );
+$rw_ok( is_multisite() ? empty( $ad['manage_privacy_options'] ) && empty( $ed['manage_privacy_options'] ) : ! empty( $ad['manage_privacy_options'] ) && ! empty( $ad['export_others_personal_data'] ) && empty( $ed['manage_privacy_options'] ), 'options: privacy caps went to roles with manage_options only (single sites only; none added on multisite)' );
 $rw_ok( ! empty( $ed['edit_rwbooks'] ) && ! empty( $ed['edit_others_rwbooks'] ) && empty( $au['edit_others_rwbooks'] ) && ! empty( $au['publish_rwbooks'] ), 'cpt: own caps granted by matching core post caps' );
 $ev = $rw_last( 'caps.options_updated' );
 $rw_ok( $ev && isset( $ev['before']['sets'], $ev['after']['sets'] ) && array( 'create', 'terms', 'privacy' ) === $ev['after']['sets'], 'options: fires caps.options_updated with before and after' );
@@ -231,7 +236,7 @@ foreach ( $rw_opts as $name => $value ) {
 	null === $value ? delete_option( $name ) : update_option( $name, $value );
 }
 foreach ( array_unique( $rw_users ) as $uid ) {
-	wp_delete_user( $uid );
+	is_multisite() ? wpmu_delete_user( $uid ) : wp_delete_user( $uid );
 }
 Caps::grant_to_administrator();
 $rw_ok( ! get_role( $rw_role ) && ! get_role( $rw_mgr_role ) && ! get_role( 'editor' )->has_cap( 'create_posts' ), 'cleanup: roles back to the starting state' );

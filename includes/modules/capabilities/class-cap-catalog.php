@@ -223,7 +223,7 @@ final class Cap_Catalog {
 		}
 		foreach ( $bucket as $id => $list ) {
 			if ( 0 === strpos( $id, 'cpt:' ) ) {
-				$type            = get_post_type_object( substr( $id, 4 ) );
+				$type       = get_post_type_object( substr( $id, 4 ) );
 				$out[ $id ] = array(
 					/* translators: %s: post type label */
 					'label' => sprintf( __( '%s (post type)', 'rolewright' ), $type ? $type->labels->name : substr( $id, 4 ) ),
@@ -248,16 +248,16 @@ final class Cap_Catalog {
 
 	public static function label( string $cap ): string {
 		$overrides = array(
-			'read'                       => __( 'Read (log in and view the dashboard)', 'rolewright' ),
-			'edit_dashboard'             => __( 'Edit dashboard', 'rolewright' ),
-			'unfiltered_html'            => __( 'Post unfiltered HTML', 'rolewright' ),
-			'unfiltered_upload'          => __( 'Upload unfiltered files', 'rolewright' ),
-			'manage_options'             => __( 'Manage settings', 'rolewright' ),
-			'edit_theme_options'         => __( 'Edit theme options (menus, widgets)', 'rolewright' ),
-			'customize'                  => __( 'Use the Customizer', 'rolewright' ),
-			'update_core'                => __( 'Update WordPress', 'rolewright' ),
+			'read'                        => __( 'Read (log in and view the dashboard)', 'rolewright' ),
+			'edit_dashboard'              => __( 'Edit dashboard', 'rolewright' ),
+			'unfiltered_html'             => __( 'Post unfiltered HTML', 'rolewright' ),
+			'unfiltered_upload'           => __( 'Upload unfiltered files', 'rolewright' ),
+			'manage_options'              => __( 'Manage settings', 'rolewright' ),
+			'edit_theme_options'          => __( 'Edit theme options (menus, widgets)', 'rolewright' ),
+			'customize'                   => __( 'Use the Customizer', 'rolewright' ),
+			'update_core'                 => __( 'Update WordPress', 'rolewright' ),
 			'export_others_personal_data' => __( 'Export other users\' personal data', 'rolewright' ),
-			'erase_others_personal_data' => __( 'Erase other users\' personal data', 'rolewright' ),
+			'erase_others_personal_data'  => __( 'Erase other users\' personal data', 'rolewright' ),
 		);
 		if ( isset( $overrides[ $cap ] ) ) {
 			return $overrides[ $cap ];

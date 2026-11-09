@@ -16,7 +16,7 @@ final class Rest_Routes {
 	private const SLUG = '(?P<slug>[A-Za-z0-9_:\-]+)';
 
 	public function register(): void {
-		$read = function ( string $cap ) {
+		$read  = function ( string $cap ) {
 			return function () use ( $cap ) {
 				return current_user_can( $cap ) ? true : new \WP_Error( 'rest_forbidden', __( 'Sorry, you are not allowed to do that.', 'rolewright' ), array( 'status' => rest_authorization_required_code() ) );
 			};
@@ -29,7 +29,7 @@ final class Rest_Routes {
 				return current_user_can( $cap ) ? true : new \WP_Error( 'rest_forbidden', __( 'Sorry, you are not allowed to do that.', 'rolewright' ), array( 'status' => rest_authorization_required_code() ) );
 			};
 		};
-		$list = array(
+		$list  = array(
 			'type'  => 'array',
 			'items' => array( 'type' => 'string' ),
 		);

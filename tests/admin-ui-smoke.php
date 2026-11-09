@@ -13,6 +13,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
 }
 
+// Multisite: site administrators hold rolewright_* caps only when the network grants it; these checks are about role-based access, so grant it.
+if ( is_multisite() ) {
+	add_filter( 'rolewright_multisite_site_admin_access', '__return_true', 20 );
+	// Core only lets site administrators manage plugins when the network enables the Plugins menu.
+	$rw_saved_menu_items = get_site_option( 'menu_items' );
+	update_site_option( 'menu_items', array( 'plugins' => 1 ) );
+}
+
 require_once ABSPATH . 'wp-admin/includes/admin.php';
 require_once ABSPATH . WPINC . '/class-wp-admin-bar.php';
 
@@ -574,10 +582,13 @@ try {
 }
 
 // Cleanup.
+if ( is_multisite() ) {
+	update_site_option( 'menu_items', $rw_saved_menu_items );
+}
 wp_set_current_user( 0 );
 require_once ABSPATH . 'wp-admin/includes/user.php';
 foreach ( $users as $uid ) {
-	wp_delete_user( $uid );
+	is_multisite() ? wpmu_delete_user( $uid ) : wp_delete_user( $uid );
 }
 remove_role( $r_mgr );
 remove_role( $r_rest );

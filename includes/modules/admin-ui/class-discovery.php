@@ -84,8 +84,8 @@ final class Discovery {
 					if ( false === $box || ! is_array( $box ) || ! preg_match( '/^[A-Za-z0-9_\-]+$/', (string) $id ) ) {
 						continue;
 					}
-					$title         = trim( wp_strip_all_tags( (string) ( $box['title'] ?? '' ) ) );
-					$found[ $id ]  = '' !== $title ? $title : (string) $id;
+					$title        = trim( wp_strip_all_tags( (string) ( $box['title'] ?? '' ) ) );
+					$found[ $id ] = '' !== $title ? $title : (string) $id;
 				}
 			}
 		}
@@ -107,11 +107,11 @@ final class Discovery {
 			return;
 		}
 		$found = array();
-		foreach ( $bar->get_nodes() ?: array() as $node ) {
+		foreach ( (array) $bar->get_nodes() as $node ) {
 			if ( ! empty( $node->group ) || ! preg_match( '/^[A-Za-z0-9_\-]+$/', (string) $node->id ) ) {
 				continue;
 			}
-			$title                = trim( wp_strip_all_tags( (string) $node->title ) );
+			$title              = trim( wp_strip_all_tags( (string) $node->title ) );
 			$found[ $node->id ] = '' !== $title ? $title : (string) $node->id;
 		}
 		self::remember( 'bar', '', $found );
@@ -123,16 +123,23 @@ final class Discovery {
 		foreach ( array( 'admin', 'template', 'post', 'meta-boxes', 'dashboard' ) as $inc ) {
 			require_once ABSPATH . 'wp-admin/includes/' . $inc . '.php';
 		}
-		$saved_screen = $current_screen;
-		$saved_boxes  = $wp_meta_boxes;
-		$seen         = self::seen();
+		// phpcs:disable WordPress.WP.GlobalVariablesOverride.Prohibited -- core registers meta boxes into these globals; they are emptied for the scan and restored at the end.
+		$saved_screen      = $current_screen;
+		$saved_boxes       = $wp_meta_boxes;
+		$seen              = self::seen();
 		$seen['metaboxes'] = array();
 		update_option( self::OPTION, $seen, false );
 
 		foreach ( get_post_types( array( 'show_ui' => true ), 'names' ) as $type ) {
 			set_current_screen( $type );
 			$wp_meta_boxes[ $type ] = array();
-			$post                   = new \WP_Post( (object) array( 'ID' => 0, 'post_type' => $type, 'post_status' => 'auto-draft' ) );
+			$post                   = new \WP_Post(
+				(object) array(
+					'ID'          => 0,
+					'post_type'   => $type,
+					'post_status' => 'auto-draft',
+				)
+			);
 			if ( function_exists( 'register_and_do_post_meta_boxes' ) ) {
 				register_and_do_post_meta_boxes( $post );
 			} else {
@@ -145,7 +152,8 @@ final class Discovery {
 
 		$wp_meta_boxes  = $saved_boxes;
 		$current_screen = $saved_screen;
-		$count          = 0;
+		// phpcs:enable WordPress.WP.GlobalVariablesOverride.Prohibited
+		$count = 0;
 		foreach ( self::seen()['metaboxes'] as $boxes ) {
 			$count += count( $boxes );
 		}

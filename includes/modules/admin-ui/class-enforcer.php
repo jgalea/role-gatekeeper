@@ -126,11 +126,11 @@ final class Enforcer {
 	 * The action is refused when the block is on or any of the screens is blocked for the user.
 	 */
 	public static function ajax_actions(): array {
-		$widgets  = array( 'widgets', array( 'widgets.php' ) );
-		$menus    = array( 'nav_menus', array( 'nav-menus.php' ) );
-		$custom   = array( 'customizer', array( 'customize.php' ) );
-		$themes   = array( 'theme_browser', array( 'theme-install.php' ) );
-		$editors  = array( 'file_editors', array( 'theme-editor.php', 'plugin-editor.php' ) );
+		$widgets = array( 'widgets', array( 'widgets.php' ) );
+		$menus   = array( 'nav_menus', array( 'nav-menus.php' ) );
+		$custom  = array( 'customizer', array( 'customize.php' ) );
+		$themes  = array( 'theme_browser', array( 'theme-install.php' ) );
+		$editors = array( 'file_editors', array( 'theme-editor.php', 'plugin-editor.php' ) );
 		return array(
 			'save-widget'                            => $widgets,
 			'widgets-order'                          => $widgets,
@@ -176,7 +176,7 @@ final class Enforcer {
 	}
 
 	private static function ajax_blocked( string $action, array $eff ): bool {
-		$can_manage = self::can_manage();
+		$can_manage     = self::can_manage();
 		$screen_blocked = function ( array $pages ) use ( $eff, $can_manage ): bool {
 			foreach ( $pages as $page ) {
 				if ( null !== Engine::decide( $page, null, array(), Discovery::menu(), Discovery::submenu(), $eff, $can_manage ) ) {
@@ -199,8 +199,8 @@ final class Enforcer {
 			if ( 'toggle-auto-updates' === $action && 'theme' === $type ) {
 				return false;
 			}
-			$key    = 'toggle-auto-updates' === $action ? 'asset' : 'plugin';
-			$raw    = isset( $_POST[ $key ] ) && is_scalar( $_POST[ $key ] ) ? wp_unslash( (string) $_POST[ $key ] ) : '';
+			$key = 'toggle-auto-updates' === $action ? 'asset' : 'plugin';
+			$raw = isset( $_POST[ $key ] ) && is_scalar( $_POST[ $key ] ) ? wp_unslash( (string) $_POST[ $key ] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitized with sanitize_text_field below.
 			// phpcs:enable
 			if ( '' === $raw ) {
 				return false;
@@ -284,7 +284,7 @@ final class Enforcer {
 			return $plugins;
 		}
 		foreach ( $eff['plugins_hide'] as $file ) {
-			if ( $file !== plugin_basename( ROLEWRIGHT_FILE ) ) {
+			if ( plugin_basename( ROLEWRIGHT_FILE ) !== $file ) {
 				unset( $plugins[ $file ] );
 			}
 		}

@@ -131,7 +131,7 @@ final class Multisite_Module extends Module {
 		if ( ! $this->can() ) {
 			$this->deny();
 		}
-		$id = isset( $_POST['job'] ) ? preg_replace( '/[^A-Za-z0-9]/', '', (string) wp_unslash( $_POST['job'] ) ) : '';
+		$id = isset( $_POST['job'] ) ? preg_replace( '/[^A-Za-z0-9]/', '', (string) wp_unslash( $_POST['job'] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- reduced to letters and digits by preg_replace.
 		check_admin_referer( 'rolewright_ms_batch_' . $id );
 		$job = Network_Sync::get( get_current_user_id(), $id );
 		if ( ! $job ) {
@@ -159,7 +159,7 @@ final class Multisite_Module extends Module {
 			delete_site_transient( self::NOTICE_KEY . get_current_user_id() );
 			printf( '<div class="notice notice-%1$s"><p>%2$s</p></div>', esc_attr( $notice[0] ), esc_html( $notice[1] ) );
 		}
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only view; each batch checks a nonce.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- read-only view; each batch checks a nonce. Reduced to letters and digits by preg_replace.
 		$job_id = isset( $_GET['job'] ) ? preg_replace( '/[^A-Za-z0-9]/', '', (string) wp_unslash( $_GET['job'] ) ) : '';
 		$job    = $job_id ? Network_Sync::get( get_current_user_id(), $job_id ) : null;
 		if ( $job ) {

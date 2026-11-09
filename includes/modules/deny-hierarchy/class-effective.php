@@ -63,6 +63,7 @@ final class Effective {
 			$rows[ $cap ]['denied_by'] = $by;
 		}
 
+		// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core hook, run to compute the caps the user really has.
 		$allcaps = apply_filters( 'user_has_cap', (array) $user->allcaps, array_keys( $rows ), array( '', $user->ID ), $user );
 		$super   = Guard::is_super( $user->ID );
 		foreach ( $rows as $cap => &$r ) {

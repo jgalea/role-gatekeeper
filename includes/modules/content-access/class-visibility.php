@@ -93,7 +93,7 @@ final class Visibility {
 		if ( empty( $block['attrs']['rolewrightMode'] ) ) {
 			return $content;
 		}
-		if ( self::$editor_preview && isset( $block['blockName'] ) && strtolower( (string) $block['blockName'] ) === self::$editor_preview['name'] && self::visibility_attrs( $block['attrs'] ) == self::$editor_preview['attrs'] ) { // phpcs:ignore Universal.Operators.StrictComparisonOperators
+		if ( self::$editor_preview && isset( $block['blockName'] ) && strtolower( (string) $block['blockName'] ) === self::$editor_preview['name'] && self::visibility_attrs( $block['attrs'] ) == self::$editor_preview['attrs'] ) { // phpcs:ignore Universal.Operators.StrictComparisons.LooseEqual -- array equality ignoring key order is intended.
 			return $content;
 		}
 		$roles = isset( $block['attrs']['rolewrightRoles'] ) && is_array( $block['attrs']['rolewrightRoles'] ) ? $block['attrs']['rolewrightRoles'] : array();
@@ -172,7 +172,7 @@ final class Visibility {
 			}
 			return $blocks;
 		};
-		$blocks = $walk( parse_blocks( $content ) );
+		$blocks  = $walk( parse_blocks( $content ) );
 		return $changed ? serialize_blocks( $blocks ) : $content;
 	}
 

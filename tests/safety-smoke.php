@@ -95,7 +95,8 @@ try {
 	$rw_ok( ! get_role( 'administrator' )->has_cap( Caps::MANAGE ), 'setup: rolewright_manage removed from administrator' );
 	Caps::grant_to_administrator();
 	$rw_ok( get_role( 'administrator' )->has_cap( Caps::MANAGE ), 'self-heal re-adds rolewright_manage' );
-	$rw_ok( user_can( $admin, Caps::MANAGE ) && ( is_multisite() || user_can( $admin, Caps::MANAGE_ROLES ) ), 'administrator user can rolewright_manage (and _roles on single site)' );
+	$rw_net_gated = is_multisite() && \Rolewright\Core\Plugin::is_enabled( 'multisite' ) && ! apply_filters( 'rolewright_multisite_site_admin_access', false, get_userdata( $admin ) );
+	$rw_ok( $rw_net_gated ? ! user_can( $admin, Caps::MANAGE ) : ( user_can( $admin, Caps::MANAGE ) && ( is_multisite() || user_can( $admin, Caps::MANAGE_ROLES ) ) ), 'administrator user can rolewright_manage (and _roles on single site); with the multisite module on, a site administrator needs the network grant' );
 	$rw_ok( ! user_can( $promoter, Caps::MANAGE ), 'promoter cannot rolewright_manage' );
 
 	// Guard basics.

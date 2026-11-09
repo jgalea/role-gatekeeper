@@ -28,7 +28,16 @@ final class Admin_Page {
 	}
 
 	private static function url( string $tab, array $args = array() ): string {
-		return add_query_arg( array_merge( array( 'page' => self::SLUG, 'tab' => $tab ), $args ), admin_url( 'admin.php' ) );
+		return add_query_arg(
+			array_merge(
+				array(
+					'page' => self::SLUG,
+					'tab'  => $tab,
+				),
+				$args
+			),
+			admin_url( 'admin.php' )
+		);
 	}
 
 	private static function role_name( string $role ): string {
@@ -59,8 +68,8 @@ final class Admin_Page {
 			wp_die( esc_html__( 'You do not have permission to view this page.', 'rolewright' ) );
 		}
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- read-only navigation.
-		$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'denials';
-		$tab = in_array( $tab, array( 'denials', 'hierarchy', 'effective' ), true ) ? $tab : 'denials';
+		$tab  = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'denials';
+		$tab  = in_array( $tab, array( 'denials', 'hierarchy', 'effective' ), true ) ? $tab : 'denials';
 		$tabs = array(
 			'denials'   => __( 'Denied capabilities', 'rolewright' ),
 			'hierarchy' => __( 'Role hierarchy', 'rolewright' ),
@@ -170,9 +179,9 @@ final class Admin_Page {
 	}
 
 	private function render_hierarchy(): void {
-		$actor = get_current_user_id();
-		$mine  = Hierarchy::user_position( $actor );
-		$top   = Hierarchy::is_top( $actor );
+		$actor  = get_current_user_id();
+		$mine   = Hierarchy::user_position( $actor );
+		$top    = Hierarchy::is_top( $actor );
 		$stored = Hierarchy::stored();
 
 		echo '<p>' . esc_html__( 'Higher numbers rank higher. Below the top, users can only edit, delete or assign roles below their own position, can only edit users below it, and don\'t see users of higher roles. Administrator is fixed at the top.', 'rolewright' ) . '</p>';

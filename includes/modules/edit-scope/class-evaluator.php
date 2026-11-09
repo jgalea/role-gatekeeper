@@ -164,7 +164,7 @@ final class Evaluator {
 					'fields'                 => 'ids',
 					'no_found_rows'          => true,
 					'orderby'                => 'none',
-					'suppress_filters'       => true,
+					'suppress_filters'       => true, // phpcs:ignore WordPressVIPMinimum.Performance.WPQueryParams.SuppressFilters_suppress_filters -- these ids become the scope's exclusion list, so other plugins' query filters (language, access) must not shrink the set.
 					'ignore_sticky_posts'    => true,
 					'rolewright_scope_skip'  => true,
 					'update_post_meta_cache' => false,

@@ -69,7 +69,7 @@ final class Rescue {
 				'expires' => time() + self::TTL,
 			)
 		);
-		$url = add_query_arg(
+		$url  = add_query_arg(
 			array(
 				'action' => self::ACTION_USE,
 				'uid'    => $user->ID,

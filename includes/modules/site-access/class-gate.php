@@ -252,17 +252,17 @@ final class Gate {
 			$member = is_user_member_of_blog( $user->ID, get_current_blog_id() );
 		}
 		return array(
-			'path'         => self::current_path(),
-			'logged_in'    => $in,
-			'member'       => $member,
-			'is_feed'      => ! $is_rest && function_exists( 'is_feed' ) && is_feed(),
-			'is_rest'      => $is_rest,
-			'script'       => $script,
-			'login_path'   => self::login_path(),
-			'query_keys'   => array_values( array_unique( array_merge( array_map( 'strval', array_keys( $_GET ) ), array_map( 'strval', array_keys( $_POST ) ) ) ) ), // phpcs:ignore WordPress.Security.NonceVerification
+			'path'           => self::current_path(),
+			'logged_in'      => $in,
+			'member'         => $member,
+			'is_feed'        => ! $is_rest && function_exists( 'is_feed' ) && is_feed(),
+			'is_rest'        => $is_rest,
+			'script'         => $script,
+			'login_path'     => self::login_path(),
+			'query_keys'     => array_values( array_unique( array_merge( array_map( 'strval', array_keys( $_GET ) ), array_map( 'strval', array_keys( $_POST ) ) ) ) ), // phpcs:ignore WordPress.Security.NonceVerification
 			'query_mismatch' => ! $is_rest && self::resolved_query_differs(),
-			'xmlrpc_on'    => (bool) apply_filters( 'xmlrpc_enabled', true ),
-			'exempt_paths' => array_filter( array_map( array( __CLASS__, 'normalize_path' ), (array) apply_filters( 'rolewright_site_access_exempt_paths', array() ) ) ),
+			'xmlrpc_on'      => (bool) apply_filters( 'xmlrpc_enabled', true ), // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core hook, read to learn whether XML-RPC is on.
+			'exempt_paths'   => array_filter( array_map( array( __CLASS__, 'normalize_path' ), (array) apply_filters( 'rolewright_site_access_exempt_paths', array() ) ) ),
 		);
 	}
 

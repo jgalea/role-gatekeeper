@@ -148,8 +148,8 @@ final class Reverter {
 		if ( is_wp_error( $ok ) ) {
 			return $ok;
 		}
-		$current = self::role_name( $slug );
-		$roles   = wp_roles();
+		$current                       = self::role_name( $slug );
+		$roles                         = wp_roles();
 		$roles->roles[ $slug ]['name'] = $old;
 		$roles->role_names[ $slug ]    = $old;
 		update_option( $roles->role_key, $roles->roles );

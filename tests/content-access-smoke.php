@@ -168,7 +168,7 @@ foreach ( $actors as $who => $uid ) {
 	$rw_ok( false !== strpos( $body, 'Public Newer ' . $sfx ), "archive (home) lists public post for $who" );
 	$rw_ok( $right === ( false !== strpos( $body, $secret ) ), "archive (home) shows protected post only to right role ($who)" );
 
-	list( , $body ) = $fetch( '/2020/', $uid );
+	list( , $body ) = $fetch( (string) wp_make_link_relative( get_year_link( 2020 ) ), $uid );
 	$rw_ok( $right === ( false !== strpos( $body, $secret ) ), "date archive shows protected post only to right role ($who)" );
 
 	list( , $body ) = $fetch( '/?s=findme' . $sfx, $uid );
@@ -321,7 +321,7 @@ $r->set_body_params( array( 'title' => 'rest attr', 'status' => 'draft', 'conten
 $res = rest_do_request( $r );
 $rid = (int) ( $res->get_data()['id'] ?? 0 );
 $posts[] = $rid;
-$rw_ok( $rid && false === strpos( get_post( $rid )->post_content, 'rolewrightMode' ), 'visibility attributes stripped on a REST save by a user without the access capability' );
+$rw_ok( $rid && false === strpos( get_post( $rid )->post_content, 'rolewrightMode' ), 'visibility attributes stripped on a REST save by a user without the access capability (status ' . $res->get_status() . ' ' . ( $res->is_error() ? $res->get_data()['code'] : get_post( $rid )->post_content ) . ')' );
 wp_set_current_user( $admin_id );
 $kp = wp_insert_post( array( 'post_title' => 'attr keep', 'post_status' => 'draft', 'post_author' => $u_editor, 'post_content' => $hidden_block ) );
 $posts[] = $kp;
@@ -398,7 +398,7 @@ foreach ( array_reverse( $posts ) as $pid ) {
 	wp_delete_post( $pid, true );
 }
 foreach ( $users as $uid ) {
-	wp_delete_user( $uid );
+	is_multisite() ? wpmu_delete_user( $uid ) : wp_delete_user( $uid );
 }
 remove_role( $role );
 unregister_block_type( 'rwtest/secret' );

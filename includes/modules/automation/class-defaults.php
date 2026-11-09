@@ -21,6 +21,7 @@ final class Defaults {
 		global $wp_roles, $wp_user_roles;
 		require_once ABSPATH . 'wp-admin/includes/schema.php';
 
+		// phpcs:disable WordPress.WP.GlobalVariablesOverride.Prohibited -- swaps the role globals for a scratch copy to read core defaults, and restores them in finally.
 		$saved_roles   = $wp_roles;
 		$saved_static  = $wp_user_roles;
 		$wp_user_roles = array(
@@ -46,6 +47,7 @@ final class Defaults {
 			$wp_roles      = $saved_roles;
 			$wp_user_roles = $saved_static;
 		}
+		// phpcs:enable WordPress.WP.GlobalVariablesOverride.Prohibited
 		self::$cache = $out;
 		return $out;
 	}

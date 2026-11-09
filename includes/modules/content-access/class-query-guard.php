@@ -91,10 +91,10 @@ final class Query_Guard {
 		if ( ! $this->head_post ) {
 			return;
 		}
-		$post = get_post( $this->head_post );
-		$html = (string) ob_get_clean();
+		$post            = get_post( $this->head_post );
+		$html            = (string) ob_get_clean();
 		$this->head_post = 0;
-		$raw  = $post ? array( (string) $post->post_title, (string) $post->post_excerpt ) : array();
+		$raw             = $post ? array( (string) $post->post_title, (string) $post->post_excerpt ) : array();
 		echo self::scrub_head( $html, $raw ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 	}
 
@@ -144,7 +144,7 @@ final class Query_Guard {
 		}
 		$hidden = Access::hidden_ids();
 		if ( $hidden ) {
-			$existing                              = (array) ( $query->query_vars['post__not_in'] ?? array() );
+			$existing                          = (array) ( $query->query_vars['post__not_in'] ?? array() );
 			$query->query_vars['post__not_in'] = array_values( array_unique( array_merge( array_map( 'intval', $existing ), $hidden ) ) );
 		}
 	}

@@ -362,7 +362,7 @@ final class Hierarchy {
 				/* translators: %d: highest allowed position */
 				return new \WP_Error( 'rolewright_bad_position', sprintf( __( 'Positions run from 0 to %d.', 'rolewright' ), self::MAX_EDITABLE ) );
 			}
-			if ( $pos === self::role_position( $role ) ) {
+			if ( self::role_position( $role ) === $pos ) {
 				continue;
 			}
 			if ( ! $top && ( self::role_position( $role ) >= $mine || $pos >= $mine ) ) {

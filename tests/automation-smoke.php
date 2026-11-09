@@ -15,6 +15,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
 }
 
+// Multisite: site administrators hold rolewright_* caps only when the network grants it; these checks are about role-based access, so grant it.
+if ( is_multisite() ) {
+	add_filter( 'rolewright_multisite_site_admin_access', '__return_true', 20 );
+}
+
 require_once ABSPATH . 'wp-admin/includes/user.php';
 require_once ABSPATH . 'wp-admin/includes/admin.php';
 
@@ -382,7 +387,7 @@ if ( function_exists( 'wp_register_ability' ) && function_exists( 'wp_get_abilit
 // Cleanup.
 delete_option( Automation_Module::OPTION_SETTINGS );
 foreach ( $users as $id ) {
-	wp_delete_user( $id );
+	is_multisite() ? wpmu_delete_user( $id ) : wp_delete_user( $id );
 }
 foreach ( $roles as $r ) {
 	remove_role( $r );

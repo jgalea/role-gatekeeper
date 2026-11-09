@@ -31,13 +31,13 @@ final class Cap_Editor {
 		$err   = null;
 
 		if ( 'options' === $op ) {
-			$sets = isset( $_POST['sets'] ) && is_array( $_POST['sets'] ) ? array_map( 'sanitize_key', wp_unslash( $_POST['sets'] ) ) : array();
-			$cpts = isset( $_POST['cpts'] ) && is_array( $_POST['cpts'] ) ? array_map( 'sanitize_key', wp_unslash( $_POST['cpts'] ) ) : array();
-			$res  = Cap_Service::save_options( $actor, $sets, $cpts );
+			$sets                      = isset( $_POST['sets'] ) && is_array( $_POST['sets'] ) ? array_map( 'sanitize_key', wp_unslash( $_POST['sets'] ) ) : array();
+			$cpts                      = isset( $_POST['cpts'] ) && is_array( $_POST['cpts'] ) ? array_map( 'sanitize_key', wp_unslash( $_POST['cpts'] ) ) : array();
+			$res                       = Cap_Service::save_options( $actor, $sets, $cpts );
 			is_wp_error( $res ) ? $err = $res : $msg = __( 'Capability options saved. New capabilities were given to roles that hold the matching core capability.', 'rolewright' );
 		} elseif ( isset( $_POST['delete_cap'] ) ) {
-			$cap = sanitize_text_field( wp_unslash( $_POST['delete_cap'] ) );
-			$res = Cap_Service::delete_custom_cap( $actor, $cap );
+			$cap                       = sanitize_text_field( wp_unslash( $_POST['delete_cap'] ) );
+			$res                       = Cap_Service::delete_custom_cap( $actor, $cap );
 			is_wp_error( $res ) ? $err = $res : $msg = __( 'Custom capability deleted.', 'rolewright' );
 		} else {
 			$granted = isset( $_POST['caps'] ) && is_array( $_POST['caps'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['caps'] ) ) : array();
@@ -51,8 +51,8 @@ final class Cap_Editor {
 			if ( is_wp_error( $res ) ) {
 				$err = $res;
 				if ( 'rolewright_confirm' === $res->get_error_code() ) {
-					$data                    = $res->get_error_data();
-					$this->state['removed']  = isset( $data['removed'] ) ? (array) $data['removed'] : array();
+					$data                   = $res->get_error_data();
+					$this->state['removed'] = isset( $data['removed'] ) ? (array) $data['removed'] : array();
 				}
 				$this->state['posted'] = $granted;
 			} else {
@@ -145,7 +145,7 @@ final class Cap_Editor {
 			echo '<label class="rw-select-all"><input type="checkbox" class="rw-all" /> ' . esc_html__( 'Select all', 'rolewright' ) . '</label>';
 			echo '<div class="rw-caps-grid">';
 			foreach ( $group['caps'] as $cap ) {
-				$on = null === $posted ? ! empty( $current[ $cap ] ) : in_array( $cap, $posted, true );
+				$on    = null === $posted ? ! empty( $current[ $cap ] ) : in_array( $cap, $posted, true );
 				$label = Cap_Catalog::label( $cap );
 				printf(
 					'<label class="rw-cap" data-search="%1$s"><input type="checkbox" name="caps[]" value="%2$s"%3$s /> %4$s <code>%2$s</code></label>',

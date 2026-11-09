@@ -38,7 +38,16 @@ final class Admin_Page {
 	}
 
 	private static function page_url( string $scope, string $target, array $extra = array() ): string {
-		return add_query_arg( array_merge( array( 'page' => self::SLUG, $scope => $target ), $extra ), admin_url( 'admin.php' ) );
+		return add_query_arg(
+			array_merge(
+				array(
+					'page' => self::SLUG,
+					$scope => $target,
+				),
+				$extra
+			),
+			admin_url( 'admin.php' )
+		);
 	}
 
 	private static function menu_label( $title ): string {

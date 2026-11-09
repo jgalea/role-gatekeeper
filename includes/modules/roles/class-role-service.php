@@ -287,13 +287,13 @@ final class Role_Service {
 	public static function core_defaults(): array {
 		require_once ABSPATH . 'wp-admin/includes/schema.php';
 		global $wp_roles;
-		$live               = $wp_roles;
-		$tmp                = new \WP_Roles();
-		$tmp->use_db        = false;
-		$tmp->roles         = array();
-		$tmp->role_objects  = array();
-		$tmp->role_names    = array();
-		$wp_roles           = $tmp; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- restored below.
+		$live              = $wp_roles;
+		$tmp               = new \WP_Roles();
+		$tmp->use_db       = false;
+		$tmp->roles        = array();
+		$tmp->role_objects = array();
+		$tmp->role_names   = array();
+		$wp_roles          = $tmp; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- restored below.
 		try {
 			populate_roles();
 			$roles = $tmp->roles;

@@ -64,7 +64,10 @@ final class Access {
 
 	public static function message_tags(): array {
 		return array(
-			'a'      => array( 'href' => true, 'title' => true ),
+			'a'      => array(
+				'href'  => true,
+				'title' => true,
+			),
 			'strong' => array(),
 			'em'     => array(),
 			'br'     => array(),
@@ -149,7 +152,7 @@ final class Access {
 
 	public static function mark_uncacheable(): void {
 		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
-			define( 'DONOTCACHEPAGE', true );
+			define( 'DONOTCACHEPAGE', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- the constant caching plugins look for.
 		}
 		if ( ! headers_sent() ) {
 			nocache_headers();
@@ -187,8 +190,8 @@ final class Access {
 		}
 		if ( $hidden ) {
 			global $wpdb;
-			$marks = implode( ',', array_fill( 0, count( $hidden ), '%d' ) );
-			$kids  = $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'attachment' AND post_parent IN ($marks)", $hidden ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders
+			$marks  = implode( ',', array_fill( 0, count( $hidden ), '%d' ) );
+			$kids   = $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'attachment' AND post_parent IN ($marks)", $hidden ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders
 			$hidden = array_merge( $hidden, array_map( 'intval', (array) $kids ) );
 		}
 		self::$hidden[ $uid ] = array_values( array_unique( $hidden ) );

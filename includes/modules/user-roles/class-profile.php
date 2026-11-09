@@ -39,7 +39,7 @@ final class Profile {
 	 * @return string[]
 	 */
 	private static function posted_list( string $key ): array {
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- callers verify the nonce first.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- callers verify the nonce first; each slug goes through Users::clean_slugs.
 		$raw = isset( $_POST[ $key ] ) && is_array( $_POST[ $key ] ) ? wp_unslash( $_POST[ $key ] ) : array();
 		return Users::clean_slugs( array_filter( $raw, 'is_string' ) );
 	}
@@ -82,9 +82,15 @@ final class Profile {
 					sprintf(
 						/* translators: %s: role names */
 						__( 'Also holds, and you can\'t change: %s', 'rolewright' ),
-						implode( ', ', array_map( function ( $r ) use ( $names ) {
-							return translate_user_role( $names[ $r ] ?? $r );
-						}, $locked ) )
+						implode(
+							', ',
+							array_map(
+								function ( $r ) use ( $names ) {
+									return translate_user_role( $names[ $r ] ?? $r );
+								},
+								$locked
+							)
+						)
 					)
 				) . '</p>';
 			}
@@ -108,8 +114,8 @@ final class Profile {
 				}
 			}
 		}
-		$direct = Users::direct_caps( $user->ID );
-		$all   += $direct;
+		$direct     = Users::direct_caps( $user->ID );
+		$all       += $direct;
 		$from_roles = Guard::caps_from_roles( Users::raw_roles( $user->ID ), $roles_caps );
 		ksort( $all );
 

@@ -29,7 +29,7 @@ final class Abilities {
 		if ( ! function_exists( 'wp_register_ability' ) ) {
 			return;
 		}
-		$str = array( 'type' => 'string' );
+		$str  = array( 'type' => 'string' );
 		$bool = array( 'type' => 'boolean' );
 
 		$this->add(

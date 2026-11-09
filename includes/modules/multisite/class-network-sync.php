@@ -50,26 +50,26 @@ final class Network_Sync {
 			return new \WP_Error( 'rolewright_no_role', __( 'The source site has none of the chosen roles.', 'rolewright' ) );
 		}
 		$job = array(
-			'id'          => wp_generate_password( 16, false, false ),
-			'actor'       => $actor,
-			'source'      => $source_site,
-			'network'     => get_current_network_id(),
-			'roles'       => $picked,
-			'mode'        => 'merge' === $mode ? 'merge' : 'replace',
-			'users'       => $users,
-			'offset'      => 0,
-			'total'       => (int) get_sites(
+			'id'         => wp_generate_password( 16, false, false ),
+			'actor'      => $actor,
+			'source'     => $source_site,
+			'network'    => get_current_network_id(),
+			'roles'      => $picked,
+			'mode'       => 'merge' === $mode ? 'merge' : 'replace',
+			'users'      => $users,
+			'offset'     => 0,
+			'total'      => (int) get_sites(
 				array(
 					'count'      => true,
 					'network_id' => get_current_network_id(),
 					'number'     => 0,
 				)
 			),
-			'sites_done'  => 0,
-			'roles_done'  => 0,
-			'users_done'  => 0,
-			'errors'      => array(),
-			'finished'    => false,
+			'sites_done' => 0,
+			'roles_done' => 0,
+			'users_done' => 0,
+			'errors'     => array(),
+			'finished'   => false,
 		);
 		self::save( $job );
 		return $job;
@@ -115,7 +115,7 @@ final class Network_Sync {
 			if ( $site_id === (int) $job['source'] ) {
 				continue;
 			}
-			$result = self::apply_to_site( $site_id, $job['roles'], $job['mode'], $actor );
+			$result             = self::apply_to_site( $site_id, $job['roles'], $job['mode'], $actor );
 			$job['roles_done'] += $result['roles'];
 			foreach ( $result['errors'] as $error ) {
 				$job['errors'][] = $error;
@@ -179,7 +179,7 @@ final class Network_Sync {
 					$out['errors'][] = sprintf( __( 'Site %1$d: %2$s', 'rolewright' ), $site_id, $written->get_error_message() );
 				} else {
 					foreach ( $changes as $slug => $def ) {
-						$out['roles']++;
+						++$out['roles'];
 						do_action(
 							'rolewright_changed',
 							null === $events[ $slug ] ? 'role.created' : 'caps.updated',
@@ -215,7 +215,7 @@ final class Network_Sync {
 				)
 			);
 			foreach ( $ids as $id ) {
-				$user = new \WP_User( (int) $id, '', $source_site );
+				$user  = new \WP_User( (int) $id, '', $source_site );
 				$roles = array_values( array_filter( (array) $user->roles, 'is_string' ) );
 				if ( $roles ) {
 					$out[ (int) $id ] = $roles;
@@ -267,7 +267,7 @@ final class Network_Sync {
 				foreach ( array_slice( $ok, 1 ) as $role ) {
 					$user->add_role( $role );
 				}
-				$out['users']++;
+				++$out['users'];
 				do_action(
 					'rolewright_changed',
 					'user.roles',

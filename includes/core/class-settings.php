@@ -58,7 +58,7 @@ final class Settings {
 			wp_die( esc_html__( 'You do not have permission to do that.', 'rolewright' ), '', array( 'response' => 403 ) );
 		}
 		check_admin_referer( 'rolewright_save_modules' );
-		$posted = isset( $_POST['modules'] ) && is_array( $_POST['modules'] ) ? array_map( 'sanitize_key', array_keys( wp_unslash( $_POST['modules'] ) ) ) : array();
+		$posted = isset( $_POST['modules'] ) && is_array( $_POST['modules'] ) ? array_map( 'sanitize_key', array_keys( wp_unslash( $_POST['modules'] ) ) ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- only the keys are read, each through sanitize_key.
 		$map    = array();
 		foreach ( Plugin::modules() as $module ) {
 			$map[ $module->id() ] = in_array( $module->id(), $posted, true );

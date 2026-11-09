@@ -15,7 +15,7 @@ final class Plugin {
 
 		foreach ( self::discover() as $module ) {
 			self::$modules[ $module->id() ] = $module;
-			$on = array_key_exists( $module->id(), $enabled ) ? (bool) $enabled[ $module->id() ] : $module->default_enabled();
+			$on                             = array_key_exists( $module->id(), $enabled ) ? (bool) $enabled[ $module->id() ] : $module->default_enabled();
 			if ( 'safety' === $module->id() || $on ) {
 				$module->init();
 			}

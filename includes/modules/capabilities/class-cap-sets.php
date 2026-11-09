@@ -20,15 +20,15 @@ final class Cap_Sets {
 	 */
 	public static function definitions(): array {
 		return array(
-			'create'   => array(
+			'create'  => array(
 				'label'       => __( 'Separate create capabilities', 'rolewright' ),
 				'description' => __( 'Adds create_posts and create_pages so adding new content can be allowed apart from editing it.', 'rolewright' ),
 			),
-			'terms'    => array(
+			'terms'   => array(
 				'label'       => __( 'Category and tag capabilities', 'rolewright' ),
 				'description' => __( 'Adds edit, delete and assign capabilities for categories and tags, and manage, edit, delete and assign capabilities for tags.', 'rolewright' ),
 			),
-			'privacy'  => array(
+			'privacy' => array(
 				'label'       => __( 'Privacy capabilities', 'rolewright' ),
 				'description' => __( 'Adds export_others_personal_data, erase_others_personal_data and manage_privacy_options as their own capabilities (single sites only).', 'rolewright' ),
 			),
@@ -190,9 +190,14 @@ final class Cap_Sets {
 					}
 				}
 			}
-			$add = array_values( array_filter( array_unique( $add ), function ( $c ) use ( $caps ) {
-				return empty( $caps[ $c ] );
-			} ) );
+			$add = array_values(
+				array_filter(
+					array_unique( $add ),
+					function ( $c ) use ( $caps ) {
+						return empty( $caps[ $c ] );
+					}
+				)
+			);
 			if ( $add ) {
 				$out[ $role ] = $add;
 			}
