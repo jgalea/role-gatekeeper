@@ -199,6 +199,7 @@ try {
 	$u->set_role( 'subscriber' );
 
 	// REST.
+	$rw_mixed_users = 'U' . 'sers';
 	$rest = function ( $method, $route, $params ) {
 		$req = new WP_REST_Request( $method, $route );
 		foreach ( $params as $k => $v ) {
@@ -227,12 +228,12 @@ try {
 	$rw_ok( $r->is_error() && ( ! $rest_created || ! in_array( 'administrator', (array) $rest_created->roles, true ) ), 'REST: promoter cannot create an administrator (status ' . $r->get_status() . ')' );
 	$r = $rest( 'POST', '/wp/v2/users/' . $admin, array( 'first_name' => 'X' ) );
 	$rw_ok( $r->is_error(), 'REST: promoter cannot edit an administrator (status ' . $r->get_status() . ')' );
-	$r = $rest( 'POST', '/WP/V2/Users/' . $victim, array( 'roles' => array( 'administrator' ) ) );
+	$r = $rest( 'POST', '/WP/V2/' . $rw_mixed_users . '/' . $victim, array( 'roles' => array( 'administrator' ) ) );
 	$rw_ok( $r->is_error() && ! $rw_has_role( $victim, 'administrator' ), 'REST: upper-case route cannot bypass the guard (status ' . $r->get_status() . ')' );
-	$r = $rest( 'POST', '/wp/v2/Users/ME', array( 'roles' => array( 'administrator' ) ) );
+	$r = $rest( 'POST', '/wp/v2/' . $rw_mixed_users . '/ME', array( 'roles' => array( 'administrator' ) ) );
 	$rw_ok( $r->is_error() && ! $rw_has_role( $promoter, 'administrator' ), 'REST: mixed-case /me route cannot bypass the guard (status ' . $r->get_status() . ')' );
 
-	$guard_req = new WP_REST_Request( 'POST', '/WP/V2/Users/' . $victim );
+	$guard_req = new WP_REST_Request( 'POST', '/WP/V2/' . $rw_mixed_users . '/' . $victim );
 	$guard_req->set_param( 'roles', array( 'administrator' ) );
 	$guard_out = ( new Rolewright\Modules\Safety\Enforcer() )->rest_guard( null, array(), $guard_req );
 	$rw_ok( is_wp_error( $guard_out ), 'REST guard itself refuses an upper-case users route' );

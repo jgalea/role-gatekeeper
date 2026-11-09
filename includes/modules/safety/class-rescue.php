@@ -98,7 +98,22 @@ final class Rescue {
 			home_url( '/' ),
 			$url
 		);
-		return (bool) wp_mail( $user->user_email, $subject, $body );
+		$to = $user->user_email;
+		// Mail delivery speed depends on the address, so on web requests it runs after the response has been sent.
+		if ( ! ( defined( 'WP_CLI' ) && WP_CLI ) && apply_filters( 'rolewright_rescue_defer_mail', true ) ) {
+			add_action(
+				'shutdown',
+				function () use ( $to, $subject, $body ) {
+					if ( function_exists( 'fastcgi_finish_request' ) ) {
+						fastcgi_finish_request();
+					}
+					wp_mail( $to, $subject, $body );
+				},
+				PHP_INT_MAX
+			);
+			return true;
+		}
+		return (bool) wp_mail( $to, $subject, $body );
 	}
 
 	private static function pad( float $start ): void {
