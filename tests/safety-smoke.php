@@ -357,6 +357,23 @@ remove_filter( 'pre_wp_mail', $rw_capture_mail, 10 );
 if ( is_multisite() ) {
 	require_once ABSPATH . 'wp-admin/includes/ms.php';
 }
+$ip_d     = '198.18.0.' . wp_rand( 1, 250 );
+$rw_ips[] = $ip_d;
+delete_transient( 'rolewright_rl_' . md5( 'acct|' . $admin ) );
+delete_user_meta( $admin, Rescue::META );
+add_filter( 'rolewright_rescue_defer_mail', '__return_true' );
+add_filter( 'rolewright_rescue_can_detach', '__return_false' );
+$rw_mails = array();
+add_filter( 'pre_wp_mail', $rw_capture_mail, 10, 2 );
+Rescue::request( get_userdata( $admin )->user_email, $ip_d );
+$rw_ok( 0 === count( $rw_mails ) && ! get_user_meta( $admin, Rescue::META, true ) && false !== wp_next_scheduled( Rescue::HOOK_DELIVER, array( $admin ) ), 'rescue: with no way to detach, delivery is scheduled and nothing runs in the request' );
+Rescue::deliver_by_id( $admin );
+$rw_ok( 1 === count( $rw_mails ) && is_array( get_user_meta( $admin, Rescue::META, true ) ), 'rescue: the scheduled delivery sends the mail and stores the hashed token' );
+remove_filter( 'pre_wp_mail', $rw_capture_mail, 10 );
+wp_clear_scheduled_hook( Rescue::HOOK_DELIVER, array( $admin ) );
+remove_filter( 'rolewright_rescue_defer_mail', '__return_true' );
+remove_filter( 'rolewright_rescue_can_detach', '__return_false' );
+delete_user_meta( $admin, Rescue::META );
 foreach ( array_unique( $rw_users ) as $uid ) {
 	if ( is_multisite() ) {
 		wpmu_delete_user( $uid );

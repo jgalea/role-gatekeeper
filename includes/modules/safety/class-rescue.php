@@ -11,6 +11,7 @@ final class Rescue {
 	const ACTION_REQUEST = 'rolewright_rescue';
 	const ACTION_USE     = 'rolewright_rescue_use';
 	const META           = 'rolewright_rescue_token';
+	const HOOK_DELIVER   = 'rolewright_rescue_deliver';
 	const FLOOR          = 0.25;
 	const TTL            = 900;
 	const LIMIT          = 3;
@@ -18,6 +19,7 @@ final class Rescue {
 
 	public function register(): void {
 		add_action( 'login_footer', array( $this, 'footer_link' ) );
+		add_action( self::HOOK_DELIVER, array( __CLASS__, 'deliver_by_id' ) );
 		add_action( 'login_form_' . self::ACTION_REQUEST, array( $this, 'request_page' ) );
 		add_action( 'login_form_' . self::ACTION_USE, array( $this, 'use_page' ) );
 	}
@@ -73,11 +75,44 @@ final class Rescue {
 		if ( ! $within || ! $user || ! $acct || ! self::is_eligible( $user ) ) {
 			return false;
 		}
+		if ( ! apply_filters( 'rolewright_rescue_defer_mail', ! ( defined( 'WP_CLI' ) && WP_CLI ) ) ) {
+			return self::deliver( $user );
+		}
+		// Token creation and mail delivery depend on the address, so on web requests they never run before the response.
+		$can_detach = apply_filters( 'rolewright_rescue_can_detach', function_exists( 'fastcgi_finish_request' ) || function_exists( 'litespeed_finish_request' ) );
+		if ( $can_detach ) {
+			add_action(
+				'shutdown',
+				function () use ( $user ) {
+					if ( function_exists( 'fastcgi_finish_request' ) ) {
+						fastcgi_finish_request();
+					} elseif ( function_exists( 'litespeed_finish_request' ) ) {
+						litespeed_finish_request();
+					}
+					self::deliver( $user );
+				},
+				PHP_INT_MAX
+			);
+			return true;
+		}
+		wp_schedule_single_event( time(), self::HOOK_DELIVER, array( (int) $user->ID ) );
+		return true;
+	}
+
+	public static function deliver_by_id( $user_id ): void {
+		$user = get_userdata( (int) $user_id );
+		if ( $user && self::is_eligible( $user ) ) {
+			self::deliver( $user );
+		}
+	}
+
+	private static function deliver( \WP_User $user ): bool {
+		$token = bin2hex( random_bytes( 32 ) );
 		update_user_meta(
 			$user->ID,
 			self::META,
 			array(
-				'hash'    => $hash,
+				'hash'    => hash( 'sha256', $token ),
 				'expires' => time() + self::TTL,
 			)
 		);
@@ -98,22 +133,7 @@ final class Rescue {
 			home_url( '/' ),
 			$url
 		);
-		$to = $user->user_email;
-		// Mail delivery speed depends on the address, so on web requests it runs after the response has been sent.
-		if ( ! ( defined( 'WP_CLI' ) && WP_CLI ) && apply_filters( 'rolewright_rescue_defer_mail', true ) ) {
-			add_action(
-				'shutdown',
-				function () use ( $to, $subject, $body ) {
-					if ( function_exists( 'fastcgi_finish_request' ) ) {
-						fastcgi_finish_request();
-					}
-					wp_mail( $to, $subject, $body );
-				},
-				PHP_INT_MAX
-			);
-			return true;
-		}
-		return (bool) wp_mail( $to, $subject, $body );
+		return (bool) wp_mail( $user->user_email, $subject, $body );
 	}
 
 	private static function pad( float $start ): void {
