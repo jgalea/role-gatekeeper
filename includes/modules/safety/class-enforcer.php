@@ -27,6 +27,7 @@ final class Enforcer {
 		add_filter( 'add_user_metadata', array( $this, 'user_meta_guard' ), PHP_INT_MAX, 4 );
 		add_action( 'user_register', array( $this, 'after_register' ), PHP_INT_MAX );
 		add_filter( 'pre_update_option', array( $this, 'roles_option_guard' ), PHP_INT_MAX, 3 );
+		add_filter( 'pre_update_option_default_role', array( $this, 'default_role_guard' ), PHP_INT_MAX, 2 );
 	}
 
 	/**
@@ -134,7 +135,7 @@ final class Enforcer {
 		if ( is_wp_error( $response ) || ! $request instanceof \WP_REST_Request ) {
 			return $response;
 		}
-		if ( ! preg_match( '#^/wp/v2/users(?:/(\d+|me))?/?$#', $request->get_route(), $m ) || 'GET' === $request->get_method() ) {
+		if ( ! preg_match( '#^/+wp/v2/users(?:/+(\d+|me))?/*$#i', $request->get_route(), $m ) || 'GET' === $request->get_method() ) {
 			return $response;
 		}
 		$actor = self::actor();
@@ -143,7 +144,7 @@ final class Enforcer {
 		}
 		$target = 0;
 		if ( isset( $m[1] ) ) {
-			$target = 'me' === $m[1] ? $actor : (int) $m[1];
+			$target = 'me' === strtolower( $m[1] ) ? $actor : (int) $m[1];
 		}
 		if ( $target && 'DELETE' !== $request->get_method() && ! Guard::can_act_on_user( $actor, $target ) ) {
 			return new \WP_Error( 'rolewright_user_above_actor', __( 'You can\'t edit a user who holds capabilities you don\'t have.', 'rolewright' ), array( 'status' => 403 ) );
@@ -240,6 +241,26 @@ final class Enforcer {
 			);
 			do_action( 'rolewright_escalation_blocked', 'new_user', $actor, (int) $user_id, $extra );
 		}
+	}
+
+	/**
+	 * The role new registrations get is a role assignment. A logged-in non-super-admin may only
+	 * pick a role they could assign themselves.
+	 *
+	 * @param mixed $value
+	 * @param mixed $old
+	 * @return mixed
+	 */
+	public function default_role_guard( $value, $old ) {
+		$actor = self::actor();
+		if ( ! $actor || Guard::is_super( $actor ) || self::$system > 0 || $value === $old ) {
+			return $value;
+		}
+		if ( ! Guard::can_assign_role( $actor, (string) $value, 0 ) ) {
+			do_action( 'rolewright_escalation_blocked', 'default_role', $actor, 0, array( (string) $value ) );
+			return $old;
+		}
+		return $value;
 	}
 
 	/**
