@@ -61,17 +61,24 @@ final class Hierarchy {
 			return self::TOP;
 		}
 		$obj = get_role( $role );
+		return $obj ? self::default_position_for_caps( (array) $obj->capabilities ) : 0;
+	}
+
+	/**
+	 * Position a role with these caps would get when nothing is stored for it.
+	 *
+	 * @param array $caps list or map
+	 */
+	public static function default_position_for_caps( array $caps ): int {
 		$pos = 0;
-		if ( $obj ) {
-			foreach ( (array) $obj->capabilities as $cap => $grant ) {
-				if ( ! $grant ) {
-					continue;
-				}
-				if ( preg_match( '/^level_(\d+)$/', (string) $cap, $m ) ) {
-					$pos = max( $pos, (int) $m[1] * 10 );
-				} elseif ( in_array( $cap, array( 'promote_users', 'edit_users', 'create_users', 'delete_users' ), true ) ) {
-					$pos = max( $pos, 90 );
-				}
+		foreach ( Guard::normalize_caps( $caps ) as $cap => $grant ) {
+			if ( ! $grant ) {
+				continue;
+			}
+			if ( preg_match( '/^level_(\d+)$/', (string) $cap, $m ) ) {
+				$pos = max( $pos, (int) $m[1] * 10 );
+			} elseif ( in_array( $cap, array( 'promote_users', 'edit_users', 'create_users', 'delete_users' ), true ) ) {
+				$pos = max( $pos, 90 );
 			}
 		}
 		return min( self::MAX_EDITABLE, $pos );
@@ -141,6 +148,37 @@ final class Hierarchy {
 		return new \WP_Error(
 			'rolewright_role_above_position',
 			__( 'That role is at or above your own position in the role hierarchy.', 'rolewright' ),
+			array( 'status' => 403 )
+		);
+	}
+
+	/**
+	 * Position $role would sit at with $new_caps: its stored position if one is set,
+	 * otherwise the default for those caps.
+	 *
+	 * @param array $new_caps list or map
+	 */
+	public static function projected_position( string $role, array $new_caps ): int {
+		if ( 'administrator' === $role ) {
+			return self::TOP;
+		}
+		$stored = self::stored();
+		return isset( $stored[ $role ] ) ? $stored[ $role ] : self::default_position_for_caps( $new_caps );
+	}
+
+	/**
+	 * Refuses a create or cap change that would leave the role at or above the actor.
+	 *
+	 * @param array $new_caps list or map
+	 * @return true|\WP_Error
+	 */
+	public static function assert_can_place_role( int $actor_id, string $role, array $new_caps ) {
+		if ( self::is_top( $actor_id ) || self::projected_position( $role, $new_caps ) < self::user_position( $actor_id ) ) {
+			return true;
+		}
+		return new \WP_Error(
+			'rolewright_role_above_position',
+			__( 'That change would put the role at or above your own position in the role hierarchy.', 'rolewright' ),
 			array( 'status' => 403 )
 		);
 	}

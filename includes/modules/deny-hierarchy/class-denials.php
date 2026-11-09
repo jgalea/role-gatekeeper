@@ -81,7 +81,7 @@ final class Denials {
 				continue;
 			}
 			foreach ( $map[ $role ] as $cap ) {
-				if ( $admin && in_array( $cap, Caps::all(), true ) ) {
+				if ( $admin && ( 'read' === $cap || Guard::is_critical_cap( $cap ) || in_array( $cap, Caps::all(), true ) ) ) {
 					continue;
 				}
 				$denied[ $cap ][] = $role;
@@ -199,6 +199,21 @@ final class Denials {
 			}
 		}
 
+		if ( ! $super ) {
+			$holders = get_users(
+				array(
+					'role'   => $role,
+					'fields' => 'ID',
+					'number' => 500,
+				)
+			);
+			foreach ( $holders as $holder_id ) {
+				if ( (int) $holder_id !== $actor_id && ! Guard::can_act_on_user( $actor_id, (int) $holder_id ) ) {
+					return new \WP_Error( 'rolewright_holder_above_actor', __( 'You can\'t change denials on this role because some users who hold it have more capabilities than you.', 'rolewright' ) );
+				}
+			}
+		}
+
 		$clean   = array();
 		$invalid = array();
 		foreach ( $denied as $cap ) {
@@ -223,6 +238,22 @@ final class Denials {
 		}
 		$clean = array_values( array_unique( $clean ) );
 		sort( $clean );
+
+		if ( ! $super ) {
+			$unheld = array();
+			foreach ( array_diff( $clean, self::for_role( $role ) ) as $cap ) {
+				if ( Guard::is_critical_cap( $cap ) && ! Guard::can_grant_cap( $actor_id, $cap ) ) {
+					$unheld[] = $cap;
+				}
+			}
+			if ( $unheld ) {
+				return new \WP_Error(
+					'rolewright_role_above_actor',
+					/* translators: %s: comma-separated capability names */
+					sprintf( __( 'You can\'t deny these capabilities because you don\'t hold them yourself: %s.', 'rolewright' ), implode( ', ', $unheld ) )
+				);
+			}
+		}
 
 		$protected = array();
 		foreach ( $clean as $cap ) {

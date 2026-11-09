@@ -178,6 +178,11 @@ try {
 	$rw_ok( ! $rw_fresh_can( $admin2, 'edit_posts' ), 'other denials still apply to that administrator' );
 	$rw_ok( ! $rw_fresh_can( $ops, Caps::MANAGE ), 'non-administrator holding the same role loses rolewright_manage' );
 	Denials::save( $admin, $r_junior, array() );
+	$rw_ok( true === Denials::save( $admin, $r_junior, array( 'manage_options', 'read' ) ), 'setup: deny manage_options and read on a secondary role of an administrator' );
+	$rw_ok( $rw_fresh_can( $admin2, 'manage_options' ) && $rw_fresh_can( $admin2, 'read' ), 'administrator with a denying secondary role keeps manage_options and read' );
+	$rw_ok( ! empty( Guard::user_caps( $admin2 )['manage_options'] ), 'Guard still sees manage_options on that administrator' );
+	$rw_ok( ! $rw_fresh_can( $junior, 'read' ), 'non-administrator holding that role loses read' );
+	Denials::save( $admin, $r_junior, array() );
 
 	// Direct option tampering cannot strip an administrator of plugin caps either.
 	update_option( Denials::OPTION, array( 'administrator' => array( Caps::MANAGE ) ) );
@@ -191,6 +196,26 @@ try {
 	Denials::save( $admin, $r_peer, array() );
 
 	$rw_ok( true === Hierarchy::save_positions( $admin, array( $r_ops => 80 ) ), 'setup: ops role at 80' );
+
+	// A delegated actor can't save a denial on a role an administrator holds.
+	$res = Denials::save( $ops, $r_junior, array( 'edit_posts' ) );
+	$rw_ok( is_wp_error( $res ) && 'rolewright_holder_above_actor' === $res->get_error_code() && array() === Denials::for_role( $r_junior ), 'delegated actor cannot set denials on a role held by an administrator (' . $rw_code( $res ) . ')' );
+	Enforcer::as_system(
+		function () use ( $admin2, $r_junior ) {
+			( new WP_User( $admin2 ) )->remove_role( $r_junior );
+		}
+	);
+	clean_user_cache( $admin2 );
+	$rw_ok( true === Denials::save( $ops, $r_junior, array( 'edit_posts' ) ), 'control: same denial saves once no administrator holds the role' );
+	Denials::save( $admin, $r_junior, array() );
+
+	// A delegated actor can't deny critical caps they don't hold.
+	$res = Denials::save( $ops, $r_junior, array( 'manage_options' ) );
+	$rw_ok( is_wp_error( $res ) && 'rolewright_role_above_actor' === $res->get_error_code() && array() === Denials::for_role( $r_junior ), 'delegated actor cannot deny manage_options (' . $rw_code( $res ) . ')' );
+	Denials::save( $admin, $r_junior, array( 'manage_options' ) );
+	$rw_ok( true === Denials::save( $ops, $r_junior, array( 'edit_posts', 'manage_options' ) ), 'delegated actor can still edit other denials on a role carrying an existing critical denial' );
+	Denials::save( $admin, $r_junior, array() );
+
 	$res = Denials::save( $ops, $r_junior, array( Caps::MANAGE ) );
 	$rw_ok( is_wp_error( $res ) && 'rolewright_lockout' === $res->get_error_code() && in_array( 'manage', (array) $res->get_error_data()['reasons'], true ), 'refuses a denial set that locks the actor out of Rolewright (' . $rw_code( $res ) . ')' );
 	$rw_ok( $rw_fresh_can( $ops, Caps::MANAGE ), 'lockout attempt left the actor\'s access intact' );
@@ -231,6 +256,35 @@ try {
 	$rw_ok( is_wp_error( Hierarchy::save_positions( $manager, array( $r_junior => 50 ) ) ), 'manager cannot raise a role to their own position' );
 	$rw_ok( true === Hierarchy::save_positions( $manager, array( $r_junior => 40 ) ) && 40 === Hierarchy::role_position( $r_junior ), 'manager can move a role below them to a position below them' );
 	Hierarchy::save_positions( $admin, array( $r_junior => 10 ) );
+
+	// Cap changes and new roles can't land at or above the actor's position.
+	$r_low = $rw_role( 'low', array( 'read' => true ) );
+	$rw_ok( 0 === Hierarchy::role_position( $r_low ), 'setup: unpositioned low role sits at 0' );
+	$res = Guard::assert_can_modify_role( $manager, $r_low, array( 'read' => true, 'promote_users' => true ) );
+	$rw_ok( is_wp_error( $res ) && 'rolewright_role_above_position' === $res->get_error_code(), 'manager cannot add user-management caps that raise a lower role to 90 (' . $rw_code( $res ) . ')' );
+	$res = Guard::assert_can_modify_role( $manager, $r_low, array( 'read' => true, 'level_7' => true ) );
+	$rw_ok( is_wp_error( $res ) && 'rolewright_role_above_position' === $res->get_error_code(), 'manager cannot add a level cap that raises a lower role to 70' );
+	$res = apply_filters( 'rolewright_role_change_veto', null, 'modify', $manager, $r_low, array( 'read' => true, 'level_1' => true ) );
+	$rw_ok( null === $res, 'control: a change that stays below the manager passes (' . $rw_code( $res ) . ')' );
+	$new_slug = 'rw_t_new_' . $rw_s;
+	$res      = Guard::assert_can_modify_role( $manager, $new_slug, array( 'read' => true, 'promote_users' => true ) );
+	$rw_ok( is_wp_error( $res ) && 'rolewright_role_above_position' === $res->get_error_code(), 'manager cannot create a role that would land above them (' . $rw_code( $res ) . ')' );
+	$res = apply_filters( 'rolewright_role_change_veto', null, 'modify', $manager, $new_slug, array( 'read' => true ) );
+	$rw_ok( null === $res, 'control: manager can create a role that lands below them (' . $rw_code( $res ) . ')' );
+	$rw_ok( true === Guard::assert_can_modify_role( $admin, $r_low, array( 'read' => true, 'promote_users' => true ) ), 'administrator is not limited by projected positions' );
+	$res = apply_filters( 'rolewright_role_change_veto', null, 'modify', $manager, $r_junior, array( 'read' => true, 'level_9' => true ) );
+	$rw_ok( null === $res, 'a stored position wins over the caps-derived default (' . $rw_code( $res ) . ')' );
+
+	$res = \Rolewright\Modules\Roles\Role_Service::clone_role( $manager, $r_senior, 'RW clone up ' . $rw_s );
+	if ( is_string( $res ) ) {
+		$rw_roles[] = $res;
+	}
+	$rw_ok( is_wp_error( $res ) && 'rolewright_role_above_position' === $res->get_error_code(), 'manager cannot clone a role above them (' . $rw_code( $res ) . ')' );
+	$res = \Rolewright\Modules\Roles\Role_Service::clone_role( $manager, $r_junior, 'RW clone down ' . $rw_s );
+	if ( is_string( $res ) ) {
+		$rw_roles[] = $res;
+	}
+	$rw_ok( ! is_wp_error( $res ) || 'rolewright_role_above_position' !== $res->get_error_code(), 'control: the hierarchy lets the manager clone a role below them (' . $rw_code( $res ) . ')' );
 
 	wp_set_current_user( $manager );
 	$editable = get_editable_roles();

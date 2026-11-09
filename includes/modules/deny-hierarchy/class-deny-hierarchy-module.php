@@ -35,15 +35,18 @@ final class Deny_Hierarchy_Module extends Module {
 		Hierarchy::register();
 		add_filter(
 			'rolewright_role_change_veto',
-			function ( $veto, $op, $actor, $role ) {
+			function ( $veto, $op, $actor, $role, $new_caps = null ) {
 				if ( $veto instanceof \WP_Error ) {
 					return $veto;
 				}
 				$check = Hierarchy::assert_can_manage_role( (int) $actor, (string) $role );
+				if ( ! is_wp_error( $check ) && 'modify' === $op && is_array( $new_caps ) ) {
+					$check = Hierarchy::assert_can_place_role( (int) $actor, (string) $role, $new_caps );
+				}
 				return is_wp_error( $check ) ? $check : $veto;
 			},
 			10,
-			4
+			5
 		);
 		if ( is_admin() ) {
 			( new Admin_Page() )->register();

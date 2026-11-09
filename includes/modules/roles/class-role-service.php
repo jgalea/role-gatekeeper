@@ -50,6 +50,10 @@ final class Role_Service {
 		if ( ! get_role( $source ) ) {
 			return new \WP_Error( 'rolewright_no_role', __( 'That role does not exist.', 'rolewright' ) );
 		}
+		$veto = apply_filters( 'rolewright_role_change_veto', null, 'clone', $actor, $source );
+		if ( $veto instanceof \WP_Error ) {
+			return $veto;
+		}
 		return self::create( $actor, $name, Role_Store::caps( $source ) );
 	}
 
@@ -214,7 +218,11 @@ final class Role_Service {
 	 * @return true|\WP_Error
 	 */
 	public static function reset( int $actor ) {
-		require_once ABSPATH . 'wp-admin/includes/schema.php';
+		$defaults = self::core_defaults();
+		$ok       = self::assert_can_reset( $actor, $defaults );
+		if ( is_wp_error( $ok ) ) {
+			return $ok;
+		}
 
 		$before = Role_Store::all();
 		$backup = self::store_backup( $actor, $before );
@@ -230,13 +238,8 @@ final class Role_Service {
 		}
 
 		Enforcer::as_system(
-			function () use ( $custom ) {
-				global $wp_roles;
-				delete_option( wp_roles()->role_key );
-				$wp_roles = new \WP_Roles();
-				populate_roles();
-				$wp_roles = new \WP_Roles();
-				$roles    = $wp_roles->roles;
+			function () use ( $custom, $defaults ) {
+				$roles = $defaults;
 				foreach ( $custom as $slug => $data ) {
 					$roles[ $slug ] = $data;
 				}
@@ -272,6 +275,79 @@ final class Role_Service {
 				'after'  => array( 'roles' => Role_Store::all() ),
 			)
 		);
+		return true;
+	}
+
+	/**
+	 * WordPress's default core roles, built in a throwaway WP_Roles so the live roles and
+	 * the stored option are untouched.
+	 *
+	 * @return array<string,array{name:string,capabilities:array<string,bool>}>
+	 */
+	public static function core_defaults(): array {
+		require_once ABSPATH . 'wp-admin/includes/schema.php';
+		global $wp_roles;
+		$live               = $wp_roles;
+		$tmp                = new \WP_Roles();
+		$tmp->use_db        = false;
+		$tmp->roles         = array();
+		$tmp->role_objects  = array();
+		$tmp->role_names    = array();
+		$wp_roles           = $tmp; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- restored below.
+		try {
+			populate_roles();
+			$roles = $tmp->roles;
+		} finally {
+			$wp_roles = $live; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+		}
+		$out = array();
+		foreach ( self::CORE_ROLES as $slug ) {
+			if ( isset( $roles[ $slug ] ) ) {
+				$out[ $slug ] = array(
+					'name'         => (string) $roles[ $slug ]['name'],
+					'capabilities' => Guard::normalize_caps( (array) $roles[ $slug ]['capabilities'] ),
+				);
+			}
+		}
+		if ( isset( $out['administrator'] ) ) {
+			foreach ( Caps::all() as $cap ) {
+				$out['administrator']['capabilities'][ $cap ] = true;
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * A reset rewrites every core role, so the actor must be a super admin or hold every
+	 * critical cap the defaults carry, and each core role's new cap set must pass the Guard.
+	 *
+	 * @param array<string,array{name:string,capabilities:array<string,bool>}> $defaults
+	 * @return true|\WP_Error
+	 */
+	private static function assert_can_reset( int $actor, array $defaults ) {
+		if ( ! $defaults ) {
+			return new \WP_Error( 'rolewright_reset_failed', __( 'The default roles could not be built, so nothing was changed.', 'rolewright' ) );
+		}
+		if ( ! Guard::is_super( $actor ) ) {
+			$needed = array();
+			foreach ( $defaults as $data ) {
+				$needed = array_merge( $needed, Guard::critical_subset( $data['capabilities'] ) );
+			}
+			$lacking = Guard::missing( array_values( array_unique( $needed ) ), Guard::user_caps( $actor ) );
+			if ( $lacking ) {
+				return new \WP_Error(
+					'rolewright_role_above_actor',
+					/* translators: %s: comma-separated capability names */
+					sprintf( __( 'Resetting the core roles needs every capability they carry by default, and you don\'t hold these: %s.', 'rolewright' ), implode( ', ', $lacking ) )
+				);
+			}
+		}
+		foreach ( $defaults as $slug => $data ) {
+			$ok = Guard::assert_can_modify_role( $actor, $slug, $data['capabilities'] );
+			if ( is_wp_error( $ok ) ) {
+				return $ok;
+			}
+		}
 		return true;
 	}
 

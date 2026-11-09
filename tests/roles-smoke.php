@@ -146,18 +146,58 @@ $rw_ok( count( $bk ) === $backups_before + 1 && isset( $bk[0]['roles']['editor']
 $ev = $rw_last( 'roles.reset' );
 $rw_ok( $ev && isset( $ev['before']['roles']['editor'] ), 'reset: fires roles.reset with before' );
 
-// A reset that would lock the actor out is rolled back.
+// Building the defaults leaves the live roles alone.
+$rw_live_obj = $GLOBALS['wp_roles'];
+get_role( 'editor' )->add_cap( 'rw_probe_' . $rw_suffix );
+$rw_defs = Role_Service::core_defaults();
+$rw_ok( $GLOBALS['wp_roles'] === $rw_live_obj && get_role( 'editor' )->has_cap( 'rw_probe_' . $rw_suffix ) && ! empty( $rw_defs['editor']['capabilities']['edit_others_posts'] ) && empty( $rw_defs['editor']['capabilities'][ 'rw_probe_' . $rw_suffix ] ) && ! empty( $rw_defs['administrator']['capabilities'][ Caps::MANAGE_ROLES ] ), 'reset: defaults built in memory, live roles untouched' );
+get_role( 'editor' )->remove_cap( 'rw_probe_' . $rw_suffix );
+
+// Escalation: a manager whose access comes from a custom role can't use reset to put back
+// caps they don't hold (editor's edit_others_posts) or critical caps (administrator defaults).
+wp_set_current_user( $rw_admin );
+$rw_bk_e = count( Role_Service::backups() );
+get_role( 'editor' )->remove_cap( 'edit_others_posts' );
+wp_set_current_user( $rw_low );
+$res = Role_Service::reset( $rw_low );
+$rw_ok( is_wp_error( $res ), 'reset: custom-role manager refused (' . ( is_wp_error( $res ) ? $res->get_error_code() : 'ok' ) . ')' );
+$rw_ok( ! get_role( 'editor' )->has_cap( 'edit_others_posts' ) && count( Role_Service::backups() ) === $rw_bk_e, 'reset: refused reset did not reinstate a cap the actor lacks' );
+wp_set_current_user( $rw_admin );
+get_role( 'editor' )->add_cap( 'edit_others_posts' );
+
+// A delegated role manager without the defaults' critical caps can't reset.
 $bk_n = count( Role_Service::backups() );
 wp_set_current_user( $rw_admin );
 $core_mgr = $rw_make( 'rw_roles_coremgr', 'editor' );
 get_role( 'editor' )->add_cap( Caps::MANAGE );
 get_role( 'editor' )->add_cap( Caps::MANAGE_ROLES );
+get_role( 'editor' )->remove_cap( 'moderate_comments' );
 wp_set_current_user( $core_mgr );
 $res = Role_Service::reset( $core_mgr );
-$rw_ok( is_wp_error( $res ) && 'rolewright_lockout' === $res->get_error_code(), 'reset: refused and rolled back when the actor would lose access' );
-$rw_ok( get_role( 'editor' )->has_cap( Caps::MANAGE_ROLES ), 'reset: roles restored after the refused reset' );
+$rw_ok( is_wp_error( $res ) && 'rolewright_role_above_actor' === $res->get_error_code(), 'reset: delegated manager without critical caps refused (' . ( is_wp_error( $res ) ? $res->get_error_code() : 'ok' ) . ')' );
+$rw_ok( get_role( 'editor' )->has_cap( Caps::MANAGE_ROLES ) && ! get_role( 'editor' )->has_cap( 'moderate_comments' ), 'reset: refused reset changed no role' );
 $rw_ok( count( Role_Service::backups() ) === $bk_n, 'reset: refused reset leaves no stray backup' );
+
+// An actor who holds everything only through a core role would be locked out: refused before writing.
 wp_set_current_user( $rw_admin );
+$rw_ed_saved = Role_Store::caps( 'editor' );
+\Rolewright\Modules\Safety\Enforcer::as_system(
+	function () {
+		Role_Store::set_caps( 'editor', Role_Store::caps( 'administrator' ) );
+	}
+);
+wp_set_current_user( $core_mgr );
+$res = Role_Service::reset( $core_mgr );
+$rw_ok( is_wp_error( $res ) && 'rolewright_lockout' === $res->get_error_code(), 'reset: refused when the actor would lose access (' . ( is_wp_error( $res ) ? $res->get_error_code() : 'ok' ) . ')' );
+$rw_ok( get_role( 'editor' )->has_cap( 'manage_options' ) && get_role( 'editor' )->has_cap( Caps::MANAGE_ROLES ), 'reset: roles unchanged after the lockout refusal' );
+$rw_ok( count( Role_Service::backups() ) === $bk_n, 'reset: lockout refusal leaves no stray backup' );
+wp_set_current_user( $rw_admin );
+\Rolewright\Modules\Safety\Enforcer::as_system(
+	function () use ( $rw_ed_saved ) {
+		Role_Store::set_caps( 'editor', $rw_ed_saved );
+	}
+);
+get_role( 'editor' )->add_cap( 'moderate_comments' );
 
 // Admin page renders and the handler-level checks hold.
 $rw_idle = Role_Service::create( $rw_admin, 'RW Idle ' . $rw_suffix );

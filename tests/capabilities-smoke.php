@@ -171,6 +171,22 @@ $rw_ok( 'create_posts' === $args['capabilities']['create_posts'], 'filter: post 
 $args = $sets->taxonomy_args( array(), 'post_tag' );
 $rw_ok( 'edit_post_tags' === $args['capabilities']['edit_terms'], 'filter: tag taxonomy gets its own caps' );
 $rw_ok( array( 'manage_privacy_options' ) === $sets->privacy_caps( array( 'manage_options' ), 'manage_privacy_options' ) || is_multisite(), 'filter: privacy cap maps to itself' );
+$rw_tx    = 0;
+$rw_count = function ( $t, $text, $domain ) use ( &$rw_tx ) {
+	if ( 'rolewright' === $domain ) {
+		++$rw_tx;
+	}
+	return $t;
+};
+add_filter( 'gettext', $rw_count, 10, 3 );
+Cap_Sets::enabled();
+Cap_Sets::is_enabled( 'privacy' );
+$sets->privacy_caps( array( 'manage_options' ), 'manage_privacy_options' );
+$sets->post_type_args( array(), 'post' );
+$sets->taxonomy_args( array(), 'category' );
+remove_filter( 'gettext', $rw_count, 10 );
+$rw_ok( 0 === $rw_tx, 'filters that can run before init translate nothing (' . $rw_tx . ' strings)' );
+$rw_ok( array_keys( Cap_Sets::definitions() ) === Cap_Sets::SET_IDS, 'set ids match the labelled definitions' );
 unregister_post_type( 'rwbook' );
 register_post_type( 'rwbook', array( 'public' => true, 'show_ui' => true ) );
 $obj = get_post_type_object( 'rwbook' );

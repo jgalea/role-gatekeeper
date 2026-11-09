@@ -130,7 +130,7 @@ final class Cap_Service {
 	 * @return true|\WP_Error
 	 */
 	public static function save_options( int $actor, array $sets, array $cpts ) {
-		$sets = array_values( array_intersect( array_keys( Cap_Sets::definitions() ), $sets ) );
+		$sets = array_values( array_intersect( Cap_Sets::SET_IDS, $sets ) );
 		$cpts = array_values( array_intersect( array_keys( Cap_Sets::eligible_post_types() ), $cpts ) );
 
 		$roles = array();

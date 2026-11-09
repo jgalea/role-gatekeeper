@@ -10,8 +10,14 @@ defined( 'ABSPATH' ) || exit;
 final class Cap_Sets {
 	const OPTION_SETS = 'rolewright_extra_cap_sets';
 	const OPTION_CPT  = 'rolewright_cpt_own_caps';
+	const SET_IDS     = array( 'create', 'terms', 'privacy' );
 
-	/** @return array<string,array{label:string,description:string}> */
+	/**
+	 * Labels for the admin screen. Filters that run before init use SET_IDS instead, so no
+	 * translation loads early.
+	 *
+	 * @return array<string,array{label:string,description:string}>
+	 */
 	public static function definitions(): array {
 		return array(
 			'create'   => array(
@@ -32,7 +38,7 @@ final class Cap_Sets {
 	/** @return string[] enabled set ids */
 	public static function enabled(): array {
 		$stored = get_option( self::OPTION_SETS, array() );
-		return is_array( $stored ) ? array_values( array_intersect( array_keys( self::definitions() ), array_map( 'strval', $stored ) ) ) : array();
+		return is_array( $stored ) ? array_values( array_intersect( self::SET_IDS, array_map( 'strval', $stored ) ) ) : array();
 	}
 
 	/** @return string[] post type slugs that use their own capabilities */

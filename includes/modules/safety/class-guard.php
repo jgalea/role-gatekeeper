@@ -394,7 +394,7 @@ final class Guard {
 	 * @return true|\WP_Error
 	 */
 	public static function assert_can_modify_role( int $actor_id, string $role, array $new_caps ) {
-		$veto = apply_filters( 'rolewright_role_change_veto', null, 'modify', $actor_id, $role );
+		$veto = apply_filters( 'rolewright_role_change_veto', null, 'modify', $actor_id, $role, $new_caps );
 		if ( $veto instanceof \WP_Error ) {
 			return $veto;
 		}
