@@ -1,0 +1,9 @@
+.rw-admin-ui .rw-picker { display: flex; flex-wrap: wrap; gap: 1.5em; margin: 1em 0; align-items: center; }
+.rw-admin-ui .rw-picker form { display: flex; gap: .5em; align-items: center; }
+.rw-admin-ui .rw-tree { columns: 3 260px; column-gap: 2em; }
+.rw-admin-ui .rw-group { break-inside: avoid; margin-bottom: 1em; }
+.rw-admin-ui .rw-group ul { margin: .3em 0 0 1.6em; }
+.rw-admin-ui .rw-box-group { margin: .5em 0; }
+.rw-admin-ui .rw-box-group ul { margin-left: 1.5em; }
+.rw-admin-ui .rw-plugins { max-width: 720px; }
+.rw-admin-ui .rw-plugins th:not(:first-child), .rw-admin-ui .rw-plugins td:not(:first-child) { text-align: center; width: 140px; }

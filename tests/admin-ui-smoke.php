@@ -1,0 +1,495 @@
+<?php
+/**
+ * Run: wp eval-file wp-content/plugins/rolewright/tests/admin-ui-smoke.php
+ */
+
+use Rolewright\Modules\Admin_Ui\Discovery;
+use Rolewright\Modules\Admin_Ui\Engine;
+use Rolewright\Modules\Admin_Ui\Enforcer;
+use Rolewright\Modules\Admin_Ui\Rules;
+use Rolewright\Modules\Safety\Caps;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit( 1 );
+}
+
+require_once ABSPATH . 'wp-admin/includes/admin.php';
+require_once ABSPATH . WPINC . '/class-wp-admin-bar.php';
+
+$rw_pass = 0;
+$rw_fail = 0;
+$rw_ok   = function ( $cond, $label ) use ( &$rw_pass, &$rw_fail ) {
+	if ( $cond ) {
+		++$rw_pass;
+		echo 'PASS ' . $label . "\n";
+	} else {
+		++$rw_fail;
+		echo 'FAIL ' . $label . "\n";
+	}
+};
+
+$sfx     = substr( md5( (string) microtime( true ) ), 0, 6 );
+$r_mgr   = 'rw_t_mgr_' . $sfx;
+$r_rest  = 'rw_t_rest_' . $sfx;
+$users   = array();
+$make    = function ( $login, $role ) use ( &$users, $sfx ) {
+	$id = wp_insert_user(
+		array(
+			'user_login' => $login . '_' . $sfx,
+			'user_email' => $login . '_' . $sfx . '@example.com',
+			'user_pass'  => wp_generate_password( 24 ),
+			'role'       => $role,
+		)
+	);
+	if ( is_wp_error( $id ) ) {
+		echo 'SETUP ERROR ' . $id->get_error_message() . "\n";
+		exit( 1 );
+	}
+	$users[] = (int) $id;
+	return (int) $id;
+};
+$code_of = function ( $r ) {
+	return is_wp_error( $r ) ? $r->get_error_code() : 'ok';
+};
+
+$saved_globals = array(
+	'menu'     => $GLOBALS['menu'] ?? null,
+	'submenu'  => $GLOBALS['submenu'] ?? null,
+	'pagenow'  => $GLOBALS['pagenow'] ?? null,
+	'plugin'   => $GLOBALS['plugin_page'] ?? null,
+	'boxes'    => $GLOBALS['wp_meta_boxes'] ?? null,
+	'rules'    => get_option( Rules::OPTION, null ),
+	'seen'     => get_option( Discovery::OPTION, null ),
+);
+
+add_filter(
+	'wp_die_handler',
+	function () {
+		return function ( $message ) {
+			throw new \RuntimeException( is_wp_error( $message ) ? $message->get_error_message() : wp_strip_all_tags( (string) $message ) );
+		};
+	}
+);
+$redirect_to = null;
+remove_all_filters( 'wp_redirect' );
+add_filter(
+	'wp_redirect',
+	function ( $location ) use ( &$redirect_to ) {
+		$redirect_to = $location;
+		return false;
+	}
+);
+$events = array();
+add_action(
+	'rolewright_changed',
+	function ( $type, $data ) use ( &$events ) {
+		$events[] = array( $type, $data );
+	},
+	10,
+	2
+);
+
+delete_option( Rules::OPTION );
+Rules::flush_cache();
+
+try {
+	$admin = $make( 'rw_admin', 'administrator' );
+	wp_set_current_user( $admin );
+	add_role(
+		$r_mgr,
+		'RW mgr',
+		array(
+			'read'                     => true,
+			Caps::MANAGE               => true,
+			Caps::MANAGE_ACCESS        => true,
+			'activate_plugins'         => true,
+			'delete_plugins'           => true,
+			'switch_themes'            => true,
+			'edit_theme_options'       => true,
+			'edit_posts'               => true,
+			'list_users'               => true,
+		)
+	);
+	add_role(
+		$r_rest,
+		'RW restricted',
+		array(
+			'read'               => true,
+			'edit_posts'         => true,
+			'list_users'         => true,
+			'activate_plugins'   => true,
+			'delete_plugins'     => true,
+			'switch_themes'      => true,
+			'edit_theme_options' => true,
+		)
+	);
+	$mgr     = $make( 'rw_mgr', $r_mgr );
+	$rest    = $make( 'rw_rest', $r_rest );
+	$rest2   = $make( 'rw_rest2', $r_rest );
+	$editor  = $make( 'rw_editor', 'editor' );
+
+	$menu    = array(
+		2  => array( 'Dashboard', 'read', 'index.php' ),
+		5  => array( 'Posts', 'edit_posts', 'edit.php' ),
+		20 => array( 'Pages', 'edit_posts', 'edit.php?post_type=page' ),
+		70 => array( 'Users', 'list_users', 'users.php' ),
+		75 => array( 'Tools', 'edit_posts', 'tools.php' ),
+		80 => array( 'Settings', 'edit_posts', 'options-general.php' ),
+		71 => array( 'Rolewright', 'read', 'rolewright' ),
+		60 => array( 'Appearance', 'edit_theme_options', 'themes.php' ),
+	);
+	$submenu = array(
+		'index.php'           => array( array( 'Home', 'read', 'index.php' ), array( 'Updates', 'read', 'update-core.php' ) ),
+		'edit.php'            => array( array( 'All Posts', 'edit_posts', 'edit.php' ), array( 'Categories', 'edit_posts', 'edit-tags.php?taxonomy=category' ) ),
+		'users.php'           => array( array( 'All Users', 'list_users', 'users.php' ), array( 'Profile', 'read', 'profile.php' ) ),
+		'tools.php'           => array( array( 'Available Tools', 'edit_posts', 'tools.php' ), array( 'Import', 'edit_posts', 'import.php' ) ),
+		'options-general.php' => array( array( 'General', 'edit_posts', 'options-general.php' ), array( 'Plugin Page', 'edit_posts', 'my-plugin-page' ) ),
+		'rolewright'          => array( array( 'Modules', 'read', 'rolewright' ), array( 'Admin interface', 'read', 'rolewright-admin-ui' ) ),
+		'themes.php'          => array( array( 'Themes', 'edit_theme_options', 'themes.php' ), array( 'Widgets', 'edit_theme_options', 'widgets.php' ), array( 'Menus', 'edit_theme_options', 'nav-menus.php' ) ),
+	);
+	Discovery::set_snapshot( $menu, $submenu );
+
+	// Sanitizing and exempt items.
+	$dirty = Rules::sanitize(
+		array(
+			'menu'      => array( 'model' => 'bogus', 'items' => array( 'users.php', '<script>', 'a b', str_repeat( 'x', 300 ) ) ),
+			'blocks'    => array( 'widgets', 'nope' ),
+			'plugins'   => array( 'locked' => array( 'hello.php', '../../evil.php', 'rolewright/rolewright.php', 'x.txt' ) ),
+			'metaboxes' => array( 'post' => array( 'postcustom', 'bad id!' ), 'Bad Type' => array() ),
+		)
+	);
+	$rw_ok( 'deny' === $dirty['menu']['model'] && array( 'users.php' ) === $dirty['menu']['items'], 'sanitize: unknown model falls back to deny, junk slugs dropped' );
+	$rw_ok( array( 'widgets' ) === $dirty['blocks'], 'sanitize: unknown block ids dropped' );
+	$rw_ok( array( 'hello.php' ) === $dirty['plugins']['locked'], 'sanitize: traversal, non-php and the Rolewright plugin itself dropped from plugin lists' );
+	$rw_ok( array( 'postcustom' ) === ( $dirty['metaboxes']['post'] ?? array() ) && 1 === count( $dirty['metaboxes'] ), 'sanitize: meta box ids validated' );
+
+	$deny_profile = Rules::save( $mgr, 'role', $r_rest, array( 'menu' => array( 'model' => 'deny', 'items' => array( 'profile.php' ) ) ) );
+	$rw_ok( 'rolewright_exempt_item' === $code_of( $deny_profile ), 'profile page cannot be blocked from the menu' );
+	$deny_sub = Rules::save( $mgr, 'role', $r_rest, array( 'menu' => array( 'model' => 'deny', 'items' => array( 'users.php|profile.php' ) ) ) );
+	$rw_ok( 'rolewright_exempt_item' === $code_of( $deny_sub ), 'profile submenu entry cannot be blocked' );
+	$deny_bar = Rules::save( $mgr, 'role', $r_rest, array( 'admin_bar' => array( 'my-account' ) ) );
+	$rw_ok( 'rolewright_exempt_item' === $code_of( $deny_bar ), 'my-account toolbar node cannot be hidden' );
+	$rw_ok( 'rolewright_protected_role' === $code_of( Rules::save( $mgr, 'role', 'administrator', array( 'blocks' => array( 'widgets' ) ) ) ), 'Administrator role cannot be restricted' );
+	$rw_ok( 'rolewright_protected_user' === $code_of( Rules::save( $mgr, 'user', (string) $admin, array( 'blocks' => array( 'widgets' ) ) ) ), 'administrator user cannot be restricted' );
+	$rw_ok( 'rolewright_no_role' === $code_of( Rules::save( $mgr, 'role', 'nonexistent_' . $sfx, array( 'blocks' => array( 'widgets' ) ) ) ), 'unknown role refused' );
+	$rw_ok( 'rolewright_forbidden' === $code_of( Rules::save( $editor, 'role', $r_rest, array( 'blocks' => array( 'widgets' ) ) ) ), 'actor without the access capability refused' );
+	$rw_ok( false === get_option( Rules::OPTION, false ), 'refused saves stored nothing' );
+
+	// Lockout pre-check.
+	$empty_allow = Rules::save( $mgr, 'role', $r_mgr, array( 'menu' => array( 'model' => 'allow', 'items' => array() ) ) );
+	$rw_ok( 'rolewright_lockout' === $code_of( $empty_allow ) && in_array( 'empty_allow_list', (array) $empty_allow->get_error_data()['reasons'], true ), 'allow model with nothing selected refused for the actor own role (lockout)' );
+	$self_user = Rules::save( $mgr, 'user', (string) $mgr, array( 'menu' => array( 'model' => 'allow', 'items' => array( 'rolewright' ) ) ) );
+	$rw_ok( 'rolewright_lockout' === $code_of( $self_user ), 'allow list with only the Rolewright entry refused for the actor own user rule' );
+	$rw_ok( false === get_option( Rules::OPTION, false ), 'lockout refusals stored nothing' );
+	$rw_ok( 'ok' === $code_of( Rules::save( $mgr, 'role', $r_rest, array( 'menu' => array( 'model' => 'allow', 'items' => array() ) ) ) ), 'empty allow list is fine for a role the actor does not hold' );
+	Rules::save( $mgr, 'role', $r_rest, array() );
+	$rw_ok( 'ok' === $code_of( Rules::save( $mgr, 'role', $r_mgr, array( 'menu' => array( 'model' => 'allow', 'items' => array( 'index.php', 'edit.php' ) ) ) ) ), 'allow list with real entries accepted for the actor own role' );
+	Rules::save( $mgr, 'role', $r_mgr, array() );
+	$rw_ok( 'ok' === $code_of( Rules::save( $mgr, 'role', $r_mgr, array( 'menu' => array( 'model' => 'deny', 'items' => array( 'rolewright', 'rolewright|rolewright-admin-ui', 'users.php' ) ) ) ) ), 'denying the Rolewright menu for a role holding the manage cap is accepted but never enforced' );
+
+	$eff_mgr = Rules::effective_for_user( $mgr );
+	$rw_ok( null !== $eff_mgr, 'effective rules computed for the manager' );
+	$can_manage = user_can( $mgr, Caps::MANAGE );
+	$rw_ok( $can_manage, 'manager holds the manage cap' );
+	$rw_ok( null === Engine::decide( 'admin.php', 'rolewright-admin-ui', array(), $menu, $submenu, $eff_mgr, true ), 'Rolewright admin-ui page is reachable even when its menu is in the deny list' );
+	$rw_ok( null === Engine::decide( 'admin.php', 'rolewright', array(), $menu, $submenu, $eff_mgr, true ), 'Rolewright top page reachable despite deny' );
+	$rw_ok( 'menu' === Engine::decide( 'admin.php', 'rolewright-admin-ui', array(), $menu, $submenu, $eff_mgr, false ), 'control: without the manage cap the same deny does block (exemption is what protects it)' );
+	wp_set_current_user( $mgr );
+	$GLOBALS['menu']    = $menu;
+	$GLOBALS['submenu'] = $submenu;
+	( new Enforcer() )->hide_menu();
+	$slugs = array_map(
+		function ( $i ) {
+			return $i[2];
+		},
+		$GLOBALS['menu']
+	);
+	$rw_ok( in_array( 'rolewright', $slugs, true ) && ! in_array( 'users.php', $slugs, true ), 'hide_menu removes users.php but keeps the Rolewright menu for a manage-cap holder' );
+	wp_set_current_user( $admin );
+	$GLOBALS['menu']    = $menu;
+	$GLOBALS['submenu'] = $submenu;
+	Rules::save( $mgr, 'role', $r_mgr, array() );
+
+	// Change event with before/after.
+	$events = array();
+	Rules::save( $mgr, 'role', $r_rest, array( 'menu' => array( 'model' => 'deny', 'items' => array( 'users.php', 'tools.php|import.php' ) ), 'blocks' => array( 'widgets', 'nav_menus' ), 'themes_locked' => 1 ) );
+	$ev = $events ? $events[0] : null;
+	$rw_ok( $ev && 'access.updated' === $ev[0] && $r_rest === $ev[1]['target'] && $mgr === $ev[1]['actor'] && array() === $ev[1]['before'] && array( 'users.php', 'tools.php|import.php' ) === $ev[1]['after']['menu']['items'], 'access.updated fired with actor, target, empty before and the stored after' );
+	$events = array();
+	Rules::save( $mgr, 'role', $r_rest, array( 'menu' => array( 'model' => 'deny', 'items' => array( 'users.php' ) ), 'blocks' => array( 'widgets' ), 'themes_locked' => 1 ) );
+	$rw_ok( $events && array( 'users.php', 'tools.php|import.php' ) === $events[0][1]['before']['menu']['items'] && array( 'users.php' ) === $events[0][1]['after']['menu']['items'], 'second save carries the previous rule as before (revertable)' );
+	$events = array();
+	Rules::save( $mgr, 'role', $r_rest, array( 'menu' => array( 'model' => 'deny', 'items' => array( 'users.php' ) ), 'blocks' => array( 'widgets' ), 'themes_locked' => 1 ) );
+	$rw_ok( ! $events, 'unchanged save fires no event' );
+
+	// Direct-URL enforcement.
+	wp_set_current_user( $rest );
+	Rules::flush_cache();
+	$GLOBALS['pagenow']     = 'users.php';
+	$GLOBALS['plugin_page'] = null;
+	$redirect_to            = null;
+	$enf                    = new Enforcer();
+	$enf->guard_request();
+	$rw_ok( is_string( $redirect_to ) && false === strpos( $redirect_to, 'users.php' ) && 0 === strpos( $redirect_to, admin_url() ), 'denied users.php redirects to another admin page: ' . (string) $redirect_to );
+	$rw_ok( $redirect_to === admin_url( 'index.php' ), 'redirect target is the first allowed menu item' );
+
+	$GLOBALS['pagenow'] = 'user-edit.php';
+	$redirect_to        = null;
+	$enf->guard_request();
+	$rw_ok( null !== $redirect_to, 'user-edit.php (hidden page under Users) is blocked with its parent' );
+
+	$GLOBALS['pagenow'] = 'import.php';
+	$redirect_to        = null;
+	$enf->guard_request();
+	$rw_ok( null === $redirect_to, 'import.php is open once its submenu entry was removed from the deny list (control: no false positive)' );
+
+	$GLOBALS['pagenow'] = 'edit.php';
+	$redirect_to        = null;
+	$enf->guard_request();
+	$rw_ok( null === $redirect_to, 'an unlisted screen is not redirected' );
+
+	$GLOBALS['pagenow'] = 'profile.php';
+	$redirect_to        = null;
+	$enf->guard_request();
+	$rw_ok( null === $redirect_to, 'profile.php is never redirected' );
+
+	$GLOBALS['pagenow'] = 'widgets.php';
+	$redirect_to        = null;
+	$enf->guard_request();
+	$rw_ok( null !== $redirect_to, 'widgets.php blocked by the Appearance block' );
+
+	$GLOBALS['pagenow']     = 'admin.php';
+	$GLOBALS['plugin_page'] = 'my-plugin-page';
+	Rules::save( $mgr, 'role', $r_rest, array( 'menu' => array( 'model' => 'deny', 'items' => array( 'options-general.php|my-plugin-page' ) ) ) );
+	wp_set_current_user( $rest );
+	$redirect_to = null;
+	$enf->guard_request();
+	$rw_ok( null !== $redirect_to, 'plugin-added submenu page (?page=slug) blocked by its key' );
+
+	$GLOBALS['pagenow']     = 'themes.php';
+	$GLOBALS['plugin_page'] = null;
+	Rules::save( $mgr, 'role', $r_rest, array( 'menu' => array( 'model' => 'deny', 'items' => array( 'themes.php' ) ) ) );
+	wp_set_current_user( $rest );
+	foreach ( array( 'themes.php', 'widgets.php', 'nav-menus.php' ) as $pg ) {
+		$GLOBALS['pagenow'] = $pg;
+		$redirect_to        = null;
+		$enf->guard_request();
+		$rw_ok( null !== $redirect_to, "denying the Appearance parent blocks $pg" );
+	}
+
+	// Allow model.
+	Rules::save( $mgr, 'role', $r_rest, array( 'menu' => array( 'model' => 'allow', 'items' => array( 'index.php', 'index.php|index.php', 'edit.php', 'edit.php|edit.php' ) ) ) );
+	wp_set_current_user( $rest );
+	$GLOBALS['pagenow'] = 'tools.php';
+	$redirect_to        = null;
+	$enf->guard_request();
+	$rw_ok( $redirect_to === admin_url( 'index.php' ), 'allow model: unlisted tools.php redirects to the first allowed item' );
+	$GLOBALS['pagenow'] = 'edit.php';
+	$redirect_to        = null;
+	$enf->guard_request();
+	$rw_ok( null === $redirect_to, 'allow model: listed edit.php open' );
+	$GLOBALS['pagenow'] = 'edit-tags.php';
+	$_GET['taxonomy']   = 'category';
+	$redirect_to        = null;
+	$enf->guard_request();
+	$rw_ok( null !== $redirect_to, 'allow model: edit-tags.php?taxonomy=category blocked when only edit.php is listed' );
+	unset( $_GET['taxonomy'] );
+	$GLOBALS['pagenow'] = 'profile.php';
+	$redirect_to        = null;
+	$enf->guard_request();
+	$rw_ok( null === $redirect_to, 'allow model: profile.php still open' );
+	$GLOBALS['pagenow'] = 'edit.php';
+	$_GET['post_type']  = 'page';
+	$redirect_to        = null;
+	$enf->guard_request();
+	$rw_ok( null !== $redirect_to, 'allow model: edit.php?post_type=page blocked (different menu entry)' );
+	unset( $_GET['post_type'] );
+	$GLOBALS['menu']    = $menu;
+	$GLOBALS['submenu'] = $submenu;
+	$enf->hide_menu();
+	$slugs = array_map(
+		function ( $i ) {
+			return $i[2];
+		},
+		$GLOBALS['menu']
+	);
+	$rw_ok( array( 'index.php', 'edit.php', 'users.php' ) === array_values( array_intersect( $slugs, array( 'index.php', 'edit.php', 'users.php', 'tools.php', 'themes.php', 'options-general.php', 'edit.php?post_type=page' ) ) ), 'allow model: hide_menu leaves the listed top-level items plus Users, which keeps only Profile' );
+	$rw_ok( array( 'profile.php' ) === array_column( $GLOBALS['submenu']['users.php'] ?? array(), 2 ), 'allow model: Profile stays reachable under Users' );
+	$rw_ok( count( $GLOBALS['submenu']['edit.php'] ?? array() ) === 1, 'allow model: unlisted submenu entry removed from a kept parent' );
+
+	// Administrator unaffected by the same rules.
+	wp_set_current_user( $admin );
+	$GLOBALS['pagenow'] = 'tools.php';
+	$redirect_to        = null;
+	$enf->guard_request();
+	$rw_ok( null === $redirect_to, 'administrator is never redirected' );
+	$rw_ok( null === Rules::effective_for_user( $admin ), 'administrator has no effective restrictions' );
+
+	// Per-user rule applies on top of the role rule.
+	Rules::save( $mgr, 'role', $r_rest, array() );
+	Rules::save( $mgr, 'user', (string) $rest2, array( 'menu' => array( 'model' => 'deny', 'items' => array( 'tools.php' ) ) ) );
+	wp_set_current_user( $rest2 );
+	$GLOBALS['pagenow'] = 'tools.php';
+	$GLOBALS['menu']    = $menu;
+	$GLOBALS['submenu'] = $submenu;
+	$redirect_to        = null;
+	$enf->guard_request();
+	$rw_ok( null !== $redirect_to, 'per-user rule blocks that user' );
+	wp_set_current_user( $rest );
+	$redirect_to = null;
+	$enf->guard_request();
+	$rw_ok( null === $redirect_to, 'per-user rule does not affect another user of the same role' );
+	Rules::save( $mgr, 'user', (string) $rest2, array() );
+
+	// Meta boxes, dashboard widgets, admin bar.
+	global $wp_meta_boxes;
+	$wp_meta_boxes['post']['normal']['core']['postcustom'] = array( 'id' => 'postcustom', 'title' => 'Custom Fields' );
+	$wp_meta_boxes['post']['side']['core']['submitdiv']    = array( 'id' => 'submitdiv', 'title' => 'Publish' );
+	$wp_meta_boxes['dashboard']['normal']['core']['dashboard_site_health'] = array( 'id' => 'dashboard_site_health', 'title' => 'Site Health' );
+	$disc = new Discovery();
+	$disc->record_post_boxes( 'post' );
+	$disc->record_dashboard();
+	$seen = Discovery::seen();
+	$rw_ok( 'Custom Fields' === ( $seen['metaboxes']['post']['postcustom'] ?? '' ) && isset( $seen['metaboxes']['dashboard']['dashboard_site_health'] ), 'meta boxes and dashboard widgets recorded at runtime (ids and titles only)' );
+
+	$bar = new WP_Admin_Bar();
+	$bar->add_node( array( 'id' => 'wp-logo', 'title' => 'WP' ) );
+	$bar->add_node( array( 'id' => 'comments', 'title' => 'Comments' ) );
+	$bar->add_node( array( 'id' => 'my-account', 'title' => 'Howdy' ) );
+	$disc->record_bar( $bar );
+	$rw_ok( isset( Discovery::seen()['bar']['comments'] ), 'toolbar nodes recorded' );
+
+	Rules::save(
+		$mgr,
+		'role',
+		$r_rest,
+		array(
+			'metaboxes' => array( 'post' => array( 'postcustom' ), 'dashboard' => array( 'dashboard_site_health' ) ),
+			'admin_bar' => array( 'wp-logo', 'comments' ),
+			'plugins'   => array( 'model' => 'deny', 'locked' => array( 'hello.php' ), 'hidden' => array( 'akismet/akismet.php' ) ),
+			'themes_locked' => 1,
+			'blocks'    => array( 'widgets', 'nav_menus' ),
+		)
+	);
+	wp_set_current_user( $rest );
+	$enf->hide_post_boxes( 'post' );
+	$rw_ok( false === $wp_meta_boxes['post']['normal']['core']['postcustom'] && is_array( $wp_meta_boxes['post']['side']['core']['submitdiv'] ), 'listed meta box removed, others kept' );
+	$enf->hide_dashboard_widgets();
+	$rw_ok( false === $wp_meta_boxes['dashboard']['normal']['core']['dashboard_site_health'], 'dashboard widget removed' );
+	$enf->hide_bar_nodes( $bar );
+	$rw_ok( null === $bar->get_node( 'wp-logo' ) && null === $bar->get_node( 'comments' ) && null !== $bar->get_node( 'my-account' ), 'toolbar nodes removed, my-account kept' );
+	$wp_meta_boxes['post']['normal']['core']['postcustom'] = array( 'id' => 'postcustom', 'title' => 'Custom Fields' );
+	wp_set_current_user( $editor );
+	$enf->hide_post_boxes( 'post' );
+	$rw_ok( is_array( $wp_meta_boxes['post']['normal']['core']['postcustom'] ), 'meta box rule does not apply to another role' );
+
+	// Plugin access.
+	wp_set_current_user( $rest );
+	$rw_ok( ! user_can( $rest, 'activate_plugin', 'hello.php' ) && ! user_can( $rest, 'deactivate_plugin', 'hello.php' ) && ! user_can( $rest, 'delete_plugin', 'hello.php' ), 'locked plugin: activate, deactivate and delete caps refused' );
+	$rw_ok( user_can( $rest, 'activate_plugin', 'rolewright/rolewright.php' ), 'unlisted plugin still manageable' );
+	$rw_ok( ! user_can( $rest, 'activate_plugin', 'akismet/akismet.php' ), 'hidden plugin cannot be managed either' );
+	$rw_ok( user_can( $admin, 'activate_plugin', 'hello.php' ), 'administrator can still manage the locked plugin' );
+	$list = $enf->filter_plugin_list( array( 'akismet/akismet.php' => array(), 'hello.php' => array() ) );
+	$rw_ok( array( 'hello.php' ) === array_keys( $list ), 'hidden plugin removed from the plugin list, locked one stays visible' );
+	$threw = false;
+	try {
+		do_action( 'activate_plugin', 'hello.php', false );
+	} catch ( \RuntimeException $e ) {
+		$threw = true;
+	}
+	$rw_ok( $threw, 'activate_plugin action refuses a locked plugin (covers bulk activation)' );
+	$threw = false;
+	try {
+		do_action( 'delete_plugin', 'hello.php' );
+	} catch ( \RuntimeException $e ) {
+		$threw = true;
+	}
+	$rw_ok( $threw, 'delete_plugin action refuses a locked plugin' );
+	$threw = false;
+	try {
+		do_action( 'deactivate_plugin', 'akismet/akismet.php', false );
+	} catch ( \RuntimeException $e ) {
+		$threw = true;
+	}
+	$rw_ok( $threw, 'deactivate_plugin action refuses a hidden plugin' );
+	$threw = false;
+	try {
+		do_action( 'activate_plugin', 'rolewright/rolewright.php', false );
+	} catch ( \RuntimeException $e ) {
+		$threw = true;
+	}
+	$rw_ok( ! $threw, 'activate_plugin action lets an unlisted plugin through' );
+
+	// Allow model for plugins.
+	Rules::save( $mgr, 'role', $r_rest, array( 'plugins' => array( 'model' => 'allow', 'locked' => array( 'akismet/akismet.php' ) ) ) );
+	wp_set_current_user( $rest );
+	$rw_ok( user_can( $rest, 'activate_plugin', 'akismet/akismet.php' ) && ! user_can( $rest, 'activate_plugin', 'hello.php' ), 'plugin allow model: only the listed plugin may be toggled' );
+
+	// REST.
+	Rules::save( $mgr, 'role', $r_rest, array( 'blocks' => array( 'widgets', 'nav_menus' ), 'plugins' => array( 'model' => 'deny', 'hidden' => array( 'hello.php' ) ) ) );
+	wp_set_current_user( $rest );
+	$resp = rest_do_request( new WP_REST_Request( 'GET', '/wp/v2/widgets' ) );
+	$rw_ok( 403 === $resp->get_status(), 'REST /wp/v2/widgets refused with 403 for the blocked role' );
+	$resp = rest_do_request( new WP_REST_Request( 'GET', '/wp/v2/menus' ) );
+	$rw_ok( 403 === $resp->get_status(), 'REST /wp/v2/menus refused with 403 for the blocked role' );
+	$resp = rest_do_request( new WP_REST_Request( 'GET', '/wp/v2/plugins/hello' ) );
+	$rw_ok( 404 === $resp->get_status(), 'REST hidden plugin route returns 404' );
+	$resp = rest_do_request( new WP_REST_Request( 'GET', '/wp/v2/plugins' ) );
+	$ids  = wp_list_pluck( (array) $resp->get_data(), 'plugin' );
+	$rw_ok( 200 === $resp->get_status() && $ids && ! in_array( 'hello', $ids, true ), 'REST plugin list omits the hidden plugin (' . count( $ids ) . ' listed)' );
+	$resp = rest_do_request( new WP_REST_Request( 'POST', '/wp/v2/plugins/hello' ) );
+	$rw_ok( in_array( $resp->get_status(), array( 403, 404 ), true ), 'REST write to a hidden plugin refused' );
+	wp_set_current_user( $admin );
+	$resp = rest_do_request( new WP_REST_Request( 'GET', '/wp/v2/plugins' ) );
+	$rw_ok( 200 === $resp->get_status() && in_array( 'hello', wp_list_pluck( (array) $resp->get_data(), 'plugin' ), true ), 'control: administrator still sees the plugin over REST' );
+
+	// Theme switching and customizer.
+	Rules::save( $mgr, 'role', $r_rest, array( 'themes_locked' => 1, 'blocks' => array( 'widgets', 'nav_menus' ) ) );
+	wp_set_current_user( $rest );
+	$rw_ok( 'old-theme' === apply_filters( 'pre_update_option_stylesheet', 'new-theme', 'old-theme' ) && 'old-theme' === apply_filters( 'pre_update_option_template', 'new-theme', 'old-theme' ), 'theme switch write is reverted to the old value for a locked role' );
+	$GLOBALS['pagenow'] = 'themes.php';
+	$_GET['action']     = 'activate';
+	$threw              = false;
+	try {
+		$enf->guard_request();
+	} catch ( \RuntimeException $e ) {
+		$threw = true;
+	}
+	unset( $_GET['action'] );
+	$rw_ok( $threw, 'themes.php?action=activate refused for a locked role' );
+	$comps = apply_filters( 'customize_loaded_components', array( 'widgets', 'nav_menus', 'custom_css' ) );
+	$rw_ok( array( 'custom_css' ) === array_values( $comps ), 'customizer widgets and menus components removed' );
+	wp_set_current_user( $admin );
+	$rw_ok( 'new-theme' === apply_filters( 'pre_update_option_stylesheet', 'new-theme', 'old-theme' ), 'control: administrator can switch themes' );
+
+	// Settings page registered under the Rolewright menu with the module capability.
+	$rw_ok( class_exists( '\Rolewright\Modules\Admin_Ui\Admin_Page' ) && 'rolewright-admin-ui' === \Rolewright\Modules\Admin_Ui\Admin_Page::SLUG, 'page slug is rolewright-admin-ui' );
+} catch ( \Throwable $e ) {
+	++$rw_fail;
+	echo 'FAIL exception: ' . $e->getMessage() . ' at ' . basename( $e->getFile() ) . ':' . $e->getLine() . "\n";
+}
+
+// Cleanup.
+wp_set_current_user( 0 );
+require_once ABSPATH . 'wp-admin/includes/user.php';
+foreach ( $users as $uid ) {
+	wp_delete_user( $uid );
+}
+remove_role( $r_mgr );
+remove_role( $r_rest );
+foreach ( array( Rules::OPTION => 'rules', Discovery::OPTION => 'seen' ) as $opt => $k ) {
+	if ( null === $saved_globals[ $k ] ) {
+		delete_option( $opt );
+	} else {
+		update_option( $opt, $saved_globals[ $k ] );
+	}
+}
+Rules::flush_cache();
+$GLOBALS['menu']           = $saved_globals['menu'];
+$GLOBALS['submenu']        = $saved_globals['submenu'];
+$GLOBALS['wp_meta_boxes']  = $saved_globals['boxes'];
+
+echo "\n" . $rw_pass . ' passed, ' . $rw_fail . " failed\n";
+if ( $rw_fail ) {
+	exit( 1 );
+}
