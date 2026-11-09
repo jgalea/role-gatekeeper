@@ -1,0 +1,230 @@
+<?php
+namespace Rolewright\Modules\Site_Access;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Private-site mode. Front-end requests go through template_redirect, REST through
+ * rest_authentication_errors. Scripts that never reach those hooks (wp-login.php, wp-cron.php,
+ * admin-ajax.php, xmlrpc.php) are untouched; decide() also exempts them so a custom front-end
+ * login page, the rescue route and password reset can't be caught by mistake.
+ */
+final class Gate {
+	const ALLOW = 'allow';
+	const LOGIN = 'login';
+	const DENY  = 'deny';
+
+	const EXEMPT_SCRIPTS = array( 'wp-login.php', 'wp-cron.php', 'admin-ajax.php', 'admin-post.php', 'xmlrpc.php', 'wp-signup.php', 'wp-activate.php' );
+
+	public function register(): void {
+		add_action( 'template_redirect', array( $this, 'on_template_redirect' ), 0 );
+		add_filter( 'rest_authentication_errors', array( $this, 'on_rest_auth' ), 99 );
+	}
+
+	/**
+	 * @param string $path Request path relative to the site root, as returned by normalize_path().
+	 */
+	public static function path_allowed( string $path, array $allow_paths ): bool {
+		foreach ( $allow_paths as $entry ) {
+			$entry = (string) $entry;
+			if ( '' === $entry ) {
+				continue;
+			}
+			if ( '*' === substr( $entry, -1 ) ) {
+				$base = rtrim( substr( $entry, 0, -1 ), '/' );
+				if ( '' !== $base && ( $path === $base || 0 === strpos( $path, $base . '/' ) ) ) {
+					return true;
+				}
+			} elseif ( $path === $entry ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Lowercased, decoded, slash-collapsed path with a leading slash and no trailing one.
+	 * Null when it holds a dot segment or control characters, so it never matches anything.
+	 */
+	public static function normalize_path( string $path ): ?string {
+		$path = rawurldecode( $path );
+		if ( preg_match( '/[\x00-\x1f\x7f\\\\]/', $path ) ) {
+			return null;
+		}
+		$segments = array();
+		foreach ( explode( '/', $path ) as $segment ) {
+			if ( '' === $segment ) {
+				continue;
+			}
+			if ( '.' === $segment || '..' === $segment ) {
+				return null;
+			}
+			$segments[] = strtolower( $segment );
+		}
+		return '/' . implode( '/', $segments );
+	}
+
+	/** Request path relative to the site's own path, or null when it can't be trusted. */
+	public static function current_path(): ?string {
+		$uri  = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '/'; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+		$path = (string) wp_parse_url( $uri, PHP_URL_PATH );
+		return self::relative_path( $path );
+	}
+
+	public static function relative_path( string $path ): ?string {
+		$norm = self::normalize_path( $path );
+		if ( null === $norm ) {
+			return null;
+		}
+		$home = (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH );
+		$home = self::normalize_path( $home );
+		if ( null !== $home && '/' !== $home ) {
+			if ( $norm === $home ) {
+				$norm = '/';
+			} elseif ( 0 === strpos( $norm, $home . '/' ) ) {
+				$norm = substr( $norm, strlen( $home ) );
+			}
+		}
+		if ( 0 === strpos( $norm, '/index.php' ) ) {
+			$rest = substr( $norm, strlen( '/index.php' ) );
+			$norm = '' === $rest ? '/' : $rest;
+		}
+		return $norm;
+	}
+
+	private static function query_vars_present( array $query_keys ): bool {
+		$public = isset( $GLOBALS['wp']->public_query_vars ) ? (array) $GLOBALS['wp']->public_query_vars : array( 'p', 'page_id', 'name', 'pagename', 'attachment_id', 'cat', 'tag', 's', 'author', 'm', 'post_type', 'feed', 'preview', 'page', 'paged', 'error', 'static', 'rest_route' );
+		return (bool) array_intersect( $query_keys, array_merge( $public, array( 'rest_route' ) ) );
+	}
+
+	/**
+	 * @param array $req {
+	 *     @type string|null $path       Normalized request path, null when untrusted.
+	 *     @type bool        $logged_in
+	 *     @type bool        $member     Logged-in user may use this site (multisite membership).
+	 *     @type bool        $is_feed
+	 *     @type bool        $is_rest
+	 *     @type string      $script     Basename of the PHP entry point, if known.
+	 *     @type string      $login_path Normalized path of the login page.
+	 *     @type string[]    $query_keys Keys present in the query string.
+	 *     @type bool        $xmlrpc_on
+	 * }
+	 */
+	public static function decide( array $req, array $settings ): string {
+		if ( empty( $settings['private_enabled'] ) ) {
+			return self::ALLOW;
+		}
+		$script = isset( $req['script'] ) ? (string) $req['script'] : '';
+		if ( in_array( $script, self::EXEMPT_SCRIPTS, true ) && ( 'xmlrpc.php' !== $script || ! empty( $req['xmlrpc_on'] ) ) ) {
+			return self::ALLOW;
+		}
+		$path = isset( $req['path'] ) ? $req['path'] : null;
+		if ( ! empty( $req['logged_in'] ) ) {
+			return ( ! isset( $req['member'] ) || $req['member'] ) ? self::ALLOW : self::DENY;
+		}
+		if ( ! empty( $req['is_feed'] ) && empty( $settings['private_feed'] ) ) {
+			return self::ALLOW;
+		}
+		if ( ! empty( $req['is_rest'] ) && empty( $settings['private_rest'] ) ) {
+			return self::ALLOW;
+		}
+		if ( null !== $path ) {
+			if ( ! empty( $req['login_path'] ) && $path === $req['login_path'] ) {
+				return self::ALLOW;
+			}
+			$exempt = isset( $req['exempt_paths'] ) ? (array) $req['exempt_paths'] : array();
+			$list   = array_merge( (array) $settings['allow_paths'], $exempt );
+			if ( self::path_allowed( $path, $list ) && ! self::query_vars_present( isset( $req['query_keys'] ) ? (array) $req['query_keys'] : array() ) ) {
+				return self::ALLOW;
+			}
+		}
+		return ( ! empty( $req['is_feed'] ) || ! empty( $req['is_rest'] ) ) ? self::DENY : self::LOGIN;
+	}
+
+	public static function login_path(): ?string {
+		$path = (string) wp_parse_url( wp_login_url(), PHP_URL_PATH );
+		return self::relative_path( $path );
+	}
+
+	private static function context( bool $is_rest ): array {
+		$script = isset( $_SERVER['SCRIPT_NAME'] ) ? basename( (string) wp_unslash( $_SERVER['SCRIPT_NAME'] ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+		$user   = wp_get_current_user();
+		$in     = $user->exists();
+		$member = true;
+		if ( $in && is_multisite() && ! is_super_admin( $user->ID ) ) {
+			$member = is_user_member_of_blog( $user->ID, get_current_blog_id() );
+		}
+		return array(
+			'path'         => self::current_path(),
+			'logged_in'    => $in,
+			'member'       => $member,
+			'is_feed'      => ! $is_rest && function_exists( 'is_feed' ) && is_feed(),
+			'is_rest'      => $is_rest,
+			'script'       => $script,
+			'login_path'   => self::login_path(),
+			'query_keys'   => array_keys( $_GET ), // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			'xmlrpc_on'    => (bool) apply_filters( 'xmlrpc_enabled', true ),
+			'exempt_paths' => array_filter( array_map( array( __CLASS__, 'normalize_path' ), (array) apply_filters( 'rolewright_site_access_exempt_paths', array() ) ) ),
+		);
+	}
+
+	public function on_template_redirect(): void {
+		$settings = Site_Access_Settings::get();
+		if ( empty( $settings['private_enabled'] ) ) {
+			return;
+		}
+		$req = self::context( false );
+		if ( apply_filters( 'rolewright_site_access_is_login_request', false, $req ) ) {
+			return;
+		}
+		$decision = self::decide( $req, $settings );
+		if ( self::ALLOW === $decision ) {
+			return;
+		}
+		nocache_headers();
+		if ( self::LOGIN === $decision ) {
+			$origin = (string) wp_parse_url( home_url( '/' ), PHP_URL_SCHEME ) . '://' . (string) wp_parse_url( home_url( '/' ), PHP_URL_HOST );
+			$port   = wp_parse_url( home_url( '/' ), PHP_URL_PORT );
+			$uri    = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '/'; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+			$back   = $origin . ( $port ? ':' . $port : '' ) . $uri;
+			wp_safe_redirect( wp_login_url( $back ), 302, 'Rolewright' );
+			exit;
+		}
+		wp_die( esc_html__( 'You need to be logged in to see this site.', 'rolewright' ), '', array( 'response' => 403 ) );
+	}
+
+	/**
+	 * @param mixed $result
+	 * @return mixed
+	 */
+	public function on_rest_auth( $result ) {
+		if ( is_wp_error( $result ) || true === $result ) {
+			return $result;
+		}
+		$settings = Site_Access_Settings::get();
+		if ( empty( $settings['private_enabled'] ) || empty( $settings['private_rest'] ) ) {
+			return $result;
+		}
+		$req          = self::context( true );
+		$route        = isset( $GLOBALS['wp']->query_vars['rest_route'] ) ? (string) $GLOBALS['wp']->query_vars['rest_route'] : '';
+		$req['path']  = self::normalize_path( '/' . rest_get_url_prefix() . '/' . ltrim( $route, '/' ) );
+		$req['query_keys'] = array();
+		$exempt_routes = array_filter( array_map( array( __CLASS__, 'normalize_path' ), (array) apply_filters( 'rolewright_site_access_exempt_rest_routes', array() ) ) );
+		$req['exempt_paths'] = $exempt_routes;
+		if ( self::DENY === self::decide( $req, $settings ) ) {
+			return new \WP_Error( 'rolewright_private_site', __( 'You need to be logged in to use this site.', 'rolewright' ), array( 'status' => 401 ) );
+		}
+		return $result;
+	}
+
+	/** Used by the settings page to mention what the gate won't touch. */
+	public static function exempt_summary(): array {
+		return array(
+			'wp-login.php (login, password reset, the Rolewright rescue link)',
+			'wp-cron.php',
+			'admin-ajax.php and admin-post.php',
+			'xmlrpc.php when XML-RPC is enabled',
+			'logged-in REST requests, including application passwords',
+		);
+	}
+}
