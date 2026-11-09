@@ -29,6 +29,30 @@ Each module has its own switch under Role Gatekeeper in the admin menu.
 
 The safety module is always on. Nobody can grant a role or capability they don't hold, the administrator role is protected, changes that would lock you out are refused, and a rescue link on the login screen restores access to the Role Gatekeeper screens.
 
+## Migrating from Members or User Role Editor
+
+Roles, capabilities, per-user capabilities and multiple roles per user are stored by WordPress itself, so they work here as they are. The migration carries over what those plugins keep of their own:
+
+- Members: capabilities a role denies become deny rules (a deny on any of a user's roles wins, as in Members), per-post content permissions and their messages, block permissions shown to logged-in users, logged-out users or chosen roles, the default restricted-content message, and private-site mode when you confirm it.
+- User Role Editor: the extra roles new users get on registration.
+
+Open Role Gatekeeper > Import and export and use "Migrate from another plugin", or run it with WP-CLI:
+
+```
+wp rolegate migrate members            # preview, writes nothing
+wp rolegate migrate members --apply    # apply what the preview shows
+wp rolegate migrate ure --apply
+```
+
+The preview lists every change and anything that has no counterpart. Applying backs up the roles first, never changes or deletes the other plugin's data, and logs one entry the audit log can revert. Running it again changes nothing.
+
+To check that nobody's permissions changed, take a snapshot before and compare after, also once the other plugin is deactivated:
+
+```
+wp rolegate migrate snapshot --file=before.json
+wp rolegate migrate verify --file=before.json
+```
+
 ## Delegating access
 
 Switching modules on or off and changing the automation settings needs an administrator who holds every administrator capability; `rolegate_manage` alone only opens the screens. Treat `rolegate_manage_caps` and `rolegate_import` as administrator-level: a holder can hand out any non-critical capability, or create and overwrite roles from a file.

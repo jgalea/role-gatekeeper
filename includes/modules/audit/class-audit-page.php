@@ -349,6 +349,8 @@ final class Audit_Page {
 		$labels = array(
 			'modules.updated'    => __( 'Modules switched on or off', 'role-gatekeeper' ),
 			'automation.updated' => __( 'Automation settings changed', 'role-gatekeeper' ),
+			'migration.applied'  => __( 'Migrated from another plugin', 'role-gatekeeper' ),
+			'migration.reverted' => __( 'Migration reverted', 'role-gatekeeper' ),
 		);
 		return isset( $labels[ $type ] ) ? $labels[ $type ] : '';
 	}

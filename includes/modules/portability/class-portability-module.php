@@ -4,6 +4,7 @@ namespace Rolegate\Modules\Portability;
 use Rolegate\Core\Module;
 use Rolegate\Core\Settings;
 use Rolegate\Modules\Safety\Caps;
+use Rolegate\Modules\Safety\Guard;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -30,6 +31,10 @@ final class Portability_Module extends Module {
 		add_action( 'admin_post_rolegate_portability_export', array( $this, 'handle_export' ) );
 		add_action( 'admin_post_rolegate_portability_preview', array( $this, 'handle_preview' ) );
 		add_action( 'admin_post_rolegate_portability_apply', array( $this, 'handle_apply' ) );
+		add_action( 'admin_post_rolegate_migrate_apply', array( $this, 'handle_migrate' ) );
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			\WP_CLI::add_command( 'rolegate migrate', Cli_Migrate::class );
+		}
 	}
 
 	public function menu(): void {
@@ -163,6 +168,115 @@ final class Portability_Module extends Module {
 		exit;
 	}
 
+	private function can_migrate(): bool {
+		return current_user_can( Caps::IMPORT ) && Guard::is_site_authority( get_current_user_id() );
+	}
+
+	public function handle_migrate(): void {
+		if ( ! $this->can_migrate() ) {
+			$this->deny();
+		}
+		$source = isset( $_POST['source'] ) ? sanitize_key( wp_unslash( $_POST['source'] ) ) : '';
+		if ( ! isset( Migrator::sources()[ $source ] ) ) {
+			$this->deny();
+		}
+		check_admin_referer( 'rolegate_migrate_apply_' . $source );
+		$back = $this->page_url( array( 'migrate' => $source ) );
+		if ( empty( $_POST['reviewed'] ) ) {
+			$this->notice( 'error', __( 'Tick the box to confirm you reviewed the changes.', 'role-gatekeeper' ) );
+			wp_safe_redirect( $back );
+			exit;
+		}
+		$result = Migrator::apply( $source, get_current_user_id(), array( 'confirm_private' => ! empty( $_POST['confirm_private'] ) ) );
+		if ( is_wp_error( $result ) ) {
+			$this->notice( 'error', $result->get_error_message() );
+			wp_safe_redirect( $back );
+			exit;
+		}
+		if ( 'unchanged' === $result['status'] ) {
+			$this->notice( 'success', __( 'Nothing to change: everything is already carried over.', 'role-gatekeeper' ) );
+		} else {
+			$message = sprintf(
+				/* translators: 1: migration id, 2: backup id */
+				__( 'Migration %1$s applied. The roles were backed up as %2$s, and the audit log can revert it.', 'role-gatekeeper' ),
+				$result['migration_id'],
+				$result['backup_id']
+			);
+			if ( $result['errors'] ) {
+				$message .= ' ' . implode( ' ', $result['errors'] );
+			}
+			$this->notice( $result['errors'] ? 'warning' : 'success', $message );
+		}
+		wp_safe_redirect( $back );
+		exit;
+	}
+
+	private function render_migrate(): void {
+		if ( ! $this->can_migrate() ) {
+			return;
+		}
+		$found = array();
+		foreach ( Migrator::sources() as $id => $class ) {
+			$plan = Migrator::plan( $id, get_current_user_id() );
+			if ( ! is_wp_error( $plan ) && $plan['detected'] ) {
+				$found[ $id ] = $plan['label'];
+			}
+		}
+		echo '<h2>' . esc_html__( 'Migrate from another plugin', 'role-gatekeeper' ) . '</h2>';
+		if ( ! $found ) {
+			echo '<p>' . esc_html__( 'No data from Members or User Role Editor was found on this site.', 'role-gatekeeper' ) . '</p>';
+			return;
+		}
+		echo '<p>' . esc_html__( 'Carries their settings and rules over. Their own data stays as it is, and nothing changes until you confirm on the next screen.', 'role-gatekeeper' ) . '</p><p>';
+		foreach ( $found as $id => $label ) {
+			/* translators: %s: plugin name */
+			echo '<a class="button" href="' . esc_url( $this->page_url( array( 'migrate' => $id ) ) ) . '">' . esc_html( sprintf( __( 'Preview migration from %s', 'role-gatekeeper' ), $label ) ) . '</a> ';
+		}
+		echo '</p>';
+	}
+
+	private function render_migration_preview( string $source ): void {
+		$plan = Migrator::plan( $source, get_current_user_id(), array( 'confirm_private' => true ) );
+		if ( is_wp_error( $plan ) ) {
+			echo '<div class="notice notice-error"><p>' . esc_html( $plan->get_error_message() ) . '</p></div>';
+			return;
+		}
+		$labels = Migrator::action_labels();
+		/* translators: %s: plugin name */
+		echo '<h2>' . esc_html( sprintf( __( 'Migrate from %s', 'role-gatekeeper' ), $plan['label'] ) ) . '</h2>';
+		echo '<div class="rw-scroll" style="overflow-x:auto"><table class="widefat striped"><thead><tr>';
+		foreach ( array( __( 'Area', 'role-gatekeeper' ), __( 'Item', 'role-gatekeeper' ), __( 'Change', 'role-gatekeeper' ), __( 'Details', 'role-gatekeeper' ) ) as $head ) {
+			echo '<th scope="col">' . esc_html( $head ) . '</th>';
+		}
+		echo '</tr></thead><tbody>';
+		$private = false;
+		foreach ( $plan['rows'] as $row ) {
+			$color = in_array( $row['action'], array( 'blocked' ), true ) ? ' style="color:#b32d2e"' : '';
+			echo '<tr><td>' . esc_html( $row['area'] ) . '</td><td>' . esc_html( $row['item'] ) . '</td><td' . $color . '>' . esc_html( $labels[ $row['action'] ] ?? $row['action'] ) . '</td><td>' . esc_html( $row['detail'] ) . '</td></tr>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- $color is a fixed string.
+		}
+		echo '</tbody></table></div>';
+		if ( null !== $plan['ops']['site_access'] ) {
+			$private = true;
+		}
+		if ( ! $plan['detected'] || ! Migrator::has_changes( $plan['ops'] ) ) {
+			echo '<p>' . esc_html__( 'Nothing to change: everything is already carried over.', 'role-gatekeeper' ) . '</p>';
+			echo '<p><a class="button" href="' . esc_url( $this->page_url() ) . '">' . esc_html__( 'Back', 'role-gatekeeper' ) . '</a></p>';
+			return;
+		}
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+		echo '<input type="hidden" name="action" value="rolegate_migrate_apply" />';
+		echo '<input type="hidden" name="source" value="' . esc_attr( $source ) . '" />';
+		wp_nonce_field( 'rolegate_migrate_apply_' . $source );
+		if ( $private ) {
+			echo '<p><label><input type="checkbox" name="confirm_private" value="1" /> ' . esc_html__( 'Also switch on private-site mode: only logged-in users can see the site.', 'role-gatekeeper' ) . '</label></p>';
+		}
+		echo '<p><label><input type="checkbox" name="reviewed" value="1" /> ' . esc_html__( 'I reviewed these changes. The current roles are backed up first.', 'role-gatekeeper' ) . '</label></p>';
+		echo '<p>';
+		submit_button( __( 'Apply migration', 'role-gatekeeper' ), 'primary', 'rolegate-migrate', false );
+		echo ' <a class="button" href="' . esc_url( $this->page_url() ) . '">' . esc_html__( 'Cancel', 'role-gatekeeper' ) . '</a></p>';
+		echo '</form>';
+	}
+
 	public function render(): void {
 		if ( ! current_user_can( Caps::IMPORT ) ) {
 			$this->deny();
@@ -184,8 +298,16 @@ final class Portability_Module extends Module {
 			}
 			echo '<div class="notice notice-error"><p>' . esc_html__( 'That import preview has expired. Upload the file again.', 'role-gatekeeper' ) . '</p></div>';
 		}
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only preview; applying checks a nonce.
+		$migrate = isset( $_GET['migrate'] ) ? sanitize_key( wp_unslash( $_GET['migrate'] ) ) : '';
+		if ( '' !== $migrate && isset( Migrator::sources()[ $migrate ] ) && $this->can_migrate() ) {
+			$this->render_migration_preview( $migrate );
+			echo '</div>';
+			return;
+		}
 		$this->render_export();
 		$this->render_import();
+		$this->render_migrate();
 		echo '</div>';
 	}
 

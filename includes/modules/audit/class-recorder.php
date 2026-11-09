@@ -82,6 +82,23 @@ final class Recorder {
 			$detail['new_label'] = $this->label( is_array( $after ) ? ( $after['name'] ?? '' ) : $after );
 		}
 
+		if ( in_array( $type, array( 'migration.applied', 'migration.reverted' ), true ) ) {
+			$detail['migration_id'] = $this->clean_target( $data['migration_id'] ?? '' );
+			$detail['label']        = $this->label( $data['summary'] ?? '' );
+			$b                      = is_array( $before ) && isset( $before['denials'] ) && is_array( $before['denials'] ) ? $before['denials'] : array();
+			$a                      = is_array( $after ) && isset( $after['denials'] ) && is_array( $after['denials'] ) ? $after['denials'] : array();
+			foreach ( array_unique( array_merge( array_keys( $b ), array_keys( $a ) ) ) as $role ) {
+				$added = array_diff( (array) ( $a[ $role ] ?? array() ), (array) ( $b[ $role ] ?? array() ) );
+				foreach ( $added as $cap ) {
+					$diff['caps']['denied'][] = $this->clean_target( $role . ':' . $cap );
+				}
+				$lifted = array_diff( (array) ( $b[ $role ] ?? array() ), (array) ( $a[ $role ] ?? array() ) );
+				foreach ( $lifted as $cap ) {
+					$diff['caps']['undenied'][] = $this->clean_target( $role . ':' . $cap );
+				}
+			}
+		}
+
 		$revert_of = isset( $data['revert_of'] ) ? absint( $data['revert_of'] ) : 0;
 		$id        = Store::insert(
 			array(

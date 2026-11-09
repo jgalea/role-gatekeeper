@@ -11,7 +11,7 @@ defined( 'ABSPATH' ) || exit;
  * change needed. The result fires rolegate_changed with revert_of, which the recorder logs.
  */
 final class Reverter {
-	const TYPES = array( 'role.created', 'role.deleted', 'role.renamed', 'caps.updated', 'user.roles', 'user.caps', 'roles.reset', 'role.default_set' );
+	const TYPES = array( 'role.created', 'role.deleted', 'role.renamed', 'caps.updated', 'user.roles', 'user.caps', 'roles.reset', 'role.default_set', 'migration.applied' );
 
 	/** Capabilities the actor needs, per type. */
 	public static function required_caps( string $type ): array {
@@ -28,6 +28,8 @@ final class Reverter {
 				return array( Caps::VIEW_AUDIT, Caps::MANAGE_USERS );
 			case 'user.caps':
 				return array( Caps::VIEW_AUDIT, Caps::MANAGE_USERS, Caps::MANAGE_CAPS );
+			case 'migration.applied':
+				return array( Caps::VIEW_AUDIT, Caps::IMPORT, Caps::MANAGE_ACCESS );
 		}
 		return array();
 	}
@@ -76,6 +78,8 @@ final class Reverter {
 				return self::revert_default_set( $entry_id, $actor, $detail );
 			case 'user.caps':
 				return self::revert_user_caps( $entry_id, $actor, (int) $row->target, $diff );
+			case 'migration.applied':
+				return self::revert_migration( $entry_id, $actor, (string) $row->target, $detail );
 		}
 		return new \WP_Error( 'rolegate_audit_not_revertible', __( 'This kind of entry can\'t be reverted.', 'role-gatekeeper' ) );
 	}
@@ -528,6 +532,32 @@ final class Reverter {
 			);
 		}
 		return true;
+	}
+
+	/** @return true|\WP_Error */
+	private static function revert_migration( int $entry_id, int $actor, string $source, array $detail ) {
+		$id = (string) ( $detail['migration_id'] ?? '' );
+		if ( '' === $id ) {
+			return new \WP_Error( 'rolegate_audit_not_revertible', __( 'The migration this entry belongs to was not recorded.', 'role-gatekeeper' ) );
+		}
+		$ok = \Rolegate\Modules\Portability\Migrator::revert( $id, $actor );
+		if ( is_wp_error( $ok ) && 'rolegate_migration_partial' !== $ok->get_error_code() ) {
+			return $ok;
+		}
+		do_action(
+			'rolegate_changed',
+			'migration.reverted',
+			array(
+				'actor'        => $actor,
+				'target'       => $source,
+				'before'       => array(),
+				'after'        => array(),
+				'migration_id' => $id,
+				'summary'      => (string) ( $detail['label'] ?? '' ),
+				'revert_of'    => $entry_id,
+			)
+		);
+		return $ok;
 	}
 
 	private static function role_name( string $slug ): string {

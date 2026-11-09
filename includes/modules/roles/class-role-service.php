@@ -164,7 +164,8 @@ final class Role_Service {
 					sprintf( __( 'The %s role holds powerful capabilities and can\'t be given to new registrations.', 'role-gatekeeper' ), Role_Store::name( $r ) )
 				);
 			}
-			if ( ! Guard::can_assign_role( $actor, $r, 0 ) ) {
+			$shell = $actor <= 0 && defined( 'WP_CLI' ) && WP_CLI;
+			if ( ! $shell && ! Guard::can_assign_role( $actor, $r, 0 ) ) {
 				return new \WP_Error(
 					'rolegate_cannot_assign',
 					/* translators: %s: role name */

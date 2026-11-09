@@ -47,6 +47,10 @@ No. Every feature is in this plugin.
 
 Use the "Locked out of Role Gatekeeper?" link on the login screen. It emails a one-time link to the administrator's address that restores the Role Gatekeeper capabilities. You can also add `define( 'ROLEGATE_DISABLE_SITE_ACCESS', true );` to wp-config.php to switch off private-site and admin-access rules.
 
+= Can I migrate from Members or User Role Editor? =
+
+Yes. Roles, capabilities and per-user capabilities are stored by WordPress itself and work here as they are. Role Gatekeeper > Import and export > "Migrate from another plugin" carries over the rest: from Members, denied capabilities, content and block permissions, the restricted-content message and private-site mode; from User Role Editor, the extra roles for new users. You see a preview first, the roles are backed up, the other plugin's data stays as it is, and the audit log can revert the migration. With WP-CLI: `wp rolegate migrate members` previews and `--apply` applies; `wp rolegate migrate snapshot` and `verify` confirm every role and user keeps the same capabilities.
+
 = Delegating access =
 
 Switching modules on or off and changing the automation settings needs an administrator who holds every administrator capability. Treat `rolegate_manage_caps` and `rolegate_import` as administrator-level: a holder can hand out any non-critical capability, or create and overwrite roles from a file.

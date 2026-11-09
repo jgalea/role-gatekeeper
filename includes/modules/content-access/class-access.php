@@ -199,9 +199,10 @@ final class Access {
 	}
 
 	public static function notice_html( int $post_id ): string {
-		$rules = self::rules( $post_id );
-		if ( '' !== trim( $rules['message'] ) ) {
-			$html = wpautop( self::sanitize_message( $rules['message'] ) );
+		$rules   = self::rules( $post_id );
+		$message = '' !== trim( $rules['message'] ) ? $rules['message'] : Content_Settings::default_message();
+		if ( '' !== trim( $message ) ) {
+			$html = wpautop( self::sanitize_message( $message ) );
 		} else {
 			$html = '<p>' . esc_html__( "You don't have permission to view this content.", 'role-gatekeeper' ) . '</p>';
 		}

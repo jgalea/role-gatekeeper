@@ -101,7 +101,8 @@ final class Settings {
 	 * @return true|\WP_Error
 	 */
 	public static function apply_modules( int $actor, array $enabled_ids ) {
-		if ( ! self::can_change( $actor ) ) {
+		$shell = $actor <= 0 && defined( 'WP_CLI' ) && WP_CLI;
+		if ( ! $shell && ! self::can_change( $actor ) ) {
 			return new \WP_Error( 'rolegate_not_authority', __( 'Only an administrator who holds every administrator capability can switch modules on or off.', 'role-gatekeeper' ) );
 		}
 		$before = array();

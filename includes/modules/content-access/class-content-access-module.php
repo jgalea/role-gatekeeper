@@ -27,6 +27,9 @@ final class Content_Access_Module extends Module {
 		( new Visibility() )->register();
 		( new Widget_Visibility() )->register();
 		( new Menu_Visibility() )->register();
+		if ( is_admin() ) {
+			( new Content_Settings() )->register();
+		}
 	}
 
 	/**

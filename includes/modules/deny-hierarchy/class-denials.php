@@ -183,11 +183,14 @@ final class Denials {
 		if ( ! get_role( $role ) ) {
 			return new \WP_Error( 'rolegate_no_role', __( 'That role does not exist.', 'role-gatekeeper' ) );
 		}
-		$allowed = Hierarchy::assert_can_manage_role( $actor_id, $role );
-		if ( is_wp_error( $allowed ) ) {
-			return $allowed;
+		$shell = self::is_shell( $actor_id );
+		if ( ! $shell ) {
+			$allowed = Hierarchy::assert_can_manage_role( $actor_id, $role );
+			if ( is_wp_error( $allowed ) ) {
+				return $allowed;
+			}
 		}
-		$super = Guard::is_super( $actor_id );
+		$super = Guard::is_super( $actor_id ) || $shell;
 		if ( ! $super ) {
 			$above = Guard::missing( Guard::critical_subset( (array) get_role( $role )->capabilities ), Guard::user_caps( $actor_id ) );
 			if ( $above ) {
@@ -292,7 +295,7 @@ final class Denials {
 
 		$after          = self::map();
 		$after[ $role ] = $clean;
-		$reasons        = self::lockout_reasons_for( $actor_id, $after );
+		$reasons        = $shell ? self::manager_reasons( $after ) : self::lockout_reasons_for( $actor_id, $after );
 		if ( $reasons ) {
 			return new \WP_Error(
 				'rolegate_lockout',
@@ -302,6 +305,28 @@ final class Denials {
 			);
 		}
 		return $clean;
+	}
+
+	/**
+	 * A WP-CLI session with no --user: there is no actor whose holdings bound the change,
+	 * so only the checks that don't depend on an actor run.
+	 */
+	public static function is_shell( int $actor_id ): bool {
+		return $actor_id <= 0 && defined( 'WP_CLI' ) && WP_CLI;
+	}
+
+	/**
+	 * @param array<string,string[]> $map_after
+	 * @return string[] no_manager_role when no role keeps rolegate_manage_roles undenied.
+	 */
+	private static function manager_reasons( array $map_after ): array {
+		foreach ( wp_roles()->roles as $name => $data ) {
+			$caps = Guard::normalize_caps( (array) $data['capabilities'] );
+			if ( ! empty( $caps[ Caps::MANAGE_ROLES ] ) && ! in_array( Caps::MANAGE_ROLES, isset( $map_after[ $name ] ) ? $map_after[ $name ] : array(), true ) ) {
+				return array();
+			}
+		}
+		return array( 'no_manager_role' );
 	}
 
 	/**
