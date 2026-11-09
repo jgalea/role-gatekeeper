@@ -1,0 +1,6 @@
+.rw-caps .rw-group { background: #fff; border: 1px solid #c3c4c7; margin: 12px 0; padding: 8px 12px; }
+.rw-caps .rw-group legend { font-weight: 600; padding: 0 6px; }
+.rw-caps .rw-select-all { display: block; margin-bottom: 6px; }
+.rw-caps .rw-caps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 16px; }
+.rw-caps .rw-cap code { color: #646970; font-size: 11px; }
+.rw-caps .rw-group[hidden], .rw-caps .rw-cap[hidden] { display: none; }
