@@ -1,0 +1,312 @@
+<?php
+/**
+ * Run: wp eval-file wp-content/plugins/rolewright/tests/content-access-smoke.php
+ *
+ * Front-end checks make real HTTP requests to the site. Inside wp-env the CLI container
+ * reaches the web container as "wordpress", so set ROLEWRIGHT_TEST_BASE (and optionally
+ * ROLEWRIGHT_TEST_HOST) when running somewhere else.
+ */
+
+use Rolewright\Modules\Content_Access\Access;
+use Rolewright\Modules\Content_Access\Menu_Visibility;
+use Rolewright\Modules\Content_Access\Post_Editor;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit( 1 );
+}
+
+require_once ABSPATH . 'wp-admin/includes/user.php';
+require_once ABSPATH . 'wp-admin/includes/post.php';
+
+$rw_pass = 0;
+$rw_fail = 0;
+$rw_ok   = function ( $cond, $label ) use ( &$rw_pass, &$rw_fail ) {
+	if ( $cond ) {
+		++$rw_pass;
+		echo 'PASS ' . $label . "\n";
+	} else {
+		++$rw_fail;
+		echo 'FAIL ' . $label . "\n";
+	}
+};
+
+$base = getenv( 'ROLEWRIGHT_TEST_BASE' ) ? getenv( 'ROLEWRIGHT_TEST_BASE' ) : 'http://wordpress';
+$host = getenv( 'ROLEWRIGHT_TEST_HOST' ) ? getenv( 'ROLEWRIGHT_TEST_HOST' ) : (string) wp_parse_url( home_url(), PHP_URL_HOST ) . ( wp_parse_url( home_url(), PHP_URL_PORT ) ? ':' . wp_parse_url( home_url(), PHP_URL_PORT ) : '' );
+
+$sfx    = substr( md5( (string) microtime( true ) ), 0, 6 );
+$role   = 'rw_t_member_' . $sfx;
+$secret = 'Zq' . $sfx . 'Vault';
+$msg    = 'Members only notice ' . $sfx;
+
+add_role( $role, 'RW Test Member', array( 'read' => true ) );
+
+$users = array();
+$mk    = function ( $login, $r ) use ( &$users, $sfx ) {
+	$id = wp_insert_user(
+		array(
+			'user_login' => $login . '_' . $sfx,
+			'user_email' => $login . '_' . $sfx . '@example.com',
+			'user_pass'  => wp_generate_password( 24 ),
+			'role'       => $r,
+		)
+	);
+	$users[] = $id;
+	return $id;
+};
+$u_right  = $mk( 'right', $role );
+$u_wrong  = $mk( 'wrong', 'subscriber' );
+$u_editor = $mk( 'editor', 'editor' );
+$admin_id = (int) get_users( array( 'role' => 'administrator', 'number' => 1, 'fields' => 'ID' ) )[0];
+$actors   = array(
+	'logged-out' => 0,
+	'wrong-role' => $u_wrong,
+	'right-role' => $u_right,
+);
+
+wp_set_current_user( $admin_id );
+
+$posts = array();
+$mkp   = function ( $title, $content, $date, $excerpt = '' ) use ( &$posts, $admin_id ) {
+	$id = wp_insert_post(
+		array(
+			'post_title'   => $title,
+			'post_content' => $content,
+			'post_excerpt' => $excerpt,
+			'post_status'  => 'publish',
+			'post_author'  => $admin_id,
+			'post_date'    => $date,
+		)
+	);
+	$posts[] = $id;
+	return $id;
+};
+$p_old = $mkp( 'Public Older ' . $sfx, 'public older body', '2020-01-01 10:00:00' );
+$p_sec = $mkp( 'Secret Title ' . $secret, 'Secret body ' . $secret . ' findme' . $sfx, '2020-01-02 10:00:00', 'Secret excerpt ' . $secret );
+$p_new = $mkp( 'Public Newer ' . $sfx, 'public newer body', '2020-01-03 10:00:00' );
+
+$att = wp_insert_attachment(
+	array(
+		'post_title'     => 'Secret attachment ' . $secret,
+		'post_mime_type' => 'image/png',
+		'post_status'    => 'inherit',
+	),
+	false,
+	$p_sec
+);
+$posts[] = $att;
+
+Access::save_rules( $p_sec, array( $role ), $msg );
+
+$rules = Access::rules( $p_sec );
+$rw_ok( array( $role ) === $rules['roles'] && $msg === $rules['message'], 'rules saved and read back' );
+$rw_ok( Access::is_restricted( $att ), 'attachment inherits the rule of its parent post' );
+
+$permalink = function ( $id ) {
+	return (string) wp_make_link_relative( get_permalink( $id ) );
+};
+$cookie = function ( $uid ) {
+	if ( ! $uid ) {
+		return array();
+	}
+	return array( LOGGED_IN_COOKIE => wp_generate_auth_cookie( $uid, time() + 3600, 'logged_in' ) );
+};
+$fetch  = function ( $path, $uid ) use ( $base, $host, $cookie ) {
+	$headers = array( 'Host' => $host );
+	$jar     = array();
+	foreach ( $cookie( $uid ) as $k => $v ) {
+		$jar[] = $k . '=' . $v;
+	}
+	if ( $jar ) {
+		$headers['Cookie'] = implode( '; ', $jar );
+	}
+	$r = wp_remote_get(
+		$base . $path,
+		array(
+			'headers'     => $headers,
+			'redirection' => 5,
+			'timeout'     => 30,
+			'sslverify'   => false,
+		)
+	);
+	if ( is_wp_error( $r ) ) {
+		return array( 0, '', array(), $r->get_error_message() );
+	}
+	return array( (int) wp_remote_retrieve_response_code( $r ), (string) wp_remote_retrieve_body( $r ), wp_remote_retrieve_headers( $r ), '' );
+};
+
+$_SERVER['HTTP_HOST'] = $host;
+list( $code ) = $fetch( $permalink( $p_new ), 0 );
+$rw_ok( 200 === $code, 'HTTP loopback works (public post returns 200, got ' . $code . ')' );
+
+foreach ( $actors as $who => $uid ) {
+	$right = ( 'right-role' === $who );
+
+	list( $code, $body, $headers ) = $fetch( $permalink( $p_sec ), $uid );
+	$rw_ok( ( $right ? 200 : 403 ) === $code, "single view status for $who (got $code)" );
+	$rw_ok( $right === ( false !== strpos( $body, 'Secret body ' . $secret ) ), "single view content shown only to right role ($who)" );
+	if ( ! $right ) {
+		$rw_ok( false === strpos( $body, $secret ), "single view leaks no title, content or excerpt for $who" );
+		$rw_ok( false !== strpos( $body, $msg ), "single view shows the custom message for $who" );
+		$rw_ok( ( 'logged-out' === $who ) === ( false !== strpos( $body, '>Log in</a>' ) ), "single view login link only for logged-out ($who)" );
+	}
+	$cc = strtolower( (string) ( $headers['cache-control'] ?? '' ) );
+	$rw_ok( false !== strpos( $cc, 'no-cache' ) || false !== strpos( $cc, 'no-store' ), "protected page sent nocache headers for $who" );
+
+	list( , $body ) = $fetch( '/', $uid );
+	$rw_ok( false !== strpos( $body, 'Public Newer ' . $sfx ), "archive (home) lists public post for $who" );
+	$rw_ok( $right === ( false !== strpos( $body, $secret ) ), "archive (home) shows protected post only to right role ($who)" );
+
+	list( , $body ) = $fetch( '/2020/', $uid );
+	$rw_ok( $right === ( false !== strpos( $body, $secret ) ), "date archive shows protected post only to right role ($who)" );
+
+	list( , $body ) = $fetch( '/?s=findme' . $sfx, $uid );
+	$rw_ok( $right === ( false !== strpos( $body, 'Secret Title' ) ), "search shows protected post only to right role ($who)" );
+	$rw_ok( $right || false === strpos( $body, $secret ), "search leaks nothing for $who" );
+
+	list( $code, $body ) = $fetch( '/?feed=rss2', $uid );
+	$rw_ok( 200 === $code && false !== strpos( $body, 'Public Newer ' . $sfx ), "feed works for $who" );
+	$rw_ok( $right === ( false !== strpos( $body, $secret ) ), "feed includes protected post only for right role ($who)" );
+
+	wp_set_current_user( $uid );
+	$res  = rest_do_request( new WP_REST_Request( 'GET', '/wp/v2/posts' ) );
+	$json = wp_json_encode( $res->get_data() );
+	$ids  = wp_list_pluck( (array) $res->get_data(), 'id' );
+	$rw_ok( in_array( $p_new, $ids, true ), "REST list contains public post for $who" );
+	$rw_ok( $right === in_array( $p_sec, $ids, true ), "REST list contains protected post only for right role ($who)" );
+	$rw_ok( $right || false === strpos( $json, $secret ), "REST list leaks no title or excerpt for $who" );
+
+	$req = new WP_REST_Request( 'GET', '/wp/v2/posts/' . $p_sec );
+	$res = rest_do_request( $req );
+	$rw_ok( ( $right ? 200 : 404 ) === $res->get_status(), "REST single status for $who (got " . $res->get_status() . ')' );
+	$rw_ok( $right || false === strpos( wp_json_encode( $res->get_data() ), $secret ), "REST single leaks nothing for $who" );
+
+	$res = rest_do_request( new WP_REST_Request( 'GET', '/wp/v2/media/' . $att ) );
+	$rw_ok( ( $right ? 200 : 404 ) === $res->get_status(), "REST attachment of protected post status for $who (got " . $res->get_status() . ')' );
+
+	$q = new WP_Query( array( 'post_type' => 'attachment', 'post_status' => 'inherit', 'fields' => 'ids' ) );
+	$rw_ok( $right === in_array( $att, $q->posts, true ), "attachment query lists protected attachment only for right role ($who)" );
+
+	$GLOBALS['post'] = get_post( $p_new ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride
+	$prev            = get_adjacent_post( false, '', true );
+	$rw_ok( $prev && ( $right ? $p_sec : $p_old ) === (int) $prev->ID, "adjacent-post link skips protected post for $who" );
+
+	$sm = wp_remote_get( $base . '/wp-sitemap-posts-post-1.xml', array( 'headers' => array( 'Host' => $host ), 'redirection' => 5 ) );
+	if ( 'logged-out' === $who ) {
+		$xml = wp_remote_retrieve_body( $sm );
+		$rw_ok( false !== strpos( $xml, get_permalink( $p_new ) ) && false === strpos( $xml, get_permalink( $p_sec ) ), 'sitemap lists the public post and omits the protected one' );
+	}
+
+	$sc = function ( $s ) {
+		return trim( do_shortcode( $s ) );
+	};
+	$rw_ok( ( $right ? 'IN' : '' ) === $sc( '[rolewright_if roles="' . $role . ',nonexistent"]IN[/rolewright_if]' ), "[rolewright_if] for $who" );
+	$rw_ok( ( $uid ? 'LI' : '' ) === $sc( '[rolewright_logged_in]LI[/rolewright_logged_in]' ), "[rolewright_logged_in] for $who" );
+	$rw_ok( ( $uid ? '' : 'LO' ) === $sc( '[rolewright_logged_out]LO[/rolewright_logged_out]' ), "[rolewright_logged_out] for $who" );
+	$form = $sc( '[rolewright_login_form]' );
+	$rw_ok( $uid ? '' === $form : ( false !== strpos( $form, 'wp-login.php' ) && false !== strpos( $form, 'rolewright-login-form' ) ), "[rolewright_login_form] for $who" );
+
+	$blocks = do_blocks(
+		'<!-- wp:paragraph {"rolewrightMode":"roles","rolewrightRoles":["' . $role . '"]} --><p>BR</p><!-- /wp:paragraph -->' .
+		'<!-- wp:paragraph {"rolewrightMode":"logged_out"} --><p>BO</p><!-- /wp:paragraph -->' .
+		'<!-- wp:paragraph {"rolewrightMode":"logged_in"} --><p>BI</p><!-- /wp:paragraph -->' .
+		'<!-- wp:paragraph --><p>BA</p><!-- /wp:paragraph -->'
+	);
+	$rw_ok( $right === ( false !== strpos( $blocks, 'BR' ) ), "block visibility by role for $who" );
+	$rw_ok( ! $uid === ( false !== strpos( $blocks, 'BO' ) ), "block visibility logged-out for $who" );
+	$rw_ok( (bool) $uid === ( false !== strpos( $blocks, 'BI' ) ), "block visibility logged-in for $who" );
+	$rw_ok( false !== strpos( $blocks, 'BA' ), "block without rule always shown for $who" );
+
+	$widget = new WP_Widget_Text();
+	$shown  = apply_filters( 'widget_display_callback', array( 'rolewright_mode' => 'roles', 'rolewright_roles' => array( $role ) ), $widget, array() );
+	$rw_ok( $right === is_array( $shown ), "classic widget visibility by role for $who" );
+	$shown = apply_filters( 'widget_display_callback', array( 'title' => 'x' ), $widget, array() );
+	$rw_ok( is_array( $shown ), "classic widget without rule shown for $who" );
+
+	$menu_id = wp_create_nav_menu( 'rw-menu-' . $sfx . '-' . $who );
+	$i_open  = wp_update_nav_menu_item( $menu_id, 0, array( 'menu-item-title' => 'Open', 'menu-item-url' => 'http://example.com/open', 'menu-item-status' => 'publish' ) );
+	$i_role  = wp_update_nav_menu_item( $menu_id, 0, array( 'menu-item-title' => 'RoleOnly', 'menu-item-url' => 'http://example.com/r', 'menu-item-status' => 'publish' ) );
+	$i_kid   = wp_update_nav_menu_item( $menu_id, 0, array( 'menu-item-title' => 'Child', 'menu-item-url' => 'http://example.com/k', 'menu-item-status' => 'publish', 'menu-item-parent-id' => $i_role ) );
+	$i_post  = wp_update_nav_menu_item( $menu_id, 0, array( 'menu-item-title' => 'SecretLink', 'menu-item-object' => 'post', 'menu-item-object-id' => $p_sec, 'menu-item-type' => 'post_type', 'menu-item-status' => 'publish' ) );
+	update_post_meta( $i_role, Menu_Visibility::META_MODE, 'roles' );
+	update_post_meta( $i_role, Menu_Visibility::META_ROLES, array( $role ) );
+	$titles = wp_list_pluck( (array) wp_get_nav_menu_items( $menu_id ), 'title' );
+	$rw_ok( in_array( 'Open', $titles, true ), "menu item without rule shown for $who" );
+	$rw_ok( $right === in_array( 'RoleOnly', $titles, true ), "menu item role rule for $who" );
+	$rw_ok( $right === in_array( 'Child', $titles, true ), "menu child follows hidden parent for $who" );
+	$rw_ok( $right === in_array( 'SecretLink', $titles, true ), "menu item pointing at protected post hidden for $who" );
+	wp_delete_nav_menu( $menu_id );
+	wp_set_current_user( $admin_id );
+}
+
+wp_set_current_user( $u_editor );
+list( $code, $body ) = array( 0, '' );
+$rw_ok( Access::can_view( $p_sec ), 'a user who can edit the post still views it' );
+wp_set_current_user( $admin_id );
+
+$events = array();
+add_action(
+	'rolewright_changed',
+	function ( $type, $data ) use ( &$events ) {
+		$events[] = array( $type, $data );
+	},
+	10,
+	2
+);
+
+$res = rest_do_request( ( function () use ( $p_new, $role ) {
+	$r = new WP_REST_Request( 'POST', '/wp/v2/posts/' . $p_new );
+	$r->set_body_params( array( 'meta' => array( '_rolewright_roles' => array( $role, 'not_a_role' ), '_rolewright_message' => 'Hi <script>alert(1)</script><b>x</b>' ) ) );
+	return $r;
+} )() );
+$after_rest = Access::rules( $p_new );
+$rw_ok( 200 === $res->get_status() && array( $role ) === $after_rest['roles'], 'block-editor save (REST meta) stores rules and drops unknown roles (status ' . $res->get_status() . ')' );
+$rw_ok( false === strpos( $after_rest['message'], '<script' ), 'message is stripped of script tags on save' );
+$rw_ok( 1 === count( $events ) && 'access.updated' === $events[0][0] && $p_new === $events[0][1]['target'] && array() === $events[0][1]['before']['roles'] && array( $role ) === $events[0][1]['after']['roles'] && $admin_id === $events[0][1]['actor'], 'rolewright_changed access.updated fired once for the REST save with before and after' );
+$rw_ok( false === strpos( Access::notice_html( $p_new ), '<script' ), 'denied notice html is escaped' );
+
+$events = array();
+$_POST  = array(
+	'_rolewright_access_nonce' => wp_create_nonce( Post_Editor::NONCE ),
+	'rolewright_roles'         => array(),
+	'rolewright_message'       => '',
+);
+( new Post_Editor() )->save_meta_box( $p_new, get_post( $p_new ) );
+$_POST = array();
+$rw_ok( ! Access::is_restricted( $p_new ) && 1 === count( $events ) && array( $role ) === $events[0][1]['before']['roles'], 'classic meta box save clears rules and fires access.updated with before' );
+
+$events = array();
+$_POST  = array( 'rolewright_roles' => array( $role ) );
+( new Post_Editor() )->save_meta_box( $p_new, get_post( $p_new ) );
+$_POST = array();
+$rw_ok( ! Access::is_restricted( $p_new ) && ! $events, 'classic save without a nonce changes nothing' );
+
+wp_set_current_user( $u_editor );
+$res = rest_do_request( ( function () use ( $p_new, $role ) {
+	$r = new WP_REST_Request( 'POST', '/wp/v2/posts/' . $p_new );
+	$r->set_body_params( array( 'meta' => array( '_rolewright_roles' => array( $role ) ) ) );
+	return $r;
+} )() );
+$rw_ok( ! Access::is_restricted( $p_new ), 'a user without the access capability cannot set rules over REST (status ' . $res->get_status() . ')' );
+$_POST = array( '_rolewright_access_nonce' => wp_create_nonce( Post_Editor::NONCE ), 'rolewright_roles' => array( $role ), 'rolewright_message' => '' );
+( new Post_Editor() )->save_meta_box( $p_new, get_post( $p_new ) );
+$_POST = array();
+$rw_ok( ! Access::is_restricted( $p_new ), 'a user without the access capability cannot set rules from the meta box' );
+wp_set_current_user( $admin_id );
+
+$events = array();
+$_POST  = array( 'rolewright_menu' => array( 999001 => array( 'nonce' => 'bad', 'mode' => 'logged_in' ) ) );
+( new Menu_Visibility() )->save( 1, 999001 );
+$_POST = array();
+$rw_ok( ! $events && '' === (string) get_post_meta( 999001, Menu_Visibility::META_MODE, true ), 'menu item save refuses a bad nonce' );
+
+// Cleanup.
+foreach ( array_reverse( $posts ) as $pid ) {
+	wp_delete_post( $pid, true );
+}
+foreach ( $users as $uid ) {
+	wp_delete_user( $uid );
+}
+remove_role( $role );
+
+echo "\nPASS: $rw_pass FAIL: $rw_fail\n";
+exit( $rw_fail ? 1 : 0 );
