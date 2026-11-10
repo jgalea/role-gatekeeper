@@ -113,7 +113,7 @@ wp_cache_delete( $rw_admin, 'user_meta' );
 $rw_ok( 0 === $rw_probe_count(), 'options: rolegate_* options are removed on the current site' );
 $rw_ok( array() === $rw_plugin_caps( $rw_raw_roles() ), 'caps: no role keeps a rolegate_* cap' );
 $rw_ok( ! get_user_meta( $rw_admin, 'rolegate_rescue_token', true ), 'user meta: the rescue token is removed' );
-$rw_ok( ! metadata_exists( 'user', $rw_admin, 'rolegate_disabled' ), 'user meta: the disabled-account flag is removed' );
+$rw_ok( metadata_exists( 'user', $rw_admin, 'rolegate_disabled' ), 'user meta: the disabled-account flag is kept while delete-on-uninstall is off' );
 if ( is_multisite() ) {
 	switch_to_blog( $rw_sub_ok );
 	$rw_ok( 0 === $rw_probe_count() && array() === $rw_plugin_caps( $rw_raw_roles() ), 'multisite: subsite options and caps are removed too' );

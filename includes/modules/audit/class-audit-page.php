@@ -262,7 +262,7 @@ final class Audit_Page {
 		wp_nonce_field( 'rolegate_audit_settings' );
 		echo '<table class="form-table" role="presentation"><tbody>';
 		echo '<tr><th scope="row"><label for="rw-retention">' . esc_html__( 'Keep entries for (days)', 'role-gatekeeper' ) . '</label></th><td><input id="rw-retention" type="number" min="1" max="3650" name="retention_days" value="' . (int) $settings['retention_days'] . '"' . disabled( ! $can_edit, true, false ) . ' /></td></tr>';
-		echo '<tr><th scope="row">' . esc_html__( 'On uninstall', 'role-gatekeeper' ) . '</th><td><label><input type="checkbox" name="delete_on_uninstall" value="1"' . checked( $settings['delete_on_uninstall'], true, false ) . disabled( ! $can_edit, true, false ) . ' /> ' . esc_html__( 'Delete the audit table when the plugin is deleted', 'role-gatekeeper' ) . '</label></td></tr>';
+		echo '<tr><th scope="row">' . esc_html__( 'On uninstall', 'role-gatekeeper' ) . '</th><td><label><input type="checkbox" name="delete_on_uninstall" value="1"' . checked( $settings['delete_on_uninstall'], true, false ) . disabled( ! $can_edit, true, false ) . ' /> ' . esc_html__( 'Delete the audit log and disabled-account flags when the plugin is deleted', 'role-gatekeeper' ) . '</label></td></tr>';
 		echo '</tbody></table>';
 		if ( $can_edit ) {
 			submit_button( __( 'Save settings', 'role-gatekeeper' ) );
