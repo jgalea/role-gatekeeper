@@ -7,6 +7,7 @@ use Rolegate\Modules\Capabilities\Cap_Catalog;
 use Rolegate\Modules\Content_Access\Access;
 use Rolegate\Modules\Content_Access\Content_Settings;
 use Rolegate\Modules\Deny_Hierarchy\Denials;
+use Rolegate\Modules\Disabled_Users\Accounts;
 use Rolegate\Modules\Roles\Role_Service;
 use Rolegate\Modules\Safety\Caps;
 use Rolegate\Modules\Safety\Guard;
@@ -23,7 +24,7 @@ defined( 'ABSPATH' ) || exit;
  * A plan is { source, label, detected, rows: [{area,item,action,detail}], ops }. ops keys:
  * denials (role => full new list), posts (id => {roles?, message?} to add), blocks
  * (id => {before, after} content), content_message, site_access (new settings), extras
- * (extra default roles), modules (ids to switch on).
+ * (extra default roles), modules (ids to switch on), users (ids of accounts to disable).
  */
 final class Migrator {
 	const RECORDS     = 'rolegate_migrations';
@@ -33,8 +34,9 @@ final class Migrator {
 	/** @return array<string,string> source id => class */
 	public static function sources(): array {
 		return array(
-			'members' => Members_Migration::class,
-			'ure'     => Ure_Migration::class,
+			'members'       => Members_Migration::class,
+			'ure'           => Ure_Migration::class,
+			'disable-users' => Disable_Users_Migration::class,
 		);
 	}
 
@@ -87,11 +89,12 @@ final class Migrator {
 			'site_access'     => null,
 			'extras'          => null,
 			'modules'         => array(),
+			'users'           => array(),
 		);
 	}
 
 	public static function has_changes( array $ops ): bool {
-		return $ops['denials'] || $ops['posts'] || $ops['blocks'] || null !== $ops['content_message'] || null !== $ops['site_access'] || null !== $ops['extras'] || $ops['modules'];
+		return $ops['denials'] || $ops['posts'] || $ops['blocks'] || null !== $ops['content_message'] || null !== $ops['site_access'] || null !== $ops['extras'] || $ops['modules'] || ! empty( $ops['users'] );
 	}
 
 	/**
@@ -147,6 +150,7 @@ final class Migrator {
 			'site_access'     => null,
 			'extras'          => null,
 			'modules'         => null,
+			'users'           => array(),
 			'post_ids'        => array(),
 			'reverted'        => false,
 		);
@@ -253,6 +257,11 @@ final class Migrator {
 			}
 		}
 
+		foreach ( (array) ( $ops['users'] ?? array() ) as $user_id ) {
+			Accounts::write( (int) $user_id, true );
+			$record['users'][] = (int) $user_id;
+		}
+
 		$record['post_ids'] = array_values( array_unique( array_map( 'intval', $record['post_ids'] ) ) );
 		self::store_record( $record );
 
@@ -271,6 +280,7 @@ final class Migrator {
 						'extras'          => $record['extras'] ? $record['extras']['before'] : null,
 						'modules'         => $record['modules'] ? $record['modules']['before'] : null,
 					),
+					'users'    => array(),
 				),
 				'after'        => array(
 					'denials'  => wp_list_pluck( $record['denials'], 'after' ),
@@ -281,6 +291,7 @@ final class Migrator {
 						'extras'          => $record['extras'] ? $record['extras']['after'] : null,
 						'modules'         => $record['modules'] ? $record['modules']['after'] : null,
 					),
+					'users'    => $record['users'],
 				),
 				'migration_id' => $record['id'],
 				'backup_id'    => $backup_id,
@@ -304,6 +315,10 @@ final class Migrator {
 		if ( $record['post_ids'] ) {
 			/* translators: %d: number of posts */
 			$parts[] = sprintf( _n( '%d post', '%d posts', count( $record['post_ids'] ), 'role-gatekeeper' ), count( $record['post_ids'] ) );
+		}
+		if ( ! empty( $record['users'] ) ) {
+			/* translators: %d: number of accounts */
+			$parts[] = sprintf( _n( '%d disabled account', '%d disabled accounts', count( $record['users'] ), 'role-gatekeeper' ), count( $record['users'] ) );
 		}
 		foreach ( array(
 			'content_message' => __( 'default message', 'role-gatekeeper' ),
@@ -487,6 +502,11 @@ final class Migrator {
 			$ok = Role_Service::set_default( $actor, (string) $record['extras']['before']['default'], (array) $record['extras']['before']['extras'] );
 			if ( is_wp_error( $ok ) ) {
 				$errors[] = $ok->get_error_message();
+			}
+		}
+		foreach ( (array) ( $record['users'] ?? array() ) as $user_id ) {
+			if ( Accounts::is_disabled( (int) $user_id ) ) {
+				Accounts::write( (int) $user_id, false );
 			}
 		}
 		if ( $record['modules'] ) {
