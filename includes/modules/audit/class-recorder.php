@@ -36,6 +36,11 @@ final class Recorder {
 			}
 		}
 
+		if ( 'user.disabled' === $type ) {
+			$detail['disabled_before'] = is_array( $before ) && ! empty( $before['disabled'] );
+			$detail['disabled_after']  = is_array( $after ) && ! empty( $after['disabled'] );
+		}
+
 		if ( in_array( $type, array( 'modules.updated', 'automation.updated' ), true ) ) {
 			$b = is_array( $before ) ? $before : array();
 			$a = is_array( $after ) ? $after : array();

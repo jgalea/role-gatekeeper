@@ -302,6 +302,9 @@ final class Audit_Page {
 				$lines[] = esc_html( $detail['label'] );
 			}
 		}
+		if ( is_array( $detail ) && isset( $detail['disabled_after'] ) ) {
+			$lines[] = $detail['disabled_after'] ? esc_html__( 'Account disabled', 'role-gatekeeper' ) : esc_html__( 'Account enabled', 'role-gatekeeper' );
+		}
 		$groups = array(
 			'caps'     => array(
 				'added'    => __( 'Granted', 'role-gatekeeper' ),
@@ -349,6 +352,7 @@ final class Audit_Page {
 		$labels = array(
 			'modules.updated'    => __( 'Modules switched on or off', 'role-gatekeeper' ),
 			'automation.updated' => __( 'Automation settings changed', 'role-gatekeeper' ),
+			'user.disabled'      => __( 'Account disabled or enabled', 'role-gatekeeper' ),
 			'migration.applied'  => __( 'Migrated from another plugin', 'role-gatekeeper' ),
 			'migration.reverted' => __( 'Migration reverted', 'role-gatekeeper' ),
 		);
