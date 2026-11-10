@@ -151,6 +151,7 @@ final class Migrator {
 			'extras'          => null,
 			'modules'         => null,
 			'users'           => array(),
+			'user_state'      => array(),
 			'post_ids'        => array(),
 			'reverted'        => false,
 		);
@@ -258,8 +259,15 @@ final class Migrator {
 		}
 
 		foreach ( (array) ( $ops['users'] ?? array() ) as $user_id ) {
-			Accounts::write( (int) $user_id, true );
-			$record['users'][] = (int) $user_id;
+			$user_id = (int) $user_id;
+			$allowed = self::is_shell( $actor ) ? true : Accounts::check_actor( $actor, $user_id );
+			if ( is_wp_error( $allowed ) ) {
+				$errors[] = '#' . $user_id . ': ' . $allowed->get_error_message();
+				continue;
+			}
+			Accounts::write( $user_id, true );
+			$record['users'][]                = $user_id;
+			$record['user_state'][ $user_id ] = Accounts::meta_id( $user_id );
 		}
 
 		$record['post_ids'] = array_values( array_unique( array_map( 'intval', $record['post_ids'] ) ) );
@@ -467,6 +475,14 @@ final class Migrator {
 		if ( $record['extras'] && ( Role_Service::extra_default_roles() !== $record['extras']['after']['extras'] || (string) get_option( 'default_role' ) !== $record['extras']['after']['default'] ) ) {
 			$changed[] = __( 'default roles', 'role-gatekeeper' );
 		}
+		foreach ( (array) ( $record['users'] ?? array() ) as $user_id ) {
+			$user_id = (int) $user_id;
+			if ( ! Accounts::is_disabled( $user_id ) || Accounts::meta_id( $user_id ) !== (int) ( $record['user_state'][ $user_id ] ?? 0 ) ) {
+				$user      = get_userdata( $user_id );
+				/* translators: %s: user login */
+				$changed[] = sprintf( __( 'account status of %s', 'role-gatekeeper' ), $user ? $user->user_login : '#' . $user_id );
+			}
+		}
 		if ( $changed ) {
 			return new \WP_Error(
 				'rolegate_migration_changed',
@@ -505,8 +521,13 @@ final class Migrator {
 			}
 		}
 		foreach ( (array) ( $record['users'] ?? array() ) as $user_id ) {
-			if ( Accounts::is_disabled( (int) $user_id ) ) {
+			if ( self::is_shell( $actor ) ) {
 				Accounts::write( (int) $user_id, false );
+				continue;
+			}
+			$ok = Accounts::change( $actor, (int) $user_id, false );
+			if ( is_wp_error( $ok ) ) {
+				$errors[] = '#' . (int) $user_id . ': ' . $ok->get_error_message();
 			}
 		}
 		if ( $record['modules'] ) {

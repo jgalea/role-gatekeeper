@@ -505,6 +505,7 @@ try {
 		$rw_ja_kept = $rw_ja_kept && '1' === get_user_meta( $rw_id, 'ja_disable_user', true );
 	}
 	$rw_ok( $rw_ja_kept, 'migration revert: ja_disable_user still untouched' );
+	$rw_ok( ! Plugin::is_enabled( 'audit' ) || ! Store::table_exists() || ( $rw_audit_rows( 'user.disabled', $rw_m['m2'] ) && false === json_decode( (string) $rw_audit_rows( 'user.disabled', $rw_m['m2'] )[0]->detail, true )['disabled_after'] ), 'migration revert: each re-enabled account gets its own audit entry' );
 	$rw_ok( $rw_login( $rw_m['m2'] ) instanceof WP_User, 'migration revert: a reverted user logs in again' );
 
 	// Module off: the migration switches it on, revert puts it back.
@@ -518,6 +519,37 @@ try {
 	$rw_rv2 = Migrator::revert( $rw_ap2['migration_id'], $rw_a );
 	$rw_ok( true === $rw_rv2 && ! Plugin::is_enabled( 'disabled-users' ) && ! Accounts::is_disabled( $rw_m['m1'] ), 'migration revert: module and users restored' );
 	update_option( Plugin::OPTION_MODULES, $rw_orig_modules ? $rw_orig_modules : array() );
+
+	// The actor's own authority bounds the migration.
+	$rw_n1 = $rw_make( 'rw_dis_n1', 'subscriber' );
+	$rw_n2 = $rw_make( 'rw_dis_n2', 'subscriber' );
+	update_user_meta( $rw_n1, 'ja_disable_user', '1' );
+	update_user_meta( $rw_n2, 'ja_disable_user', '1' );
+	$rw_deny = function ( $ok, $actor, $target ) use ( $rw_n2 ) {
+		return $target === $rw_n2 ? false : $ok;
+	};
+	add_filter( 'rolegate_can_act_on_user', $rw_deny, 10, 3 );
+	$rw_ap3 = null;
+	$rw_p3  = Migrator::plan( 'disable-users', $rw_a );
+	$rw_ok( in_array( $rw_n1, $rw_p3['ops']['users'], true ) && ! in_array( $rw_n2, $rw_p3['ops']['users'], true ) && $rw_find( $rw_p3['rows'], 'blocked', 'rw_dis_n2' ), 'migration authority: a user the actor can\'t act on is left out of the plan and reported' );
+	$rw_ap3 = Migrator::apply( 'disable-users', $rw_a );
+	$rw_ok( ! is_wp_error( $rw_ap3 ) && Accounts::is_disabled( $rw_n1 ) && ! Accounts::is_disabled( $rw_n2 ), 'migration authority: apply disables the allowed user and not the one above the actor' );
+	remove_filter( 'rolegate_can_act_on_user', $rw_deny, 10 );
+	if ( Migrator::is_shell( 0 ) ) {
+		add_filter( 'rolegate_can_act_on_user', $rw_deny, 10, 3 );
+		$rw_ok( in_array( $rw_n2, Migrator::plan( 'disable-users', 0 )['ops']['users'], true ), 'migration authority: the shell actor keeps WP-CLI\'s own reach' );
+		remove_filter( 'rolegate_can_act_on_user', $rw_deny, 10 );
+	}
+
+	// Revert only touches accounts whose flag is as the migration left it.
+	Accounts::change( $rw_a, $rw_m['m1'], false );
+	Accounts::change( $rw_a, $rw_m['m1'], true );
+	$rw_rv3 = ! is_wp_error( $rw_ap3 ) ? Migrator::revert( $rw_ap3['migration_id'], $rw_a ) : null;
+	$rw_ok( is_wp_error( $rw_rv3 ) && 'rolegate_migration_changed' === $rw_rv3->get_error_code() && false !== strpos( $rw_rv3->get_error_message(), 'rw_dis_m1' ), 'migration revert: an account someone re-disabled on purpose is reported and blocks the revert' );
+	$rw_ok( Accounts::is_disabled( $rw_n1 ) && Accounts::is_disabled( $rw_m['m1'] ) && Accounts::is_disabled( $rw_m['m2'] ), 'migration revert: nothing was re-enabled when an account had changed' );
+	foreach ( array_merge( array_values( array_slice( $rw_m, 0, 5 ) ), array( $rw_n1 ) ) as $rw_id ) {
+		Accounts::write( $rw_id, false );
+	}
 
 	// Shell actor: the last active manager stays enabled.
 	if ( Migrator::is_shell( 0 ) ) {

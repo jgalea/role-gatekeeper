@@ -26,7 +26,11 @@ final class Disable_Users_Migration {
 	public static function flagged(): array {
 		global $wpdb;
 		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT m.user_id FROM {$wpdb->usermeta} m INNER JOIN {$wpdb->users} u ON u.ID = m.user_id WHERE m.meta_key = %s AND m.meta_value = %s ORDER BY m.user_id", self::META, '1' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
-		return array_values( array_unique( array_map( 'intval', (array) $ids ) ) );
+		$ids = array_values( array_unique( array_map( 'intval', (array) $ids ) ) );
+		if ( is_multisite() ) {
+			$ids = array_values( array_filter( $ids, 'is_user_member_of_blog' ) );
+		}
+		return $ids;
 	}
 
 	public static function plan( int $actor, array $opts = array() ): array {
@@ -62,6 +66,18 @@ final class Disable_Users_Migration {
 		if ( $actor > 0 && in_array( $actor, $todo, true ) ) {
 			$todo   = array_values( array_diff( $todo, array( $actor ) ) );
 			$rows[] = Migrator::row( $area, self::login( $actor ), 'blocked', __( 'This is your own account, which you can\'t disable.', 'role-gatekeeper' ) );
+		}
+		if ( ! Migrator::is_shell( $actor ) ) {
+			$denied = array();
+			foreach ( $todo as $id ) {
+				if ( true !== Accounts::check_actor( $actor, $id ) ) {
+					$denied[] = $id;
+				}
+			}
+			if ( $denied ) {
+				$todo   = array_values( array_diff( $todo, $denied ) );
+				$rows[] = Migrator::row( $area, implode( ', ', array_map( array( __CLASS__, 'login' ), array_slice( $denied, 0, 10 ) ) ), 'blocked', __( 'You can\'t change the accounts of these users.', 'role-gatekeeper' ) );
+			}
 		}
 		$managers = Accounts::active_managers();
 		if ( $managers && ! array_diff( $managers, $todo ) ) {

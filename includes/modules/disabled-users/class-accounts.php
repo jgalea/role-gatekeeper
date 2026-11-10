@@ -14,6 +14,11 @@ final class Accounts {
 		return $user_id > 0 && '1' === (string) get_user_meta( $user_id, self::META, true );
 	}
 
+	public static function meta_id( int $user_id ): int {
+		global $wpdb;
+		return (int) $wpdb->get_var( $wpdb->prepare( "SELECT umeta_id FROM {$wpdb->usermeta} WHERE user_id = %d AND meta_key = %s ORDER BY umeta_id DESC LIMIT 1", $user_id, self::META ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+	}
+
 	/**
 	 * Sets or clears the flag and ends the user's sessions when disabling. No checks, no log entry.
 	 */
