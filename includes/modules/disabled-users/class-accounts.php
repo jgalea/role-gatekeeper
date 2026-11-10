@@ -105,6 +105,9 @@ final class Accounts {
 		if ( true !== $member ) {
 			return $member;
 		}
+		if ( is_multisite() && ! is_super_admin( $actor ) && ! user_can( $actor, 'manage_network_users' ) ) {
+			return new \WP_Error( 'rolegate_needs_network_users', __( 'On a multisite network, only super admins and users who can manage network users can disable or enable accounts.', 'role-gatekeeper' ) );
+		}
 		if ( ! user_can( $actor, 'edit_user', $target ) || ! Guard::can_act_on_user( $actor, $target ) ) {
 			return new \WP_Error( 'rolegate_user_above_actor', __( 'This user holds capabilities you don\'t have.', 'role-gatekeeper' ) );
 		}

@@ -122,9 +122,9 @@ try {
 	sort( $rw_trio );
 	$rw_ok( $rw_trio === Accounts::active_managers(), 'setup: the three test users are the only active managers on A (' . implode( ',', Accounts::active_managers() ) . ')' );
 
-	// Actor rules. Core's edit_user gate on multisite needs manage_network_users, so a site admin without it is refused first.
+	// Actor rules. On multisite a site admin needs manage_network_users (core's edit_user rule), and gets a clear error without it.
 	$rw_res = Accounts::check( $rw_sadmin, $rw_member, true );
-	$rw_ok( is_wp_error( $rw_res ) && 'rolegate_user_above_actor' === $rw_res->get_error_code(), 'actor: a site admin without manage_network_users is refused on a member too, by core\'s edit_user gate (' . $rw_code( $rw_res ) . ')' );
+	$rw_ok( is_wp_error( $rw_res ) && 'rolegate_needs_network_users' === $rw_res->get_error_code(), 'actor: a site admin without manage_network_users gets the network-users error, not "holds capabilities" (' . $rw_code( $rw_res ) . ')' );
 	get_userdata( $rw_sadmin )->add_cap( 'manage_network_users' );
 	$rw_res = Accounts::check( $rw_sadmin, $rw_out_b, true );
 	$rw_ok( is_wp_error( $rw_res ) && 'rolegate_not_site_member' === $rw_res->get_error_code(), 'actor: a site admin cannot disable a user outside their site (' . $rw_code( $rw_res ) . ')' );
