@@ -17,6 +17,35 @@ final class Users_List {
 		add_filter( 'bulk_actions-users', array( $this, 'bulk_actions' ) );
 		add_filter( 'handle_bulk_actions-users', array( $this, 'handle_bulk' ), 10, 3 );
 		add_action( 'admin_notices', array( $this, 'notice' ) );
+		add_action( 'admin_head-users.php', array( $this, 'styles' ) );
+		if ( is_multisite() ) {
+			add_filter( 'manage_users-network_columns', array( $this, 'columns' ) );
+			add_filter( 'views_users-network', array( $this, 'views' ) );
+			add_filter( 'bulk_actions-users-network', array( $this, 'bulk_actions' ) );
+			add_filter( 'handle_network_bulk_actions-users-network', array( $this, 'handle_bulk' ), 10, 3 );
+			add_action( 'network_admin_notices', array( $this, 'notice' ) );
+			add_action( 'admin_head-users.php', array( $this, 'styles' ) );
+		}
+	}
+
+	public function styles(): void {
+		$ids = get_users(
+			array(
+				'fields'     => 'ID',
+				'number'     => 200,
+				'meta_key'   => Accounts::META, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+				'meta_value' => '1', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+			)
+		);
+		if ( ! $ids ) {
+			return;
+		}
+		$selectors = array();
+		foreach ( $ids as $id ) {
+			$selectors[] = '#user-' . (int) $id . ' .column-username strong a::after';
+		}
+		$label = str_replace( array( '\\', '"' ), array( '\\\\', '\\"' ), ' (' . wp_strip_all_tags( __( 'Disabled', 'role-gatekeeper' ) ) . ')' );
+		echo '<style>' . implode( ',', $selectors ) . '{content:"' . $label . '";font-weight:400;color:#b32d2e}.rolegate-state{font-weight:600;color:#b32d2e}</style>'; // phpcs:ignore WordPress.Security.EscapeOutput -- ids are integers; the label is escaped for a CSS string.
 	}
 
 	/**
@@ -24,7 +53,7 @@ final class Users_List {
 	 * @return array
 	 */
 	public function columns( $columns ) {
-		$columns['rolegate_disabled'] = __( 'Account', 'role-gatekeeper' );
+		$columns['rolegate_disabled'] = __( 'Status', 'role-gatekeeper' );
 		return $columns;
 	}
 
@@ -38,7 +67,7 @@ final class Users_List {
 		if ( 'rolegate_disabled' !== $column ) {
 			return $output;
 		}
-		return Accounts::is_disabled( (int) $user_id ) ? '<strong>' . esc_html__( 'Disabled', 'role-gatekeeper' ) . '</strong>' : '';
+		return Accounts::is_disabled( (int) $user_id ) ? '<strong class="rolegate-state">' . esc_html__( 'Disabled', 'role-gatekeeper' ) . '</strong>' : '';
 	}
 
 	private static function filtering(): bool {
@@ -64,15 +93,7 @@ final class Users_List {
 	 * @return array
 	 */
 	public function views( $views ) {
-		$query   = new \WP_User_Query(
-			array(
-				'fields'      => 'ID',
-				'number'      => 1,
-				'count_total' => true,
-				'meta_query'  => self::meta_query(), // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
-			)
-		);
-		$count   = (int) $query->get_total();
+		$count   = Accounts::count_disabled();
 		$current = self::filtering();
 		if ( ! $count && ! $current ) {
 			return $views;
@@ -133,13 +154,18 @@ final class Users_List {
 		$actor   = get_current_user_id();
 		$done    = 0;
 		$skip    = 0;
+		$why     = array();
 		foreach ( array_unique( array_map( 'intval', (array) $user_ids ) ) as $id ) {
-			if ( true === Accounts::change( $actor, $id, $disable ) ) {
+			$result = Accounts::change( $actor, $id, $disable );
+			if ( true === $result ) {
 				++$done;
 			} else {
 				++$skip;
+				$user  = get_userdata( $id );
+				$why[] = array( $user ? $user->user_login : '#' . $id, $result->get_error_message() );
 			}
 		}
+		set_transient( 'rolegate_dis_skipped_' . $actor, array_slice( $why, 0, 10 ), 5 * MINUTE_IN_SECONDS );
 		$keys = array( 'rolegate_dis_mode', 'rolegate_dis_done', 'rolegate_dis_skip' );
 		return add_query_arg(
 			array(
@@ -170,8 +196,18 @@ final class Users_List {
 		}
 		if ( $skip ) {
 			/* translators: %s: number of users */
-			$text .= ' ' . sprintf( _n( '%s user was skipped: your own account, the last user who can manage Role Gatekeeper, a user above you, or an account already in that state.', '%s users were skipped: your own account, the last user who can manage Role Gatekeeper, users above you, or accounts already in that state.', $skip, 'role-gatekeeper' ), number_format_i18n( $skip ) );
+			$text .= ' ' . sprintf( _n( '%s user was skipped.', '%s users were skipped.', $skip, 'role-gatekeeper' ), number_format_i18n( $skip ) );
 		}
-		printf( '<div class="notice notice-%s is-dismissible"><p>%s</p></div>', $skip && ! $done ? 'warning' : 'success', esc_html( $text ) );
+		$list = '';
+		$why  = $skip ? get_transient( 'rolegate_dis_skipped_' . get_current_user_id() ) : false;
+		delete_transient( 'rolegate_dis_skipped_' . get_current_user_id() );
+		if ( is_array( $why ) && $why ) {
+			$list = '<ul style="list-style:disc;margin-inline-start:2em">';
+			foreach ( $why as $row ) {
+				$list .= '<li>' . esc_html( $row[0] . ': ' . $row[1] ) . '</li>';
+			}
+			$list .= '</ul>';
+		}
+		printf( '<div class="notice notice-%s is-dismissible"><p>%s</p>%s</div>', $skip && ! $done ? 'warning' : 'success', esc_html( $text ), $list ); // phpcs:ignore WordPress.Security.EscapeOutput -- escaped above.
 	}
 }
