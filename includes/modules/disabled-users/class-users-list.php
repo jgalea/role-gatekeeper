@@ -155,7 +155,7 @@ final class Users_List {
 		if ( ! in_array( $action, array( self::DISABLE, self::ENABLE, self::EXPIRE, self::KEEP ), true ) ) {
 			return $sendback;
 		}
-		check_admin_referer( 'bulk-users' );
+		check_admin_referer( is_network_admin() ? 'bulk-users-network' : 'bulk-users' );
 		if ( get_current_user_id() && ! current_user_can( Caps::MANAGE_USERS ) ) {
 			wp_die( esc_html__( 'You do not have permission to do that.', 'role-gatekeeper' ), '', array( 'response' => 403 ) );
 		}
