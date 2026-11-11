@@ -161,8 +161,19 @@ final class Accounts {
 		if ( $disable && self::is_last_manager( $target ) ) {
 			return new \WP_Error( 'rolegate_last_manager', __( 'This is the last active user who can manage Role Gatekeeper, so the account can\'t be disabled.', 'role-gatekeeper' ) );
 		}
-		if ( $disable && in_array( 'administrator', Users::raw_roles( $target ), true ) && ! Users::has_other_active_admin( $target ) ) {
-			return new \WP_Error( 'rolegate_last_admin', __( 'This is the last active administrator, so the account can\'t be disabled.', 'role-gatekeeper' ) );
+		if ( $disable ) {
+			// Disabling is network-wide, so every site the target administers needs another active administrator.
+			$blogs = is_multisite() ? array_keys( get_blogs_of_user( $target ) ) : array( get_current_blog_id() );
+			foreach ( $blogs as $blog_id ) {
+				$switched = is_multisite() && switch_to_blog( (int) $blog_id );
+				$sole     = in_array( 'administrator', Users::raw_roles( $target ), true ) && ! Users::has_other_active_admin( $target );
+				if ( $switched ) {
+					restore_current_blog();
+				}
+				if ( $sole ) {
+					return new \WP_Error( 'rolegate_last_admin', __( 'This is the last active administrator, so the account can\'t be disabled.', 'role-gatekeeper' ) );
+				}
+			}
 		}
 		return true;
 	}

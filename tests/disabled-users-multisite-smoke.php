@@ -291,6 +291,28 @@ try {
 	$rw_post( array() );
 	$rw_post( array() );
 
+	// Disabling is network-wide: the only administrator of any one site can't be disabled.
+	$rw_solo  = $rw_make( 'rw_dm_solo', 'subscriber', array( $rw_a ) );
+	$rw_solo2 = $rw_make( 'rw_dm_solo2', 'subscriber', array( $rw_a ) );
+	$rw_c     = wp_insert_site(
+		array(
+			'domain' => (string) get_network()->domain,
+			'path'   => '/rw-c-' . $rw_sfx . '/',
+			'title'  => 'RW c',
+		)
+	);
+	$rw_sites['c'] = (int) $rw_c;
+	add_user_to_blog( (int) $rw_c, $rw_solo, 'administrator' );
+	$rw_res = Accounts::check( $rw_super, $rw_solo, true );
+	$rw_ok( 'rolegate_last_admin' === $rw_code( $rw_res ), 'network disable: the only administrator of another site can\'t be disabled from site A (' . $rw_code( $rw_res ) . ')' );
+	$rw_res = Accounts::schedule( $rw_super, $rw_solo, time() + DAY_IN_SECONDS );
+	$rw_ok( 'rolegate_last_admin' === $rw_code( $rw_res ) && ! get_user_meta( $rw_solo, Accounts::DUE_META, true ), 'network disable: scheduling them is refused too (' . $rw_code( $rw_res ) . ')' );
+	add_user_to_blog( (int) $rw_c, $rw_solo2, 'administrator' );
+	$rw_ok( true === Accounts::check( $rw_super, $rw_solo, true ), 'network disable control: with a second active administrator on that site they can be disabled' );
+	Accounts::write( $rw_solo2, true );
+	$rw_ok( 'rolegate_last_admin' === $rw_code( Accounts::check( $rw_super, $rw_solo, true ) ), 'network disable: a disabled second administrator doesn\'t count' );
+	Accounts::write( $rw_solo2, false );
+
 	// Migration from Disable Users.
 	$rw_ja = function ( $id, $val ) {
 		update_user_meta( $id, 'ja_disable_user', $val );
