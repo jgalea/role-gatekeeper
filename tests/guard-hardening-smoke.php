@@ -40,6 +40,8 @@ try {
 		$rw_ok( Guard::is_critical_cap( $rw_cap ), 'critical: ' . $rw_cap );
 	}
 
+	$rw_ok( Guard::is_critical_cap( 'wpcode_edit_snippets' ) && Guard::is_critical_cap( 'wpcode_activate_snippets' ), 'critical: WPCode snippet capabilities' );
+
 	// Audit settings need a full site authority, not only rolegate_manage.
 	$rw_role = 'rw_t_aud_' . $rw_sfx;
 	$rw_roles[] = $rw_role;

@@ -88,6 +88,7 @@ final class Cap_Editor {
 		}
 
 		echo '<div class="wrap rw-caps"><h1>' . esc_html__( 'Capabilities', 'role-gatekeeper' ) . '</h1>';
+		echo '<p class="description">' . wp_kses( __( 'Capabilities that can run code or take over the site need extra care to hand out. Add capabilities from other plugins to that list with the <code>rolegate_critical_caps</code> filter.', 'role-gatekeeper' ), array( 'code' => array() ) ) . '</p>';
 		$notices = get_transient( 'rolegate_caps_notice_' . $actor );
 		delete_transient( 'rolegate_caps_notice_' . $actor );
 		foreach ( is_array( $notices ) ? $notices : array() as $n ) {

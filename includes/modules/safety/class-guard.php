@@ -58,6 +58,8 @@ final class Guard {
 		'gform_full_access',
 		'gravityforms_edit_forms',
 		'wpseo_manage_options',
+		'wpcode_edit_snippets',
+		'wpcode_activate_snippets',
 	);
 
 	/** @var string[] Caps WordPress reserves for super admins on multisite. */
