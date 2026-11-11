@@ -213,12 +213,13 @@ final class Denials {
 						'paged'  => $page++,
 					)
 				);
+				$full = 500 === count( $holders );
 				foreach ( $holders as $holder_id ) {
 					if ( (int) $holder_id !== $actor_id && ! Guard::can_act_on_user( $actor_id, (int) $holder_id ) ) {
 						return new \WP_Error( 'rolegate_holder_above_actor', __( 'You can\'t change denials on this role because some users who hold it have more capabilities than you.', 'role-gatekeeper' ) );
 					}
 				}
-			} while ( 500 === count( $holders ) );
+			} while ( $full );
 		}
 
 		$clean   = array();

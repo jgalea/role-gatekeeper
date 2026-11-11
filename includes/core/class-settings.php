@@ -57,7 +57,7 @@ final class Settings {
 				checked( Plugin::is_enabled( $module->id() ) || 'safety' === $module->id(), true, false ),
 				disabled( $locked, true, false ),
 				esc_html( $module->description() ),
-				self::warning_html( (string) apply_filters( 'rolegate_module_warning', '', $module->id() ) )
+				self::warning_html( (string) apply_filters( 'rolegate_module_warning', '', $module->id() ) ) // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in warning_html().
 			);
 		}
 		echo '</tbody></table>';

@@ -318,6 +318,13 @@ final class Guard {
 				}
 			}
 		}
+		// No role stores these by default; whoever can manage options (the network on multisite) can hand them out and counts as holding them.
+		$privacy_gate = is_multisite() ? 'manage_network' : 'manage_options';
+		foreach ( array( 'export_others_personal_data', 'erase_others_personal_data', 'manage_privacy_options' ) as $privacy_cap ) {
+			if ( $user->has_cap( $privacy_gate ) ) {
+				$caps[ $privacy_cap ] = true;
+			}
+		}
 		$caps = apply_filters( 'rolegate_guard_user_caps', $caps, $user );
 		return is_array( $caps ) ? $caps : array();
 	}

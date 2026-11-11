@@ -295,7 +295,7 @@ final class Ops {
 		if ( is_wp_error( $ok ) ) {
 			return $ok;
 		}
-		$ok     = Gate::self_lockout( $actor, $target, $after, self::direct_caps( $user ) );
+		$ok = Gate::self_lockout( $actor, $target, $after, self::direct_caps( $user ) );
 		if ( is_wp_error( $ok ) ) {
 			return $ok;
 		}

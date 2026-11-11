@@ -67,12 +67,12 @@ final class Login_Redirects_Page {
 		echo '<input type="hidden" name="action" value="' . esc_attr( self::ACTION ) . '" />';
 		wp_nonce_field( self::ACTION );
 		echo '<div class="rw-scroll" style="overflow-x:auto"><table class="widefat striped"><thead><tr><th>' . esc_html__( 'Role', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'After login', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'After logout', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'Default landing page', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'After registration', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'After first login', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'Priority', 'role-gatekeeper' ) . '</th></tr></thead><tbody>';
-		$position = 1;
-		$order    = array_flip( (array) $s['priority'] );
+		$position     = 1;
+		$order        = array_flip( (array) $s['priority'] );
 		$field_labels = array(
-			'login'   => __( 'After login', 'role-gatekeeper' ),
-			'logout'  => __( 'After logout', 'role-gatekeeper' ),
-			'landing' => __( 'Default landing page', 'role-gatekeeper' ),
+			'login'        => __( 'After login', 'role-gatekeeper' ),
+			'logout'       => __( 'After logout', 'role-gatekeeper' ),
+			'landing'      => __( 'Default landing page', 'role-gatekeeper' ),
 			'registration' => __( 'After registration', 'role-gatekeeper' ),
 			'first_login'  => __( 'After first login', 'role-gatekeeper' ),
 		);

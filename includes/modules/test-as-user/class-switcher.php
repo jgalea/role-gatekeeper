@@ -67,7 +67,7 @@ final class Switcher {
 
 	public function row_action( $actions, $user ) {
 		if ( $user instanceof \WP_User && true === self::check( get_current_user_id(), $user->ID ) ) {
-			$url                        = wp_nonce_url( admin_url( 'admin-post.php?action=' . self::START . '&user=' . $user->ID ), self::START . $user->ID );
+			$url                         = wp_nonce_url( admin_url( 'admin-post.php?action=' . self::START . '&user=' . $user->ID ), self::START . $user->ID );
 			$actions['rolegate_test_as'] = '<a href="' . esc_url( $url ) . '">' . esc_html__( 'Test as this user', 'role-gatekeeper' ) . '</a>';
 		}
 		return $actions;
@@ -79,7 +79,14 @@ final class Switcher {
 		check_admin_referer( self::START . $target );
 		$ok = self::check( $actor, $target );
 		if ( is_wp_error( $ok ) ) {
-			wp_die( esc_html( $ok->get_error_message() ), '', array( 'response' => 403, 'back_link' => true ) );
+			wp_die(
+				esc_html( $ok->get_error_message() ),
+				'',
+				array(
+					'response'  => 403,
+					'back_link' => true,
+				)
+			);
 		}
 		$expires = time() + self::DURATION;
 		$limit   = static function () {
@@ -162,8 +169,8 @@ final class Switcher {
 			return null;
 		}
 		list( $actor, $expires, $sig ) = $parts;
-		$actor   = (int) $actor;
-		$expires = (int) $expires;
+		$actor                         = (int) $actor;
+		$expires                       = (int) $expires;
 		if ( $actor <= 0 || $expires < time() || ! hash_equals( self::sign( $actor, get_current_user_id(), $expires ), $sig ) ) {
 			return null;
 		}

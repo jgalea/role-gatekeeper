@@ -43,7 +43,15 @@ final class Profile_Field {
 			$text = $by ? sprintf( __( 'Disabled on %1$s by %2$s.', 'role-gatekeeper' ), $when, $by->user_login ) : sprintf( /* translators: %s: date */ __( 'Disabled on %s.', 'role-gatekeeper' ), $when );
 			echo '<p class="description">' . esc_html( $text );
 			if ( current_user_can( Caps::VIEW_AUDIT ) && \Rolegate\Core\Plugin::is_enabled( 'audit' ) ) {
-				echo ' <a href="' . esc_url( add_query_arg( array( 'page' => \Rolegate\Modules\Audit\Audit_Page::SLUG, 'type' => 'user.disabled' ), admin_url( 'admin.php' ) ) ) . '">' . esc_html__( 'View in the audit log', 'role-gatekeeper' ) . '</a>';
+				echo ' <a href="' . esc_url(
+					add_query_arg(
+						array(
+							'page' => \Rolegate\Modules\Audit\Audit_Page::SLUG,
+							'type' => 'user.disabled',
+						),
+						admin_url( 'admin.php' )
+					)
+				) . '">' . esc_html__( 'View in the audit log', 'role-gatekeeper' ) . '</a>';
 			}
 			echo '</p>';
 		}

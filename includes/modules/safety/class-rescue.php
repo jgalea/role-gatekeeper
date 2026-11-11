@@ -66,12 +66,12 @@ final class Rescue {
 	 * the total to a constant floor, so response time doesn't reveal admin addresses.
 	 */
 	private static function request_inner( string $email, string $ip ): bool {
-		$within = self::hit( 'ip|' . $ip );
-		$email  = sanitize_email( $email );
-		$user   = $email ? get_user_by( 'email', $email ) : false;
-		$token  = bin2hex( random_bytes( 32 ) );
-		$hash   = hash( 'sha256', $token );
-		$acct   = self::hit( 'acct|' . $ip . '|' . ( $user ? $user->ID : 'none|' . hash( 'sha256', strtolower( $email ) ) ) );
+		$within     = self::hit( 'ip|' . $ip );
+		$email      = sanitize_email( $email );
+		$user       = $email ? get_user_by( 'email', $email ) : false;
+		$token      = bin2hex( random_bytes( 32 ) );
+		$hash       = hash( 'sha256', $token );
+		$acct       = self::hit( 'acct|' . $ip . '|' . ( $user ? $user->ID : 'none|' . hash( 'sha256', strtolower( $email ) ) ) );
 		$defer      = (bool) apply_filters( 'rolegate_rescue_defer_mail', ! ( defined( 'WP_CLI' ) && WP_CLI ) );
 		$can_detach = (bool) apply_filters( 'rolegate_rescue_can_detach', function_exists( 'fastcgi_finish_request' ) || function_exists( 'litespeed_finish_request' ) );
 		if ( ! $within || ! $user || ! $acct || ! self::is_eligible( $user ) ) {

@@ -9,11 +9,11 @@ use Rolegate\Modules\User_Roles\Users;
 defined( 'ABSPATH' ) || exit;
 
 final class Accounts {
-	const META      = 'rolegate_disabled';
-	const INFO_META = 'rolegate_disabled_info';
-	const DUE_META  = 'rolegate_disable_at';
+	const META           = 'rolegate_disabled';
+	const INFO_META      = 'rolegate_disabled_info';
+	const DUE_META       = 'rolegate_disable_at';
 	const MESSAGE_OPTION = 'rolegate_disabled_message';
-	const DUE_HOOK  = 'rolegate_disable_due';
+	const DUE_HOOK       = 'rolegate_disable_due';
 
 	public static function is_disabled( int $user_id ): bool {
 		return $user_id > 0 && '1' === (string) get_user_meta( $user_id, self::META, true );

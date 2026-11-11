@@ -34,7 +34,7 @@ final class Stripped_Notice {
 		if ( ! $on_screen || ! $ids || ! current_user_can( Caps::MANAGE ) ) {
 			return;
 		}
-		$text  = sprintf(
+		$text = sprintf(
 			/* translators: %s: number of accounts */
 			_n( 'Roles that can change the site were removed from %s account created while nobody was logged in.', 'Roles that can change the site were removed from %s accounts created while nobody was logged in.', count( $ids ), 'role-gatekeeper' ),
 			number_format_i18n( count( $ids ) )
