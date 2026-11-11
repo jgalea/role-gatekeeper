@@ -353,6 +353,8 @@ final class Audit_Page {
 			'modules.updated'    => __( 'Modules switched on or off', 'role-gatekeeper' ),
 			'automation.updated' => __( 'Automation settings changed', 'role-gatekeeper' ),
 			'user.disabled'      => __( 'Account disabled or enabled', 'role-gatekeeper' ),
+			'user.test_started'  => __( 'Started testing as a user', 'role-gatekeeper' ),
+			'user.test_ended'    => __( 'Stopped testing as a user', 'role-gatekeeper' ),
 			'migration.applied'  => __( 'Migrated from another plugin', 'role-gatekeeper' ),
 			'migration.reverted' => __( 'Migration reverted', 'role-gatekeeper' ),
 		);

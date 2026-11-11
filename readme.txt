@@ -25,6 +25,7 @@ Features:
 * Admin interface: hide or block admin menu items, meta boxes, dashboard widgets and toolbar nodes per role or user, and control plugin and theme access.
 * Edit scope: limit what a role or user can edit by post, author or term, and which terms they can assign.
 * Disabled accounts: block a user from logging in while keeping the account and posts. A checkbox on the user screen, a Disabled column and view on the Users list, bulk Disable and Enable, and sessions, REST, XML-RPC and application passwords are blocked too.
+* Test as this user (off by default): sign in as a user who holds nothing you don't, for up to an hour, with a banner and a one-click way back to your own account. Every start and stop is in the audit log.
 * Import and export: export roles as JSON, preview an import before it applies, and import from a User Role Editor roles backup.
 * Multisite: apply a role to every site in batches, push users to subsites and control site-admin access from the network.
 * Audit log: a record of every role, capability and access change with one-click revert, and a permissions viewer showing who holds a capability.
