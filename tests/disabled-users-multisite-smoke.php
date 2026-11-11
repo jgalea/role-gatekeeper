@@ -311,6 +311,12 @@ try {
 	$rw_ok( true === Accounts::check( $rw_super, $rw_solo, true ), 'network disable control: with a second active administrator on that site they can be disabled' );
 	Accounts::write( $rw_solo2, true );
 	$rw_ok( 'rolegate_last_admin' === $rw_code( Accounts::check( $rw_super, $rw_solo, true ) ), 'network disable: a disabled second administrator doesn\'t count' );
+	update_user_meta( $rw_solo, Accounts::DUE_META, time() - 5 );
+	update_user_meta( $rw_solo, Accounts::DUE_BY_META, $rw_super );
+	Accounts::apply_due_all();
+	$rw_ok( ! Accounts::is_disabled( $rw_solo ) && (int) get_user_meta( $rw_solo, Accounts::DUE_META, true ) > 0, 'network disable: the daily job doesn\'t disable the only administrator of another site' );
+	delete_user_meta( $rw_solo, Accounts::DUE_META );
+	delete_user_meta( $rw_solo, Accounts::DUE_BY_META );
 	Accounts::write( $rw_solo2, false );
 
 	// Migration from Disable Users.

@@ -350,13 +350,14 @@ final class Audit_Page {
 
 	private static function type_label( string $type ): string {
 		$labels = array(
-			'modules.updated'    => __( 'Modules switched on or off', 'role-gatekeeper' ),
-			'automation.updated' => __( 'Automation settings changed', 'role-gatekeeper' ),
-			'user.disabled'      => __( 'Account disabled or enabled', 'role-gatekeeper' ),
-			'user.test_started'  => __( 'Started testing as a user', 'role-gatekeeper' ),
-			'user.test_ended'    => __( 'Stopped testing as a user', 'role-gatekeeper' ),
-			'migration.applied'  => __( 'Migrated from another plugin', 'role-gatekeeper' ),
-			'migration.reverted' => __( 'Migration reverted', 'role-gatekeeper' ),
+			'modules.updated'      => __( 'Modules switched on or off', 'role-gatekeeper' ),
+			'automation.updated'   => __( 'Automation settings changed', 'role-gatekeeper' ),
+			'user.disabled'        => __( 'Account disabled or enabled', 'role-gatekeeper' ),
+			'user.disable_skipped' => __( 'Scheduled disabling skipped', 'role-gatekeeper' ),
+			'user.test_started'    => __( 'Started testing as a user', 'role-gatekeeper' ),
+			'user.test_ended'      => __( 'Stopped testing as a user', 'role-gatekeeper' ),
+			'migration.applied'    => __( 'Migrated from another plugin', 'role-gatekeeper' ),
+			'migration.reverted'   => __( 'Migration reverted', 'role-gatekeeper' ),
 		);
 		return isset( $labels[ $type ] ) ? $labels[ $type ] : '';
 	}

@@ -635,19 +635,55 @@ try {
 	$rw_ok( true === Accounts::schedule( $rw_a, $rw_sched, time() + DAY_IN_SECONDS ) && ! Accounts::is_disabled( $rw_sched ) && (int) get_user_meta( $rw_sched, Accounts::DUE_META, true ) > time(), 'schedule: a future date is stored and the account stays enabled' );
 	Accounts::apply_due( $rw_sched );
 	$rw_ok( ! Accounts::is_disabled( $rw_sched ), 'schedule: apply_due leaves an account whose date has not come' );
+	$rw_ok( (int) get_user_meta( $rw_sched, Accounts::DUE_BY_META, true ) === $rw_a, 'schedule: the person who set the date is stored with it' );
 	update_user_meta( $rw_sched, Accounts::DUE_META, time() - 5 );
-	$rw_ok( $rw_login( $rw_sched ) instanceof WP_Error && 'rolegate_disabled' === $rw_login( $rw_sched )->get_error_code() && Accounts::is_disabled( $rw_sched ) && ! get_user_meta( $rw_sched, Accounts::DUE_META, true ), 'schedule: a login after the date is refused and the account is disabled' );
+	$rw_ok( $rw_login( $rw_sched ) instanceof WP_Error && 'rolegate_disabled' === $rw_login( $rw_sched )->get_error_code() && Accounts::is_disabled( $rw_sched ) && ! get_user_meta( $rw_sched, Accounts::DUE_META, true ) && ! get_user_meta( $rw_sched, Accounts::DUE_BY_META, true ), 'schedule: a login after the date is refused and the account is disabled' );
+	$rw_ev = $rw_last_event( 'user.disabled' );
+	$rw_info = get_user_meta( $rw_sched, Accounts::INFO_META, true );
+	$rw_ok( $rw_ev && $rw_a === $rw_ev['actor'] && $rw_sched === $rw_ev['target'] && is_array( $rw_info ) && $rw_a === (int) $rw_info['by'], 'schedule: the disable is attributed to whoever set the date, not to nobody' );
 	$rw_sched2 = $rw_make( 'rw_dis_sched2', 'subscriber' );
+	Accounts::schedule( $rw_a, $rw_sched2, time() + DAY_IN_SECONDS );
 	update_user_meta( $rw_sched2, Accounts::DUE_META, time() - 5 );
 	Accounts::apply_due_all();
 	$rw_ok( Accounts::is_disabled( $rw_sched2 ), 'schedule: the daily job disables accounts that are due' );
 	Accounts::write( $rw_b, true );
 	Accounts::write( $rw_a, false );
 	update_user_meta( $rw_a, Accounts::DUE_META, time() - 5 );
+	update_user_meta( $rw_a, Accounts::DUE_BY_META, $rw_owner );
 	Accounts::apply_due( $rw_a );
-	$rw_ok( ! Accounts::is_disabled( $rw_a ), 'schedule: the last active administrator is never disabled by a date' );
+	$rw_ok( ! Accounts::is_disabled( $rw_a ) && (int) get_user_meta( $rw_a, Accounts::DUE_META, true ) > 0, 'schedule: the last active administrator is never disabled by a date, and the date waits' );
 	delete_user_meta( $rw_a, Accounts::DUE_META );
+	delete_user_meta( $rw_a, Accounts::DUE_BY_META );
 	Accounts::write( $rw_b, false );
+
+	// The scheduler's authority is checked again when the date arrives.
+	$rw_f1 = $rw_make( 'rw_dis_f1', 'subscriber' );
+	$rw_ok( true === Accounts::schedule( $rw_mgr, $rw_f1, time() + DAY_IN_SECONDS ), 'schedule authority: a user manager schedules a subscriber' );
+	\Rolegate\Modules\Safety\Enforcer::as_system(
+		function () use ( $rw_f1 ) {
+			get_userdata( $rw_f1 )->set_role( 'administrator' );
+		}
+	);
+	update_user_meta( $rw_f1, Accounts::DUE_META, time() - 5 );
+	Accounts::apply_due_all();
+	$rw_ev = $rw_last_event( 'user.disable_skipped' );
+	$rw_ok( ! Accounts::is_disabled( $rw_f1 ) && ! get_user_meta( $rw_f1, Accounts::DUE_META, true ) && ! get_user_meta( $rw_f1, Accounts::DUE_BY_META, true ), 'schedule authority: the target was promoted above the scheduler, so nothing is disabled and the date is dropped' );
+	$rw_ok( $rw_ev && $rw_mgr === $rw_ev['actor'] && $rw_f1 === $rw_ev['target'] && 'rolegate_user_above_actor' === $rw_ev['after']['reason'], 'schedule authority: the skip is logged against the scheduler with the reason' );
+	$rw_f2 = $rw_make( 'rw_dis_f2', 'subscriber' );
+	Accounts::schedule( $rw_mgr, $rw_f2, time() + DAY_IN_SECONDS );
+	update_user_meta( $rw_f2, Accounts::DUE_BY_META, $rw_plain );
+	update_user_meta( $rw_f2, Accounts::DUE_META, time() - 5 );
+	Accounts::apply_due( $rw_f2 );
+	$rw_ok( ! Accounts::is_disabled( $rw_f2 ) && ! get_user_meta( $rw_f2, Accounts::DUE_META, true ), 'schedule authority: a scheduler who can no longer manage accounts disables nobody' );
+	$rw_f3 = $rw_make( 'rw_dis_f3', 'subscriber' );
+	update_user_meta( $rw_f3, Accounts::DUE_META, time() - 5 );
+	Accounts::apply_due( $rw_f3 );
+	$rw_ok( ! Accounts::is_disabled( $rw_f3 ) && ! get_user_meta( $rw_f3, Accounts::DUE_META, true ), 'schedule authority: a date with nobody recorded as setting it is dropped' );
+	$rw_f4 = $rw_make( 'rw_dis_f4', 'subscriber' );
+	Accounts::schedule( $rw_mgr, $rw_f4, time() + DAY_IN_SECONDS );
+	update_user_meta( $rw_f4, Accounts::DUE_META, time() - 5 );
+	Accounts::apply_due( $rw_f4 );
+	$rw_ok( Accounts::is_disabled( $rw_f4 ), 'schedule authority control: a scheduler who still holds the rights disables the account' );
 
 	// Custom login message.
 	Accounts::write( $rw_victim, true );

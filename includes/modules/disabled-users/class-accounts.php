@@ -12,6 +12,7 @@ final class Accounts {
 	const META           = 'rolegate_disabled';
 	const INFO_META      = 'rolegate_disabled_info';
 	const DUE_META       = 'rolegate_disable_at';
+	const DUE_BY_META    = 'rolegate_disable_by';
 	const MESSAGE_OPTION = 'rolegate_disabled_message';
 	const DUE_HOOK       = 'rolegate_disable_due';
 
@@ -198,8 +199,10 @@ final class Accounts {
 		}
 		if ( $at > 0 ) {
 			update_user_meta( $target, self::DUE_META, $at );
+			update_user_meta( $target, self::DUE_BY_META, $actor );
 		} else {
 			delete_user_meta( $target, self::DUE_META );
+			delete_user_meta( $target, self::DUE_BY_META );
 		}
 		do_action(
 			'rolegate_changed',
@@ -215,35 +218,58 @@ final class Accounts {
 	}
 
 	/**
-	 * Disables the account when its date has passed, unless that would remove the last active administrator or manager.
+	 * Disables the account when its date has passed. The person who set the date must still be allowed to disable it, and the
+	 * last active administrator or manager is never disabled: a date that fails the first test is dropped, one that fails the second waits.
 	 */
 	public static function apply_due( int $user_id ): void {
 		$at = (int) get_user_meta( $user_id, self::DUE_META, true );
 		if ( ! $at || $at > time() ) {
 			return;
 		}
+		$by = (int) get_user_meta( $user_id, self::DUE_BY_META, true );
 		if ( self::is_disabled( $user_id ) ) {
 			delete_user_meta( $user_id, self::DUE_META );
+			delete_user_meta( $user_id, self::DUE_BY_META );
 			return;
 		}
-		if ( self::is_last_manager( $user_id ) || ( in_array( 'administrator', Users::raw_roles( $user_id ), true ) && ! Users::has_other_active_admin( $user_id ) ) ) {
+		$ok = $by > 0 ? self::check( $by, $user_id, true ) : new \WP_Error( 'rolegate_no_scheduler', __( 'Nobody is recorded as having set this date.', 'role-gatekeeper' ) );
+		if ( is_wp_error( $ok ) && in_array( $ok->get_error_code(), array( 'rolegate_last_admin', 'rolegate_last_manager' ), true ) ) {
+			return;
+		}
+		if ( is_wp_error( $ok ) ) {
+			delete_user_meta( $user_id, self::DUE_META );
+			delete_user_meta( $user_id, self::DUE_BY_META );
+			do_action(
+				'rolegate_changed',
+				'user.disable_skipped',
+				array(
+					'actor'  => $by,
+					'target' => $user_id,
+					'before' => array( 'at' => $at ),
+					'after'  => array(
+						'at'     => 0,
+						'reason' => $ok->get_error_code(),
+					),
+				)
+			);
 			return;
 		}
 		self::write( $user_id, true );
 		delete_user_meta( $user_id, self::DUE_META );
+		delete_user_meta( $user_id, self::DUE_BY_META );
 		update_user_meta(
 			$user_id,
 			self::INFO_META,
 			array(
 				'at' => time(),
-				'by' => 0,
+				'by' => $by,
 			)
 		);
 		do_action(
 			'rolegate_changed',
 			'user.disabled',
 			array(
-				'actor'  => 0,
+				'actor'  => $by,
 				'target' => $user_id,
 				'before' => array( 'disabled' => false ),
 				'after'  => array( 'disabled' => true ),
