@@ -114,6 +114,14 @@ final class Gate {
 	}
 
 	/** @return true|\WP_Error */
+	public static function promote_user( int $actor, int $target ) {
+		if ( $actor > 0 && ! user_can( $actor, 'promote_user', $target ) ) {
+			return new \WP_Error( 'rolegate_cannot_promote', __( 'You can\'t change the roles of this user.', 'role-gatekeeper' ) );
+		}
+		return true;
+	}
+
+	/** @return true|\WP_Error */
 	public static function act_on_user( int $actor, int $target ) {
 		if ( $actor > 0 && ! Guard::can_act_on_user( $actor, $target ) ) {
 			return new \WP_Error( 'rolegate_user_above_actor', __( 'You can\'t change a user who holds capabilities you don\'t have.', 'role-gatekeeper' ) );

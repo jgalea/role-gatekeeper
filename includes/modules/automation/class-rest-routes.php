@@ -212,7 +212,7 @@ final class Rest_Routes {
 		if ( is_array( $data ) && isset( $data['status'] ) ) {
 			return $error;
 		}
-		$forbidden = array( 'rolegate_lockout', 'rolegate_protected_role', 'rolegate_cap_not_held', 'rolegate_role_above_actor', 'rolegate_cannot_assign', 'rolegate_user_above_actor' );
+		$forbidden = array( 'rolegate_lockout', 'rolegate_protected_role', 'rolegate_cap_not_held', 'rolegate_role_above_actor', 'rolegate_cannot_assign', 'rolegate_user_above_actor', 'rolegate_cannot_promote' );
 		$status    = in_array( $error->get_error_code(), $forbidden, true ) ? 403 : 400;
 		$data      = is_array( $data ) ? $data : array();
 		return new \WP_Error( $error->get_error_code(), $error->get_error_message(), array_merge( $data, array( 'status' => $status ) ) );
