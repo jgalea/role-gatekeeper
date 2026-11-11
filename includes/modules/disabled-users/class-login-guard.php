@@ -52,8 +52,11 @@ final class Login_Guard {
 	 * @return mixed
 	 */
 	public function authenticate( $user ) {
+		if ( $user instanceof \WP_User ) {
+			Accounts::apply_due( $user->ID );
+		}
 		if ( $user instanceof \WP_User && Accounts::is_disabled( $user->ID ) ) {
-			return new \WP_Error( 'rolegate_disabled', __( 'This account has been disabled.', 'role-gatekeeper' ) );
+			return new \WP_Error( 'rolegate_disabled', Accounts::login_message() );
 		}
 		return $user;
 	}
@@ -63,6 +66,9 @@ final class Login_Guard {
 	 * @return int|false
 	 */
 	public function current_user( $user_id ) {
+		if ( $user_id ) {
+			Accounts::apply_due( (int) $user_id );
+		}
 		return $user_id && Accounts::is_disabled( (int) $user_id ) ? false : $user_id;
 	}
 

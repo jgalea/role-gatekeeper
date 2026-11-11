@@ -8,6 +8,8 @@ defined( 'ABSPATH' ) || exit;
 final class Users_List {
 	const DISABLE = 'rolegate_disable';
 	const ENABLE  = 'rolegate_enable';
+	const EXPIRE  = 'rolegate_expire_30';
+	const KEEP    = 'rolegate_expire_clear';
 
 	public function register(): void {
 		add_filter( 'manage_users_columns', array( $this, 'columns' ) );
@@ -67,7 +69,12 @@ final class Users_List {
 		if ( 'rolegate_disabled' !== $column ) {
 			return $output;
 		}
-		return Accounts::is_disabled( (int) $user_id ) ? '<strong class="rolegate-state">' . esc_html__( 'Disabled', 'role-gatekeeper' ) . '</strong>' : '';
+		if ( Accounts::is_disabled( (int) $user_id ) ) {
+			return '<strong class="rolegate-state">' . esc_html__( 'Disabled', 'role-gatekeeper' ) . '</strong>';
+		}
+		$due = (int) get_user_meta( (int) $user_id, Accounts::DUE_META, true );
+		/* translators: %s: date */
+		return $due ? esc_html( sprintf( __( 'Disables on %s', 'role-gatekeeper' ), wp_date( get_option( 'date_format' ), $due ) ) ) : '';
 	}
 
 	private static function filtering(): bool {
@@ -132,6 +139,8 @@ final class Users_List {
 		if ( current_user_can( Caps::MANAGE_USERS ) ) {
 			$actions[ self::DISABLE ] = __( 'Disable accounts', 'role-gatekeeper' );
 			$actions[ self::ENABLE ]  = __( 'Enable accounts', 'role-gatekeeper' );
+			$actions[ self::EXPIRE ]  = __( 'Disable accounts in 30 days', 'role-gatekeeper' );
+			$actions[ self::KEEP ]    = __( 'Cancel scheduled disabling', 'role-gatekeeper' );
 		}
 		return $actions;
 	}
@@ -143,7 +152,7 @@ final class Users_List {
 	 * @return string
 	 */
 	public function handle_bulk( $sendback, $action, $user_ids ) {
-		if ( self::DISABLE !== $action && self::ENABLE !== $action ) {
+		if ( ! in_array( $action, array( self::DISABLE, self::ENABLE, self::EXPIRE, self::KEEP ), true ) ) {
 			return $sendback;
 		}
 		check_admin_referer( 'bulk-users' );
@@ -151,12 +160,13 @@ final class Users_List {
 			wp_die( esc_html__( 'You do not have permission to do that.', 'role-gatekeeper' ), '', array( 'response' => 403 ) );
 		}
 		$disable = self::DISABLE === $action;
+		$timed   = in_array( $action, array( self::EXPIRE, self::KEEP ), true );
 		$actor   = get_current_user_id();
 		$done    = 0;
 		$skip    = 0;
 		$why     = array();
 		foreach ( array_unique( array_map( 'intval', (array) $user_ids ) ) as $id ) {
-			$result = Accounts::change( $actor, $id, $disable );
+			$result = $timed ? Accounts::schedule( $actor, $id, self::EXPIRE === $action ? time() + 30 * DAY_IN_SECONDS : 0 ) : Accounts::change( $actor, $id, $disable );
 			if ( true === $result ) {
 				++$done;
 			} else {
@@ -169,7 +179,7 @@ final class Users_List {
 		$keys = array( 'rolegate_dis_mode', 'rolegate_dis_done', 'rolegate_dis_skip' );
 		return add_query_arg(
 			array(
-				'rolegate_dis_mode' => $disable ? 'disable' : 'enable',
+				'rolegate_dis_mode' => $timed ? ( self::EXPIRE === $action ? 'expire' : 'keep' ) : ( $disable ? 'disable' : 'enable' ),
 				'rolegate_dis_done' => $done,
 				'rolegate_dis_skip' => $skip,
 			),
@@ -183,11 +193,18 @@ final class Users_List {
 		if ( 'users.php' !== $pagenow || ! isset( $_GET['rolegate_dis_mode'], $_GET['rolegate_dis_done'], $_GET['rolegate_dis_skip'] ) ) {
 			return;
 		}
-		$disabled = 'disable' === $_GET['rolegate_dis_mode'];
+		$mode     = sanitize_key( wp_unslash( $_GET['rolegate_dis_mode'] ) );
+		$disabled = 'disable' === $mode;
 		$done     = (int) $_GET['rolegate_dis_done'];
 		$skip     = (int) $_GET['rolegate_dis_skip'];
 		// phpcs:enable
-		if ( $disabled ) {
+		if ( 'expire' === $mode ) {
+			/* translators: %s: number of users */
+			$text = sprintf( _n( '%s account will be disabled in 30 days.', '%s accounts will be disabled in 30 days.', $done, 'role-gatekeeper' ), number_format_i18n( $done ) );
+		} elseif ( 'keep' === $mode ) {
+			/* translators: %s: number of users */
+			$text = sprintf( _n( 'Scheduled disabling cancelled for %s account.', 'Scheduled disabling cancelled for %s accounts.', $done, 'role-gatekeeper' ), number_format_i18n( $done ) );
+		} elseif ( $disabled ) {
 			/* translators: %s: number of users */
 			$text = sprintf( _n( '%s account disabled.', '%s accounts disabled.', $done, 'role-gatekeeper' ), number_format_i18n( $done ) );
 		} else {

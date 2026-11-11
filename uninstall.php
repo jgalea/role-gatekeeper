@@ -88,3 +88,4 @@ if ( function_exists( 'wp_cache_flush_group' ) ) {
 }
 
 wp_clear_scheduled_hook( 'rolegate_audit_prune' );
+wp_clear_scheduled_hook( 'rolegate_disable_due' );

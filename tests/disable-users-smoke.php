@@ -618,6 +618,36 @@ try {
 	$rw_uid = $rw_make( 'rw_dis_under', $rw_under );
 	$rw_nr  = new \WP_User_Query( array( 'fields' => 'ID', 'meta_query' => \Rolegate\Modules\User_Roles\Users::no_role_meta_query() ) ); // phpcs:ignore WordPress.DB.SlowDBQuery
 	$rw_ok( ! in_array( $rw_uid, array_map( 'intval', $rw_nr->get_results() ), true ), 'a user whose role slug contains an underscore is not in the No role view' );
+	// Scheduled disabling.
+	$rw_sched = $rw_make( 'rw_dis_sched', 'subscriber' );
+	$rw_ok( 'rolegate_disable_date_past' === $rw_code( Accounts::schedule( $rw_a, $rw_sched, time() - 60 ) ), 'schedule: a date in the past is refused' );
+	$rw_ok( true === Accounts::schedule( $rw_a, $rw_sched, time() + DAY_IN_SECONDS ) && ! Accounts::is_disabled( $rw_sched ) && (int) get_user_meta( $rw_sched, Accounts::DUE_META, true ) > time(), 'schedule: a future date is stored and the account stays enabled' );
+	Accounts::apply_due( $rw_sched );
+	$rw_ok( ! Accounts::is_disabled( $rw_sched ), 'schedule: apply_due leaves an account whose date has not come' );
+	update_user_meta( $rw_sched, Accounts::DUE_META, time() - 5 );
+	$rw_ok( $rw_login( $rw_sched ) instanceof WP_Error && 'rolegate_disabled' === $rw_login( $rw_sched )->get_error_code() && Accounts::is_disabled( $rw_sched ) && ! get_user_meta( $rw_sched, Accounts::DUE_META, true ), 'schedule: a login after the date is refused and the account is disabled' );
+	$rw_sched2 = $rw_make( 'rw_dis_sched2', 'subscriber' );
+	update_user_meta( $rw_sched2, Accounts::DUE_META, time() - 5 );
+	Accounts::apply_due_all();
+	$rw_ok( Accounts::is_disabled( $rw_sched2 ), 'schedule: the daily job disables accounts that are due' );
+	Accounts::write( $rw_b, true );
+	Accounts::write( $rw_a, false );
+	update_user_meta( $rw_a, Accounts::DUE_META, time() - 5 );
+	Accounts::apply_due( $rw_a );
+	$rw_ok( ! Accounts::is_disabled( $rw_a ), 'schedule: the last active administrator is never disabled by a date' );
+	delete_user_meta( $rw_a, Accounts::DUE_META );
+	Accounts::write( $rw_b, false );
+
+	// Custom login message.
+	Accounts::write( $rw_victim, true );
+	$rw_default_msg = $rw_login( $rw_victim );
+	$rw_ok( $rw_default_msg instanceof WP_Error && 'This account has been disabled.' === $rw_default_msg->get_error_message(), 'login message: the default text when none is set' );
+	update_option( Accounts::MESSAGE_OPTION, 'Contact the front desk.', false );
+	$rw_custom_msg = $rw_login( $rw_victim );
+	$rw_ok( $rw_custom_msg instanceof WP_Error && 'rolegate_disabled' === $rw_custom_msg->get_error_code() && 'Contact the front desk.' === $rw_custom_msg->get_error_message(), 'login message: the custom text is shown to a disabled account' );
+	delete_option( Accounts::MESSAGE_OPTION );
+	Accounts::write( $rw_victim, false );
+
 	// Code that sets the current user or the auth cookie itself, and password resets.
 	Accounts::write( $rw_victim, true );
 	wp_set_current_user( $rw_victim );

@@ -20,6 +20,10 @@ final class Disabled_Users_Module extends Module {
 
 	public function init(): void {
 		( new Login_Guard() )->register();
+		add_action( Accounts::DUE_HOOK, array( Accounts::class, 'apply_due_all' ) );
+		if ( ! wp_next_scheduled( Accounts::DUE_HOOK ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', Accounts::DUE_HOOK );
+		}
 		if ( ! is_admin() ) {
 			return;
 		}
@@ -28,6 +32,7 @@ final class Disabled_Users_Module extends Module {
 		add_action( 'admin_notices', array( $this, 'plugins_notice' ) );
 		( new Profile_Field() )->register();
 		( new Users_List() )->register();
+		( new Settings_Page() )->register();
 	}
 
 	public function module_warning( $text, $id ) {
