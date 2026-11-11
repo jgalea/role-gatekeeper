@@ -37,6 +37,9 @@ final class Guard {
 		'update_core',
 		'unfiltered_html',
 		'unfiltered_upload',
+		'export_others_personal_data',
+		'erase_others_personal_data',
+		'manage_privacy_options',
 		'manage_network',
 		'manage_network_users',
 		'manage_network_plugins',
@@ -55,7 +58,12 @@ final class Guard {
 		'gform_full_access',
 		'gravityforms_edit_forms',
 		'wpseo_manage_options',
+		'wpcode_edit_snippets',
+		'wpcode_activate_snippets',
 	);
+
+	/** @var string[] Caps WordPress reserves for super admins on multisite. */
+	private static $super_only_caps = array( 'unfiltered_html', 'edit_files', 'edit_plugins', 'edit_themes', 'update_core', 'update_plugins', 'delete_plugins', 'install_plugins', 'upload_plugins', 'update_themes', 'delete_themes', 'install_themes', 'upload_themes' );
 
 	/** @var string[] */
 	private static $network_caps = array( 'manage_sites', 'create_sites', 'delete_sites', 'upgrade_network', 'setup_network' );
@@ -196,7 +204,7 @@ final class Guard {
 	public static function critical_subset( array $caps ): array {
 		$out = array();
 		foreach ( self::normalize_caps( $caps ) as $cap => $grant ) {
-			if ( $grant && self::is_critical_cap( $cap ) ) {
+			if ( $grant && self::is_critical_cap( $cap ) && ! ( is_multisite() && in_array( $cap, self::$super_only_caps, true ) ) ) {
 				$out[] = $cap;
 			}
 		}
@@ -299,12 +307,22 @@ final class Guard {
 		foreach ( self::role_name_caps_of( $user ) as $cap ) {
 			unset( $caps[ $cap ] );
 		}
+		if ( is_multisite() && ! is_super_admin( $user_id ) ) {
+			$caps = array_diff_key( $caps, array_flip( self::$super_only_caps ) );
+		}
 		if ( in_array( 'administrator', (array) $user->roles, true ) ) {
 			$admin = get_role( 'administrator' );
 			foreach ( Caps::all() as $cap ) {
 				if ( $admin && ! empty( $admin->capabilities[ $cap ] ) ) {
 					$caps[ $cap ] = true;
 				}
+			}
+		}
+		// No role stores these by default; whoever can manage options (the network on multisite) can hand them out and counts as holding them.
+		$privacy_gate = is_multisite() ? 'manage_network' : 'manage_options';
+		foreach ( array( 'export_others_personal_data', 'erase_others_personal_data', 'manage_privacy_options' ) as $privacy_cap ) {
+			if ( $user->has_cap( $privacy_gate ) ) {
+				$caps[ $privacy_cap ] = true;
 			}
 		}
 		$caps = apply_filters( 'rolegate_guard_user_caps', $caps, $user );

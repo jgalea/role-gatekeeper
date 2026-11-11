@@ -81,7 +81,7 @@ $types = function () use ( &$events ) {
 // A limited manager: can manage roles, caps and users, does not hold manage_options.
 $mgr_slug = 'rw_auto_mgr_' . $sfx;
 $roles[]  = $mgr_slug;
-add_role( $mgr_slug, 'Auto Mgr', array( 'read' => true, Caps::MANAGE => true, Caps::MANAGE_ROLES => true, Caps::MANAGE_CAPS => true, Caps::MANAGE_USERS => true ) );
+add_role( $mgr_slug, 'Auto Mgr', array( 'read' => true, 'promote_users' => true, Caps::MANAGE => true, Caps::MANAGE_ROLES => true, Caps::MANAGE_CAPS => true, Caps::MANAGE_USERS => true ) );
 $mgr = $make( 'rw_auto_mgr', $mgr_slug );
 
 // Role operations, shell actor (0).
@@ -383,6 +383,60 @@ if ( function_exists( 'wp_register_ability' ) && function_exists( 'wp_get_abilit
 } else {
 	echo "SKIP abilities tests (Abilities API not available)\n";
 }
+
+// Role changes need WordPress's promote_user check and can't remove the last active administrator.
+$np_slug = 'rw_auto_np_' . $sfx;
+$roles[] = $np_slug;
+add_role( $np_slug, 'Auto No Promote', array( 'read' => true, Caps::MANAGE_USERS => true ) );
+$np     = $make( 'rw_auto_np', $np_slug );
+$np_vic = $make( 'rw_auto_npvic', 'subscriber' );
+$rw_ok( ! user_can( $np, 'promote_user', $np_vic ), 'promote setup: the manager can\'t promote users' );
+$rw_ok( 'rolegate_cannot_promote' === $code( Ops::assign_role( $np, $np_vic, 'author' ) ) && ! in_array( 'author', get_userdata( $np_vic )->roles, true ), 'assign_role: refused without promote_user' );
+$rw_ok( 'rolegate_cannot_promote' === $code( Ops::unassign_role( $np, $np_vic, 'subscriber' ) ) && in_array( 'subscriber', get_userdata( $np_vic )->roles, true ), 'unassign_role: refused without promote_user' );
+$rw_ok( true === Ops::assign_role( 0, $np_vic, 'author' ), 'promote control: the shell actor is unaffected' );
+update_option( Automation_Module::OPTION_SETTINGS, array( 'rest_writes' => true, 'abilities_writes' => false ) );
+wp_set_current_user( $np );
+$r = $call( 'POST', '/users/' . $np_vic . '/roles', array( 'unassign' => array( 'author' ) ) );
+$rw_ok( 403 === $status( $r ) && in_array( 'author', get_userdata( $np_vic )->roles, true ), 'REST users/<id>/roles: refused without promote_user' );
+wp_set_current_user( $admin );
+
+$la_keep  = 'rw_auto_keep_' . $sfx;
+$roles[]  = $la_keep;
+add_role( $la_keep, 'Auto Keeper', array( 'read' => true, Caps::MANAGE => true, Caps::MANAGE_USERS => true, 'promote_users' => true ) );
+$la_admin = $make( 'rw_auto_la', 'administrator' );
+get_userdata( $la_admin )->add_role( $la_keep );
+$la_other = array_values( array_diff( array_map( 'intval', get_users( array( 'role' => 'administrator', 'fields' => 'ID' ) ) ), array( $la_admin ) ) );
+\Rolegate\Modules\Safety\Enforcer::as_system(
+	function () use ( $la_other, $la_keep ) {
+		foreach ( $la_other as $id ) {
+			$u = get_userdata( $id );
+			$u->add_role( 'subscriber' );
+			$u->remove_role( 'administrator' );
+		}
+	}
+);
+$rw_ok( array( $la_admin ) === array_map( 'intval', get_users( array( 'role' => 'administrator', 'fields' => 'ID' ) ) ), 'last admin setup: one administrator' );
+wp_set_current_user( $la_admin );
+$rw_ok( 'rolegate_last_admin' === $code( Ops::unassign_role( $la_admin, $la_admin, 'administrator' ) ) && in_array( 'administrator', get_userdata( $la_admin )->roles, true ), 'unassign_role: the last administrator keeps the role' );
+$r = $call( 'POST', '/users/' . $la_admin . '/roles', array( 'unassign' => array( 'administrator' ), 'confirm' => true ) );
+$rw_ok( 400 === $status( $r ) && in_array( 'administrator', get_userdata( $la_admin )->roles, true ), 'REST users/<id>/roles: the last administrator keeps the role' );
+$rw_ok( 'rolegate_last_admin' === $code( Ops::unassign_role( 0, $la_admin, 'administrator' ) ), 'unassign_role: the shell can\'t remove the last administrator either' );
+$la_dis = $make( 'rw_auto_ladis', 'administrator' );
+\Rolegate\Modules\Disabled_Users\Accounts::write( $la_dis, true );
+$rw_ok( 'rolegate_last_admin' === $code( Ops::unassign_role( 0, $la_admin, 'administrator' ) ), 'unassign_role: a disabled administrator doesn\'t count as a second one' );
+\Rolegate\Modules\Disabled_Users\Accounts::write( $la_dis, false );
+$rw_ok( true === Ops::unassign_role( 0, $la_admin, 'administrator' ), 'last admin control: allowed once an active second administrator exists' );
+wp_set_current_user( $admin );
+\Rolegate\Modules\Safety\Enforcer::as_system(
+	function () use ( $la_other ) {
+		foreach ( $la_other as $id ) {
+			$u = get_userdata( $id );
+			$u->add_role( 'administrator' );
+			$u->remove_role( 'subscriber' );
+		}
+	}
+);
+delete_option( Automation_Module::OPTION_SETTINGS );
 
 // Cleanup.
 delete_option( Automation_Module::OPTION_SETTINGS );

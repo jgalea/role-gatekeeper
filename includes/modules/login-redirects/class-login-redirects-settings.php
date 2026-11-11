@@ -7,7 +7,7 @@ defined( 'ABSPATH' ) || exit;
 
 final class Login_Redirects_Settings {
 	const OPTION = 'rolegate_login_redirects';
-	const FIELDS = array( 'login', 'logout', 'landing' );
+	const FIELDS = array( 'login', 'logout', 'landing', 'registration', 'first_login' );
 
 	public static function defaults(): array {
 		return array(
@@ -26,7 +26,7 @@ final class Login_Redirects_Settings {
 	}
 
 	/**
-	 * @param array $raw Unslashed form values: rules[role][login|logout|landing], priority[role], override.
+	 * @param array $raw Unslashed form values: rules[role][login|logout|landing|registration|first_login], priority[role], override.
 	 * @return array|\WP_Error
 	 */
 	public static function sanitize( array $raw ) {

@@ -255,7 +255,69 @@ try {
 	Accounts::write( $rw_sadmin, false );
 	wp_set_current_user( $rw_sadmin );
 	$rw_ok( isset( $rw_list->bulk_actions( array() )[ Users_List::DISABLE ] ), 'bulk: the actions are offered to the site admin on A' );
+
+	// The network users screen verifies bulk-users-network, not bulk-users.
+	set_current_screen( 'users-network' );
+	add_filter(
+		'wp_die_handler',
+		$rw_die_net = function () {
+			return function ( $message ) {
+				throw new \RuntimeException( is_string( $message ) ? $message : 'wp_die' );
+			};
+		}
+	);
+	wp_set_current_user( $rw_super );
+	$rw_post( array( '_wpnonce' => wp_create_nonce( 'bulk-users-network' ) ) );
+	$rw_net_died = false;
+	try {
+		$rw_out = $rw_list->handle_bulk( network_admin_url( 'users.php' ), Users_List::DISABLE, array( $rw_member ) );
+	} catch ( \RuntimeException $rw_e ) {
+		$rw_net_died = true;
+		$rw_out      = '';
+	}
+	parse_str( (string) wp_parse_url( $rw_out, PHP_URL_QUERY ), $rw_q );
+	$rw_ok( ! $rw_net_died && '1' === ( $rw_q['rolegate_dis_done'] ?? '' ) && Accounts::is_disabled( $rw_member ), 'network users screen: a bulk disable with the network nonce goes through' );
+	Accounts::write( $rw_member, false );
+	$rw_post( array( '_wpnonce' => wp_create_nonce( 'bulk-users' ) ) );
+	$rw_net_died = false;
+	try {
+		$rw_list->handle_bulk( network_admin_url( 'users.php' ), Users_List::DISABLE, array( $rw_member ) );
+	} catch ( \RuntimeException $rw_e ) {
+		$rw_net_died = true;
+	}
+	$rw_ok( $rw_net_died && ! Accounts::is_disabled( $rw_member ), 'network users screen: the single-site nonce is refused' );
+	remove_filter( 'wp_die_handler', $rw_die_net );
+	set_current_screen( 'front' );
 	$rw_post( array() );
+	$rw_post( array() );
+
+	// Disabling is network-wide: the only administrator of any one site can't be disabled.
+	$rw_solo  = $rw_make( 'rw_dm_solo', 'subscriber', array( $rw_a ) );
+	$rw_solo2 = $rw_make( 'rw_dm_solo2', 'subscriber', array( $rw_a ) );
+	$rw_c     = wp_insert_site(
+		array(
+			'domain' => (string) get_network()->domain,
+			'path'   => '/rw-c-' . $rw_sfx . '/',
+			'title'  => 'RW c',
+		)
+	);
+	$rw_sites['c'] = (int) $rw_c;
+	add_user_to_blog( (int) $rw_c, $rw_solo, 'administrator' );
+	$rw_res = Accounts::check( $rw_super, $rw_solo, true );
+	$rw_ok( 'rolegate_last_admin' === $rw_code( $rw_res ), 'network disable: the only administrator of another site can\'t be disabled from site A (' . $rw_code( $rw_res ) . ')' );
+	$rw_res = Accounts::schedule( $rw_super, $rw_solo, time() + DAY_IN_SECONDS );
+	$rw_ok( 'rolegate_last_admin' === $rw_code( $rw_res ) && ! get_user_meta( $rw_solo, Accounts::DUE_META, true ), 'network disable: scheduling them is refused too (' . $rw_code( $rw_res ) . ')' );
+	add_user_to_blog( (int) $rw_c, $rw_solo2, 'administrator' );
+	$rw_ok( true === Accounts::check( $rw_super, $rw_solo, true ), 'network disable control: with a second active administrator on that site they can be disabled' );
+	Accounts::write( $rw_solo2, true );
+	$rw_ok( 'rolegate_last_admin' === $rw_code( Accounts::check( $rw_super, $rw_solo, true ) ), 'network disable: a disabled second administrator doesn\'t count' );
+	update_user_meta( $rw_solo, Accounts::DUE_META, time() - 5 );
+	update_user_meta( $rw_solo, Accounts::DUE_BY_META, $rw_super );
+	Accounts::apply_due_all();
+	$rw_ok( ! Accounts::is_disabled( $rw_solo ) && (int) get_user_meta( $rw_solo, Accounts::DUE_META, true ) > 0, 'network disable: the daily job doesn\'t disable the only administrator of another site' );
+	delete_user_meta( $rw_solo, Accounts::DUE_META );
+	delete_user_meta( $rw_solo, Accounts::DUE_BY_META );
+	Accounts::write( $rw_solo2, false );
 
 	// Migration from Disable Users.
 	$rw_ja = function ( $id, $val ) {

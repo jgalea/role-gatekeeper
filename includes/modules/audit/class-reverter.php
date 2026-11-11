@@ -4,6 +4,7 @@ namespace Rolegate\Modules\Audit;
 use Rolegate\Modules\Disabled_Users\Accounts;
 use Rolegate\Modules\Safety\Caps;
 use Rolegate\Modules\Safety\Guard;
+use Rolegate\Modules\User_Roles\Users;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -222,17 +223,9 @@ final class Reverter {
 		if ( $actor !== $target && ! user_can( $actor, 'promote_user', $target ) ) {
 			return new \WP_Error( 'rolegate_cannot_promote', __( 'You can\'t change the roles of this user.', 'role-gatekeeper' ) );
 		}
-		if ( in_array( 'administrator', $before, true ) && ! in_array( 'administrator', $after, true ) ) {
-			$admins = get_users(
-				array(
-					'role'   => 'administrator',
-					'fields' => 'ID',
-					'number' => 2,
-				)
-			);
-			if ( count( $admins ) < 2 ) {
-				return new \WP_Error( 'rolegate_last_admin', __( 'The last administrator can\'t lose the Administrator role.', 'role-gatekeeper' ) );
-			}
+		$ok = Users::check_last_admin( $target, $before, $after );
+		if ( is_wp_error( $ok ) ) {
+			return $ok;
 		}
 		$ok = self::check_user_result( $actor, $after, self::user_own_caps( $user ) );
 		if ( is_wp_error( $ok ) ) {

@@ -330,9 +330,12 @@ try {
 	$rw_ok( '' !== $token2 && is_wp_error( Rescue::consume( $admin, $token2, $ip_c ) ), 'rescue: expired token refused' );
 
 	$before = count( $rw_mails );
+	$ip_e   = '100.64.0.' . wp_rand( 1, 250 );
 	Rescue::request( get_userdata( $admin )->user_email, $ip_c );
 	Rescue::request( get_userdata( $admin )->user_email, $ip_c );
-	$rw_ok( count( $rw_mails ) === $before + 1, 'rescue: per-account limit of 3 per hour' );
+	Rescue::request( get_userdata( $admin )->user_email, $ip_b );
+	Rescue::request( get_userdata( $admin )->user_email, $ip_e );
+	$rw_ok( count( $rw_mails ) === $before + 3, 'rescue: per-account limit of 5 an hour across all IPs (' . ( count( $rw_mails ) - $before ) . ' of 4 more sent)' );
 
 	$before = count( $rw_mails );
 	Rescue::request( get_userdata( $admin2 )->user_email, $ip_a );

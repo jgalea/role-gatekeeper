@@ -79,12 +79,13 @@ if ( is_multisite() ) {
 	$rolegate_clean_site();
 }
 
-$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->usermeta} WHERE meta_key = %s", 'rolegate_rescue_token' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->usermeta} WHERE meta_key IN (%s, %s, %s, %s)", 'rolegate_rescue_token', 'rolegate_first_login_pending', 'rolegate_disable_at', 'rolegate_disable_by' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 if ( $rolegate_purge_flags ) {
-	$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->usermeta} WHERE meta_key = %s", 'rolegate_disabled' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+	$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->usermeta} WHERE meta_key IN (%s, %s)", 'rolegate_disabled', 'rolegate_disabled_info' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 }
 if ( function_exists( 'wp_cache_flush_group' ) ) {
 	wp_cache_flush_group( 'user_meta' );
 }
 
 wp_clear_scheduled_hook( 'rolegate_audit_prune' );
+wp_clear_scheduled_hook( 'rolegate_disable_due' );

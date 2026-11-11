@@ -34,6 +34,15 @@ $rw_ok   = function ( $cond, $label ) use ( &$rw_pass, &$rw_fail ) {
 	}
 };
 
+$rw_php_notices = array();
+set_error_handler( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.prevent_path_disclosure_set_error_handler
+	function ( $no, $msg, $file, $line ) use ( &$rw_php_notices ) {
+		$rw_php_notices[] = $msg . ' (' . basename( $file ) . ':' . $line . ')';
+		return true;
+	},
+	E_WARNING | E_NOTICE | E_USER_WARNING | E_USER_NOTICE
+);
+
 if ( is_multisite() ) {
 	add_filter( 'rolegate_multisite_site_admin_access', '__return_true', 20 );
 }
@@ -253,13 +262,28 @@ try {
 	$rw_ok( is_wp_error( $rw_res ) && 'rolegate_last_manager' === $rw_res->get_error_code() && ! Accounts::is_disabled( $rw_a ), 'the last active manager cannot be disabled by anyone' );
 	$rw_ok( ! Accounts::is_last_manager( $rw_v2 ), 'a non-manager is never the last manager' );
 
+	// Fixture shortcut: the guard resets a disabled current user, so a disabled administrator can only "act" with that reset switched off.
+	$rw_acting_disabled = function ( callable $fn ) {
+		global $wp_filter;
+		$saved = $wp_filter['set_current_user']->callbacks[ PHP_INT_MAX ] ?? array();
+		foreach ( $saved as $rw_cb ) {
+			remove_action( 'set_current_user', $rw_cb['function'], PHP_INT_MAX );
+		}
+		try {
+			return $fn();
+		} finally {
+			foreach ( $saved as $rw_cb ) {
+				add_action( 'set_current_user', $rw_cb['function'], PHP_INT_MAX, $rw_cb['accepted_args'] );
+			}
+		}
+	};
 	$rw_render = function ( $target, $actor ) {
 		wp_set_current_user( $actor );
 		ob_start();
 		( new Profile_Field() )->render( get_userdata( $target ) );
 		return (string) ob_get_clean();
 	};
-	$rw_html = $rw_render( $rw_a, $rw_b );
+	$rw_html = $rw_acting_disabled( function () use ( $rw_render, $rw_a, $rw_b ) { return $rw_render( $rw_a, $rw_b ); } );
 	$rw_ok( false !== strpos( $rw_html, 'rolegate_disabled_user' ) && preg_match( '/name="rolegate_disabled_user"[^>]*disabled/', $rw_html ), 'profile: the last manager\'s checkbox is shown locked' );
 	$rw_html = $rw_render( $rw_v2, $rw_a );
 	$rw_ok( false !== strpos( $rw_html, 'name="rolegate_disabled_user"' ) && ! preg_match( '/name="rolegate_disabled_user"[^>]*disabled/', $rw_html ) && false !== strpos( $rw_html, 'rolegate_disabled_nonce' ), 'profile: an ordinary user shows an enabled checkbox and a nonce' );
@@ -350,7 +374,7 @@ try {
 	$rw_ok( 'enable' === ( $rw_q['rolegate_dis_mode'] ?? '' ) && '2' === ( $rw_q['rolegate_dis_done'] ?? '' ) && '1' === ( $rw_q['rolegate_dis_skip'] ?? '' ) && ! Accounts::is_disabled( $rw_v2 ) && ! Accounts::is_disabled( $rw_v3 ), 'bulk enable: two enabled, an already enabled account skipped' );
 	$rw_q = $rw_bulk( $rw_a, 'rolegate_disable', array( $rw_b, $rw_a ) );
 	$rw_ok( '1' === ( $rw_q['rolegate_dis_done'] ?? '' ) && Accounts::is_disabled( $rw_b ), 'bulk disable: the second manager goes' );
-	$rw_q = $rw_bulk( $rw_b, 'rolegate_disable', array( $rw_a ) );
+	$rw_q = $rw_acting_disabled( function () use ( $rw_bulk, $rw_a, $rw_b ) { return $rw_bulk( $rw_b, 'rolegate_disable', array( $rw_a ) ); } );
 	$rw_ok( '0' === ( $rw_q['rolegate_dis_done'] ?? '' ) && '1' === ( $rw_q['rolegate_dis_skip'] ?? '' ) && ! Accounts::is_disabled( $rw_a ), 'bulk disable: the last active manager is skipped' );
 	Accounts::change( $rw_a, $rw_b, false );
 	$rw_q = $rw_bulk( $rw_mgr, 'rolegate_disable', array( $rw_a, $rw_b ) );
@@ -561,6 +585,132 @@ try {
 		echo "NOTE not running under WP-CLI: shell actor check skipped\n";
 	}
 	delete_user_meta( $rw_a, 'ja_disable_user' );
+
+	// The last active administrator can't be disabled or demoted, and disabled administrators don't count as a second one.
+	$rw_all_admins = array_map( 'intval', get_users( array( 'role' => 'administrator', 'fields' => 'ID' ) ) );
+	$rw_parked     = array();
+	foreach ( array_diff( $rw_all_admins, array( $rw_a, $rw_b ) ) as $rw_id ) {
+		if ( ! Accounts::is_disabled( $rw_id ) ) {
+			Accounts::write( $rw_id, true );
+			$rw_parked[] = $rw_id;
+		}
+	}
+	$rw_owner_role = $rw_role . '_own';
+	$rw_roles[]    = $rw_owner_role;
+	\Rolegate\Modules\Safety\Enforcer::as_system(
+		function () use ( $rw_owner_role ) {
+			add_role( $rw_owner_role, 'RW owner', get_role( 'administrator' )->capabilities );
+		}
+	);
+	wp_set_current_user( $rw_a );
+	$rw_owner = $rw_make( 'rw_dis_owner', $rw_owner_role );
+	wp_set_current_user( 0 );
+	Accounts::write( $rw_a, false );
+	Accounts::write( $rw_b, true );
+	$rw_code = function ( $res ) {
+		return is_wp_error( $res ) ? $res->get_error_code() : 'ok';
+	};
+	$rw_ok( 'rolegate_last_admin' === $rw_code( Accounts::check( $rw_owner, $rw_a, true ) ), 'last admin: the only active administrator can\'t be disabled even when another user can manage the plugin (' . $rw_code( Accounts::check( $rw_owner, $rw_a, true ) ) . ')' );
+	$rw_ok( 'rolegate_last_admin' === $rw_code( \Rolegate\Modules\User_Roles\Users::check_last_admin( $rw_a, array( 'administrator' ), array() ) ), 'last admin: removing the role is refused while the other administrator is disabled' );
+	Accounts::write( $rw_b, false );
+	$rw_ok( 'ok' === $rw_code( Accounts::check( $rw_owner, $rw_a, true ) ) && true === \Rolegate\Modules\User_Roles\Users::check_last_admin( $rw_a, array( 'administrator' ), array() ), 'last admin control: both allowed once a second administrator is enabled' );
+
+	// Per-user capability holders are found as managers (LIKE value isn't escaped twice).
+	$rw_percap = $rw_make( 'rw_dis_percap', 'subscriber' );
+	\Rolegate\Modules\Safety\Enforcer::as_system(
+		function () use ( $rw_percap ) {
+			get_userdata( $rw_percap )->add_cap( Caps::MANAGE );
+		}
+	);
+	$rw_ok( in_array( $rw_percap, Accounts::active_managers(), true ), 'per-user rolegate_manage holder is an active manager' );
+	$rw_under = 'rw_dis_u_' . $rw_sfx;
+	$rw_roles[] = $rw_under;
+	add_role( $rw_under, 'RW underscore', array( 'read' => true ) );
+	$rw_uid = $rw_make( 'rw_dis_under', $rw_under );
+	$rw_nr  = new \WP_User_Query( array( 'fields' => 'ID', 'meta_query' => \Rolegate\Modules\User_Roles\Users::no_role_meta_query() ) ); // phpcs:ignore WordPress.DB.SlowDBQuery
+	$rw_ok( ! in_array( $rw_uid, array_map( 'intval', $rw_nr->get_results() ), true ), 'a user whose role slug contains an underscore is not in the No role view' );
+	// Scheduled disabling.
+	$rw_sched = $rw_make( 'rw_dis_sched', 'subscriber' );
+	$rw_ok( 'rolegate_disable_date_past' === $rw_code( Accounts::schedule( $rw_a, $rw_sched, time() - 60 ) ), 'schedule: a date in the past is refused' );
+	$rw_ok( true === Accounts::schedule( $rw_a, $rw_sched, time() + DAY_IN_SECONDS ) && ! Accounts::is_disabled( $rw_sched ) && (int) get_user_meta( $rw_sched, Accounts::DUE_META, true ) > time(), 'schedule: a future date is stored and the account stays enabled' );
+	Accounts::apply_due( $rw_sched );
+	$rw_ok( ! Accounts::is_disabled( $rw_sched ), 'schedule: apply_due leaves an account whose date has not come' );
+	$rw_ok( (int) get_user_meta( $rw_sched, Accounts::DUE_BY_META, true ) === $rw_a, 'schedule: the person who set the date is stored with it' );
+	update_user_meta( $rw_sched, Accounts::DUE_META, time() - 5 );
+	$rw_ok( $rw_login( $rw_sched ) instanceof WP_Error && 'rolegate_disabled' === $rw_login( $rw_sched )->get_error_code() && Accounts::is_disabled( $rw_sched ) && ! get_user_meta( $rw_sched, Accounts::DUE_META, true ) && ! get_user_meta( $rw_sched, Accounts::DUE_BY_META, true ), 'schedule: a login after the date is refused and the account is disabled' );
+	$rw_ev = $rw_last_event( 'user.disabled' );
+	$rw_info = get_user_meta( $rw_sched, Accounts::INFO_META, true );
+	$rw_ok( $rw_ev && $rw_a === $rw_ev['actor'] && $rw_sched === $rw_ev['target'] && is_array( $rw_info ) && $rw_a === (int) $rw_info['by'], 'schedule: the disable is attributed to whoever set the date, not to nobody' );
+	$rw_sched2 = $rw_make( 'rw_dis_sched2', 'subscriber' );
+	Accounts::schedule( $rw_a, $rw_sched2, time() + DAY_IN_SECONDS );
+	update_user_meta( $rw_sched2, Accounts::DUE_META, time() - 5 );
+	Accounts::apply_due_all();
+	$rw_ok( Accounts::is_disabled( $rw_sched2 ), 'schedule: the daily job disables accounts that are due' );
+	Accounts::write( $rw_b, true );
+	Accounts::write( $rw_a, false );
+	update_user_meta( $rw_a, Accounts::DUE_META, time() - 5 );
+	update_user_meta( $rw_a, Accounts::DUE_BY_META, $rw_owner );
+	Accounts::apply_due( $rw_a );
+	$rw_ok( ! Accounts::is_disabled( $rw_a ) && (int) get_user_meta( $rw_a, Accounts::DUE_META, true ) > 0, 'schedule: the last active administrator is never disabled by a date, and the date waits' );
+	delete_user_meta( $rw_a, Accounts::DUE_META );
+	delete_user_meta( $rw_a, Accounts::DUE_BY_META );
+	Accounts::write( $rw_b, false );
+
+	// The scheduler's authority is checked again when the date arrives.
+	$rw_f1 = $rw_make( 'rw_dis_f1', 'subscriber' );
+	$rw_ok( true === Accounts::schedule( $rw_mgr, $rw_f1, time() + DAY_IN_SECONDS ), 'schedule authority: a user manager schedules a subscriber' );
+	\Rolegate\Modules\Safety\Enforcer::as_system(
+		function () use ( $rw_f1 ) {
+			get_userdata( $rw_f1 )->set_role( 'administrator' );
+		}
+	);
+	update_user_meta( $rw_f1, Accounts::DUE_META, time() - 5 );
+	Accounts::apply_due_all();
+	$rw_ev = $rw_last_event( 'user.disable_skipped' );
+	$rw_ok( ! Accounts::is_disabled( $rw_f1 ) && ! get_user_meta( $rw_f1, Accounts::DUE_META, true ) && ! get_user_meta( $rw_f1, Accounts::DUE_BY_META, true ), 'schedule authority: the target was promoted above the scheduler, so nothing is disabled and the date is dropped' );
+	$rw_ok( $rw_ev && $rw_mgr === $rw_ev['actor'] && $rw_f1 === $rw_ev['target'] && 'rolegate_user_above_actor' === $rw_ev['after']['reason'], 'schedule authority: the skip is logged against the scheduler with the reason' );
+	$rw_f2 = $rw_make( 'rw_dis_f2', 'subscriber' );
+	Accounts::schedule( $rw_mgr, $rw_f2, time() + DAY_IN_SECONDS );
+	update_user_meta( $rw_f2, Accounts::DUE_BY_META, $rw_plain );
+	update_user_meta( $rw_f2, Accounts::DUE_META, time() - 5 );
+	Accounts::apply_due( $rw_f2 );
+	$rw_ok( ! Accounts::is_disabled( $rw_f2 ) && ! get_user_meta( $rw_f2, Accounts::DUE_META, true ), 'schedule authority: a scheduler who can no longer manage accounts disables nobody' );
+	$rw_f3 = $rw_make( 'rw_dis_f3', 'subscriber' );
+	update_user_meta( $rw_f3, Accounts::DUE_META, time() - 5 );
+	Accounts::apply_due( $rw_f3 );
+	$rw_ok( ! Accounts::is_disabled( $rw_f3 ) && ! get_user_meta( $rw_f3, Accounts::DUE_META, true ), 'schedule authority: a date with nobody recorded as setting it is dropped' );
+	$rw_f4 = $rw_make( 'rw_dis_f4', 'subscriber' );
+	Accounts::schedule( $rw_mgr, $rw_f4, time() + DAY_IN_SECONDS );
+	update_user_meta( $rw_f4, Accounts::DUE_META, time() - 5 );
+	Accounts::apply_due( $rw_f4 );
+	$rw_ok( Accounts::is_disabled( $rw_f4 ), 'schedule authority control: a scheduler who still holds the rights disables the account' );
+
+	// Custom login message.
+	Accounts::write( $rw_victim, true );
+	$rw_default_msg = $rw_login( $rw_victim );
+	$rw_ok( $rw_default_msg instanceof WP_Error && 'This account has been disabled.' === $rw_default_msg->get_error_message(), 'login message: the default text when none is set' );
+	update_option( Accounts::MESSAGE_OPTION, 'Contact the front desk.', false );
+	$rw_custom_msg = $rw_login( $rw_victim );
+	$rw_ok( $rw_custom_msg instanceof WP_Error && 'rolegate_disabled' === $rw_custom_msg->get_error_code() && 'Contact the front desk.' === $rw_custom_msg->get_error_message(), 'login message: the custom text is shown to a disabled account' );
+	delete_option( Accounts::MESSAGE_OPTION );
+	Accounts::write( $rw_victim, false );
+
+	// Code that sets the current user or the auth cookie itself, and password resets.
+	Accounts::write( $rw_victim, true );
+	wp_set_current_user( $rw_victim );
+	$rw_ok( 0 === get_current_user_id() && ! current_user_can( 'read' ), 'wp_set_current_user() on a disabled account resolves to nobody' );
+	wp_set_current_user( 0 );
+	$rw_tokens = count( \WP_Session_Tokens::get_instance( $rw_victim )->get_all() );
+	wp_set_auth_cookie( $rw_victim, false );
+	$rw_ok( count( \WP_Session_Tokens::get_instance( $rw_victim )->get_all() ) === $rw_tokens, 'wp_set_auth_cookie() for a disabled account leaves no session behind' );
+	$rw_ok( false === apply_filters( 'allow_password_reset', true, $rw_victim ), 'password reset is not allowed for a disabled account' );
+	Accounts::write( $rw_victim, false );
+	wp_set_current_user( $rw_victim );
+	$rw_ok( get_current_user_id() === $rw_victim && true === apply_filters( 'allow_password_reset', true, $rw_victim ), 'control: an enabled account keeps its current user and password reset' );
+	wp_set_current_user( 0 );
+	foreach ( $rw_parked as $rw_id ) {
+		Accounts::write( $rw_id, false );
+	}
 } catch ( \Throwable $e ) {
 	++$rw_fail;
 	echo 'FAIL exception: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine() . "\n";
@@ -597,6 +747,9 @@ if ( null === $rw_orig_records ) {
 }
 $_POST    = array();
 $_REQUEST = array();
+
+restore_error_handler();
+$rw_ok( array() === $rw_php_notices, 'the run raised no PHP warnings or notices' . ( $rw_php_notices ? ': ' . implode( '; ', array_slice( $rw_php_notices, 0, 3 ) ) : '' ) );
 
 echo sprintf( "\n%d passed, %d failed\n", $rw_pass, $rw_fail );
 exit( $rw_fail ? 1 : 0 );

@@ -1,11 +1,16 @@
 <?php
 namespace Rolegate\Modules\Disabled_Users;
 
+use Rolegate\Modules\Safety\Caps;
+
 defined( 'ABSPATH' ) || exit;
 
 final class Profile_Field {
 	/** @var array<int,bool> */
 	private static $plan = array();
+
+	/** @var array<int,int> */
+	private static $due = array();
 
 	public function register(): void {
 		add_action( 'edit_user_profile', array( $this, 'render' ) );
@@ -30,6 +35,32 @@ final class Profile_Field {
 			disabled( $locked, true, false ),
 			esc_html__( 'This user can\'t log in. The account, posts and byline stay.', 'role-gatekeeper' )
 		);
+		$info = $disabled ? get_user_meta( $user->ID, Accounts::INFO_META, true ) : array();
+		if ( is_array( $info ) && ! empty( $info['at'] ) ) {
+			$by   = ! empty( $info['by'] ) ? get_userdata( (int) $info['by'] ) : false;
+			$when = wp_date( get_option( 'date_format' ), (int) $info['at'] );
+			/* translators: 1: date, 2: username */
+			$text = $by ? sprintf( __( 'Disabled on %1$s by %2$s.', 'role-gatekeeper' ), $when, $by->user_login ) : sprintf( /* translators: %s: date */ __( 'Disabled on %s.', 'role-gatekeeper' ), $when );
+			echo '<p class="description">' . esc_html( $text );
+			if ( current_user_can( Caps::VIEW_AUDIT ) && \Rolegate\Core\Plugin::is_enabled( 'audit' ) ) {
+				echo ' <a href="' . esc_url(
+					add_query_arg(
+						array(
+							'page' => \Rolegate\Modules\Audit\Audit_Page::SLUG,
+							'type' => 'user.disabled',
+						),
+						admin_url( 'admin.php' )
+					)
+				) . '">' . esc_html__( 'View in the audit log', 'role-gatekeeper' ) . '</a>';
+			}
+			echo '</p>';
+		}
+		if ( ! $disabled && ! $locked ) {
+			$due = (int) get_user_meta( $user->ID, Accounts::DUE_META, true );
+			echo '<p style="margin-top:12px"><label for="rolegate_disable_on">' . esc_html__( 'Disable this account on', 'role-gatekeeper' ) . '</label><br />';
+			printf( '<input type="date" id="rolegate_disable_on" name="rolegate_disable_on" value="%s" /></p>', esc_attr( $due ? wp_date( 'Y-m-d', $due ) : '' ) );
+			echo '<p class="description">' . esc_html__( 'Leave empty to keep the account active. The account is disabled at the start of that day.', 'role-gatekeeper' ) . '</p>';
+		}
 		if ( $locked ) {
 			echo '<p class="description">' . esc_html__( 'This is the last active user who can manage Role Gatekeeper.', 'role-gatekeeper' ) . '</p>';
 		}
@@ -59,6 +90,26 @@ final class Profile_Field {
 		}
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
 		$want = ! empty( $_POST['rolegate_disabled_user'] );
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
+		if ( isset( $_POST['rolegate_disable_on'] ) && ! $want && ! Accounts::is_disabled( $target ) ) {
+			// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
+			$date = sanitize_text_field( wp_unslash( $_POST['rolegate_disable_on'] ) );
+			$at   = 0;
+			if ( '' !== $date ) {
+				$parsed = date_create_immutable( $date . ' 00:00:00', wp_timezone() );
+				$at     = $parsed && $parsed->format( 'Y-m-d' ) === $date ? $parsed->getTimestamp() : -1;
+			}
+			if ( $at < 0 ) {
+				$errors->add( 'rolegate_disable_date', __( 'Enter the disable date as a valid date.', 'role-gatekeeper' ) );
+			} elseif ( (int) get_user_meta( $target, Accounts::DUE_META, true ) !== $at ) {
+				$ok = $at > 0 ? Accounts::check( $actor, $target, true ) : true;
+				if ( is_wp_error( $ok ) || ( $at > 0 && $at <= time() ) ) {
+					$errors->add( is_wp_error( $ok ) ? $ok->get_error_code() : 'rolegate_disable_date_past', is_wp_error( $ok ) ? $ok->get_error_message() : __( 'Pick a date in the future.', 'role-gatekeeper' ) );
+					return;
+				}
+				self::$due[ $target ] = $at;
+			}
+		}
 		if ( Accounts::is_disabled( $target ) === $want ) {
 			return;
 		}
@@ -72,6 +123,10 @@ final class Profile_Field {
 
 	public function apply( $user_id ): void {
 		$user_id = (int) $user_id;
+		if ( isset( self::$due[ $user_id ] ) ) {
+			Accounts::schedule( get_current_user_id(), $user_id, self::$due[ $user_id ] );
+			unset( self::$due[ $user_id ] );
+		}
 		if ( ! isset( self::$plan[ $user_id ] ) ) {
 			return;
 		}

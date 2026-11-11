@@ -52,7 +52,7 @@ final class Audit_Page {
 	}
 
 	public function handle_settings(): void {
-		if ( ! current_user_can( Caps::MANAGE ) || ! current_user_can( Caps::VIEW_AUDIT ) ) {
+		if ( ! current_user_can( Caps::MANAGE ) || ! current_user_can( Caps::VIEW_AUDIT ) || ! Settings::can_change( get_current_user_id() ) ) {
 			wp_die( esc_html__( 'You do not have permission to do that.', 'role-gatekeeper' ), '', array( 'response' => 403 ) );
 		}
 		check_admin_referer( 'rolegate_audit_settings' );
@@ -257,7 +257,7 @@ final class Audit_Page {
 
 	private function render_settings(): void {
 		$settings = Audit_Module::settings();
-		$can_edit = current_user_can( Caps::MANAGE );
+		$can_edit = current_user_can( Caps::MANAGE ) && Settings::can_change( get_current_user_id() );
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '"><input type="hidden" name="action" value="rolegate_audit_settings" />';
 		wp_nonce_field( 'rolegate_audit_settings' );
 		echo '<table class="form-table" role="presentation"><tbody>';
@@ -350,11 +350,14 @@ final class Audit_Page {
 
 	private static function type_label( string $type ): string {
 		$labels = array(
-			'modules.updated'    => __( 'Modules switched on or off', 'role-gatekeeper' ),
-			'automation.updated' => __( 'Automation settings changed', 'role-gatekeeper' ),
-			'user.disabled'      => __( 'Account disabled or enabled', 'role-gatekeeper' ),
-			'migration.applied'  => __( 'Migrated from another plugin', 'role-gatekeeper' ),
-			'migration.reverted' => __( 'Migration reverted', 'role-gatekeeper' ),
+			'modules.updated'      => __( 'Modules switched on or off', 'role-gatekeeper' ),
+			'automation.updated'   => __( 'Automation settings changed', 'role-gatekeeper' ),
+			'user.disabled'        => __( 'Account disabled or enabled', 'role-gatekeeper' ),
+			'user.disable_skipped' => __( 'Scheduled disabling skipped', 'role-gatekeeper' ),
+			'user.test_started'    => __( 'Started testing as a user', 'role-gatekeeper' ),
+			'user.test_ended'      => __( 'Stopped testing as a user', 'role-gatekeeper' ),
+			'migration.applied'    => __( 'Migrated from another plugin', 'role-gatekeeper' ),
+			'migration.reverted'   => __( 'Migration reverted', 'role-gatekeeper' ),
 		);
 		return isset( $labels[ $type ] ) ? $labels[ $type ] : '';
 	}
