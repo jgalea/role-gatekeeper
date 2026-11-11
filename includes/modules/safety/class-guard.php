@@ -60,6 +60,9 @@ final class Guard {
 		'wpseo_manage_options',
 	);
 
+	/** @var string[] Caps WordPress reserves for super admins on multisite. */
+	private static $super_only_caps = array( 'unfiltered_html', 'edit_files', 'edit_plugins', 'edit_themes', 'update_core', 'update_plugins', 'delete_plugins', 'install_plugins', 'upload_plugins', 'update_themes', 'delete_themes', 'install_themes', 'upload_themes' );
+
 	/** @var string[] */
 	private static $network_caps = array( 'manage_sites', 'create_sites', 'delete_sites', 'upgrade_network', 'setup_network' );
 
@@ -199,7 +202,7 @@ final class Guard {
 	public static function critical_subset( array $caps ): array {
 		$out = array();
 		foreach ( self::normalize_caps( $caps ) as $cap => $grant ) {
-			if ( $grant && self::is_critical_cap( $cap ) ) {
+			if ( $grant && self::is_critical_cap( $cap ) && ! ( is_multisite() && in_array( $cap, self::$super_only_caps, true ) ) ) {
 				$out[] = $cap;
 			}
 		}
@@ -301,6 +304,9 @@ final class Guard {
 		}
 		foreach ( self::role_name_caps_of( $user ) as $cap ) {
 			unset( $caps[ $cap ] );
+		}
+		if ( is_multisite() && ! is_super_admin( $user_id ) ) {
+			$caps = array_diff_key( $caps, array_flip( self::$super_only_caps ) );
 		}
 		if ( in_array( 'administrator', (array) $user->roles, true ) ) {
 			$admin = get_role( 'administrator' );
