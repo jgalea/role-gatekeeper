@@ -6,6 +6,8 @@ use Rolegate\Modules\Site_Access\Redirects;
 defined( 'ABSPATH' ) || exit;
 
 final class Resolver {
+	const FIRST_LOGIN_META = 'rolegate_first_login_pending';
+
 	/**
 	 * Roles in priority order: the configured order first, then any other role the user holds.
 	 *
@@ -53,11 +55,18 @@ final class Resolver {
 		$settings  = Login_Redirects_Settings::get();
 		$requested = (string) $requested;
 		$usable    = self::requested_is_usable( $requested );
+		$first     = (bool) get_user_meta( $user->ID, self::FIRST_LOGIN_META, true );
+		if ( $first ) {
+			delete_user_meta( $user->ID, self::FIRST_LOGIN_META );
+		}
 		if ( $usable && empty( $settings['override'] ) ) {
 			return $redirect_to;
 		}
 		$roles = (array) $user->roles;
-		$url   = self::url_for( $roles, 'login', $settings );
+		$url   = $first ? self::url_for( $roles, 'first_login', $settings ) : '';
+		if ( '' === $url ) {
+			$url = self::url_for( $roles, 'login', $settings );
+		}
 		if ( '' === $url ) {
 			$url = self::url_for( $roles, 'landing', $settings );
 		}
@@ -86,5 +95,23 @@ final class Resolver {
 		}
 		$url = self::url_for( (array) $user->roles, 'logout', Login_Redirects_Settings::get() );
 		return '' !== $url ? $url : $redirect_to;
+	}
+
+	/**
+	 * @param string $redirect_to
+	 * @param mixed  $user_id The new user's ID.
+	 * @return string
+	 */
+	public static function filter_registration( $redirect_to, $user_id ) {
+		$user = is_numeric( $user_id ) ? get_userdata( (int) $user_id ) : false;
+		if ( ! $user ) {
+			return $redirect_to;
+		}
+		$url = self::url_for( (array) $user->roles, 'registration', Login_Redirects_Settings::get() );
+		return '' !== $url ? $url : $redirect_to;
+	}
+
+	public static function mark_first_login( $user_id ): void {
+		update_user_meta( (int) $user_id, self::FIRST_LOGIN_META, 1 );
 	}
 }
