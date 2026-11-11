@@ -9,13 +9,13 @@ use Rolegate\Modules\User_Roles\Users;
 defined( 'ABSPATH' ) || exit;
 
 final class Accounts {
-	const META = 'rolegate_disabled';
+	const META      = 'rolegate_disabled';
+	const INFO_META = 'rolegate_disabled_info';
 
 	public static function is_disabled( int $user_id ): bool {
 		return $user_id > 0 && '1' === (string) get_user_meta( $user_id, self::META, true );
 	}
 
-	public static function is_blocked( int $user_id ): bool {
 	public static function count_disabled(): int {
 		$query = new \WP_User_Query(
 			array(
@@ -33,6 +33,7 @@ final class Accounts {
 		return (int) $query->get_total();
 	}
 
+	public static function is_blocked( int $user_id ): bool {
 		return Plugin::is_enabled( 'disabled-users' ) && self::is_disabled( $user_id );
 	}
 
@@ -169,6 +170,18 @@ final class Accounts {
 			return new \WP_Error( 'rolegate_disabled_noop', $disable ? __( 'That account is already disabled.', 'role-gatekeeper' ) : __( 'That account is already enabled.', 'role-gatekeeper' ) );
 		}
 		self::write( $target, $disable );
+		if ( $disable ) {
+			update_user_meta(
+				$target,
+				self::INFO_META,
+				array(
+					'at' => time(),
+					'by' => $actor,
+				)
+			);
+		} else {
+			delete_user_meta( $target, self::INFO_META );
+		}
 		$data = array(
 			'actor'  => $actor,
 			'target' => $target,

@@ -1,6 +1,8 @@
 <?php
 namespace Rolegate\Modules\Disabled_Users;
 
+use Rolegate\Modules\Safety\Caps;
+
 defined( 'ABSPATH' ) || exit;
 
 final class Profile_Field {
@@ -30,6 +32,18 @@ final class Profile_Field {
 			disabled( $locked, true, false ),
 			esc_html__( 'This user can\'t log in. The account, posts and byline stay.', 'role-gatekeeper' )
 		);
+		$info = $disabled ? get_user_meta( $user->ID, Accounts::INFO_META, true ) : array();
+		if ( is_array( $info ) && ! empty( $info['at'] ) ) {
+			$by   = ! empty( $info['by'] ) ? get_userdata( (int) $info['by'] ) : false;
+			$when = wp_date( get_option( 'date_format' ), (int) $info['at'] );
+			/* translators: 1: date, 2: username */
+			$text = $by ? sprintf( __( 'Disabled on %1$s by %2$s.', 'role-gatekeeper' ), $when, $by->user_login ) : sprintf( /* translators: %s: date */ __( 'Disabled on %s.', 'role-gatekeeper' ), $when );
+			echo '<p class="description">' . esc_html( $text );
+			if ( current_user_can( Caps::VIEW_AUDIT ) && \Rolegate\Core\Plugin::is_enabled( 'audit' ) ) {
+				echo ' <a href="' . esc_url( add_query_arg( array( 'page' => \Rolegate\Modules\Audit\Audit_Page::SLUG, 'type' => 'user.disabled' ), admin_url( 'admin.php' ) ) ) . '">' . esc_html__( 'View in the audit log', 'role-gatekeeper' ) . '</a>';
+			}
+			echo '</p>';
+		}
 		if ( $locked ) {
 			echo '<p class="description">' . esc_html__( 'This is the last active user who can manage Role Gatekeeper.', 'role-gatekeeper' ) . '</p>';
 		}
