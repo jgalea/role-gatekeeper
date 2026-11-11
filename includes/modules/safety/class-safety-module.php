@@ -28,5 +28,6 @@ final class Safety_Module extends Module {
 		add_filter( 'user_has_cap', array( Caps::class, 'filter_user_has_cap' ), PHP_INT_MAX, 4 );
 		( new Enforcer() )->register();
 		( new Rescue() )->register();
+		( new Stripped_Notice() )->register();
 	}
 }

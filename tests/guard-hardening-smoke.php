@@ -8,7 +8,9 @@ use Rolegate\Modules\Audit\Audit_Page;
 use Rolegate\Modules\Safety\Caps;
 use Rolegate\Modules\Safety\Enforcer;
 use Rolegate\Modules\Safety\Guard;
+use Rolegate\Modules\Roles\Role_Service;
 use Rolegate\Modules\Safety\Rescue;
+use Rolegate\Modules\Safety\Stripped_Notice;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
@@ -122,6 +124,65 @@ try {
 	$rw_hidden = ob_get_clean();
 	remove_filter( 'rolegate_rescue_show_link', '__return_false' );
 	$rw_ok( false !== strpos( $rw_link, 'rolegate_rescue' ) && '' === $rw_hidden, 'rescue: the login page link shows by default and can be hidden' );
+
+	// Extra default roles apply to self-registrations only.
+	$rw_extra_role = 'rw_t_extra_' . $rw_sfx;
+	$rw_roles[]    = $rw_extra_role;
+	Enforcer::as_system(
+		function () use ( $rw_extra_role ) {
+			add_role( $rw_extra_role, 'RW extra', array( 'read' => true ) );
+		}
+	);
+	$rw_orig_extra = get_option( Role_Service::OPTION_EXTRA, null );
+	update_option( Role_Service::OPTION_EXTRA, array( $rw_extra_role ), false );
+	wp_set_current_user( $rw_admin );
+	$rw_by_admin = wp_insert_user(
+		array(
+			'user_login' => 'rw_t_byadm_' . $rw_sfx,
+			'user_email' => 'rw_t_byadm_' . $rw_sfx . '@example.com',
+			'user_pass'  => wp_generate_password( 24 ),
+			'role'       => 'subscriber',
+		)
+	);
+	wp_set_current_user( 0 );
+	$rw_self = wp_insert_user(
+		array(
+			'user_login' => 'rw_t_self_' . $rw_sfx,
+			'user_email' => 'rw_t_self_' . $rw_sfx . '@example.com',
+			'user_pass'  => wp_generate_password( 24 ),
+			'role'       => 'subscriber',
+		)
+	);
+	$rw_users[] = $rw_by_admin;
+	$rw_users[] = $rw_self;
+	$rw_ok( ! in_array( $rw_extra_role, get_userdata( $rw_by_admin )->roles, true ), 'extra default roles: not added to a user an administrator creates' );
+	$rw_ok( in_array( $rw_extra_role, get_userdata( $rw_self )->roles, true ), 'extra default roles: added to a self-registration' );
+	if ( null === $rw_orig_extra ) {
+		delete_option( Role_Service::OPTION_EXTRA );
+	} else {
+		update_option( Role_Service::OPTION_EXTRA, $rw_orig_extra, false );
+	}
+
+	// A role stripped from an anonymously created account is surfaced in an admin notice.
+	$rw_orig_stripped = get_option( Stripped_Notice::OPTION, null );
+	delete_option( Stripped_Notice::OPTION );
+	wp_set_current_user( 0 );
+	$rw_anon = wp_insert_user(
+		array(
+			'user_login' => 'rw_t_anon_' . $rw_sfx,
+			'user_email' => 'rw_t_anon_' . $rw_sfx . '@example.com',
+			'user_pass'  => wp_generate_password( 24 ),
+			'role'       => 'administrator',
+		)
+	);
+	$rw_users[] = $rw_anon;
+	$rw_ok( ! in_array( 'administrator', get_userdata( $rw_anon )->roles, true ) && in_array( $rw_anon, array_map( 'intval', (array) get_option( Stripped_Notice::OPTION, array() ) ), true ), 'stripped registration: the account is recorded for the admin notice' );
+	if ( null === $rw_orig_stripped ) {
+		delete_option( Stripped_Notice::OPTION );
+	} else {
+		update_option( Stripped_Notice::OPTION, $rw_orig_stripped, false );
+	}
+	wp_set_current_user( $rw_admin );
 
 	// Multisite: capabilities WordPress reserves for super admins aren't held by site administrators.
 	if ( is_multisite() ) {
