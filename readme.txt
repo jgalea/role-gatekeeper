@@ -61,6 +61,10 @@ Switching modules on or off and changing the automation settings needs an admini
 
 = 1.1.0 =
 * Disabled accounts: disable a user from the user screen or in bulk, keeping the account, posts and byline. Logged in the audit log with revert.
+* Schedule an account to be disabled on a date, with a custom login message for disabled accounts.
+* Test as this user: a signed, expiring switch with a banner and a way back, limited to users who hold nothing you lack.
+* Login redirects after registration and after a user's first login.
+* Hardening: last-administrator rules count only enabled administrators, imports roll back when a section fails, role changes over REST, abilities and the CLI need promote_user, and disabled accounts are blocked however they are signed in.
 * Migration from Disable Users: `wp rolegate migrate disable-users` or Import and export > Migrate from another plugin.
 * Migration from Disable User Login: `wp rolegate migrate disable-user-login` or Import and export > Migrate from another plugin.
 * Migration from Adminimize: `wp rolegate migrate adminimize` or Import and export > Migrate from another plugin.
