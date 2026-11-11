@@ -46,7 +46,7 @@ No. Every feature is in this plugin.
 
 = What happens if I lock myself out? =
 
-Use the "Locked out of Role Gatekeeper?" link on the login screen. It emails a one-time link to the administrator's address that restores the Role Gatekeeper capabilities. You can also add `define( 'ROLEGATE_DISABLE_SITE_ACCESS', true );` to wp-config.php to switch off private-site and admin-access rules.
+Use the "Locked out of Role Gatekeeper?" link on the login screen. It emails a one-time link to the administrator's address that restores the Role Gatekeeper capabilities. Return false from the `rolegate_rescue_show_link` filter to hide the link; the request page keeps working at `wp-login.php?action=rolegate_rescue`. Behind a proxy or CDN, return the visitor's address from the `rolegate_rescue_client_ip` filter so the hourly limits apply per visitor. You can also add `define( 'ROLEGATE_DISABLE_SITE_ACCESS', true );` to wp-config.php to switch off private-site and admin-access rules.
 
 = Can I migrate from Members, User Role Editor or Disable Users? =
 

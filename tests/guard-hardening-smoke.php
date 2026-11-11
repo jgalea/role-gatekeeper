@@ -8,6 +8,7 @@ use Rolegate\Modules\Audit\Audit_Page;
 use Rolegate\Modules\Safety\Caps;
 use Rolegate\Modules\Safety\Enforcer;
 use Rolegate\Modules\Safety\Guard;
+use Rolegate\Modules\Safety\Rescue;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
@@ -28,6 +29,7 @@ $rw_ok   = function ( $cond, $label ) use ( &$rw_pass, &$rw_fail ) {
 	}
 };
 
+$rw_admin = get_current_user_id();
 $rw_sfx   = substr( md5( (string) microtime( true ) ), 0, 6 );
 $rw_users = array();
 $rw_roles = array();
@@ -79,6 +81,45 @@ try {
 	}
 	remove_filter( 'wp_die_handler', $rw_die );
 	$rw_ok( $rw_died && get_option( Audit_Module::OPTION_SETTINGS, null ) === $rw_before, 'audit settings: a manager who isn\'t a site authority can\'t save them' );
+
+	wp_set_current_user( $rw_admin );
+	// Rescue limits: one visitor can't use up an administrator's bucket for everyone else; the login link can be hidden.
+	$rw_resc = wp_insert_user(
+		array(
+			'user_login' => 'rw_t_resc_' . $rw_sfx,
+			'user_email' => 'rw_t_resc_' . $rw_sfx . '@example.com',
+			'user_pass'  => wp_generate_password( 24 ),
+			'role'       => 'administrator',
+		)
+	);
+	$rw_users[] = $rw_resc;
+	$rw_mails   = 0;
+	add_filter( 'rolegate_rescue_defer_mail', '__return_false' );
+	add_filter(
+		'pre_wp_mail',
+		$rw_mail = function () use ( &$rw_mails ) {
+			++$rw_mails;
+			return false;
+		}
+	);
+	$rw_email = get_userdata( $rw_resc )->user_email;
+	for ( $i = 0; $i < 4; $i++ ) {
+		Rescue::request( $rw_email, '198.51.100.10' . $rw_sfx );
+	}
+	$rw_ok( 3 === $rw_mails, 'rescue: one address from one IP is limited to three links an hour (' . $rw_mails . ')' );
+	Rescue::request( $rw_email, '203.0.113.7' . $rw_sfx );
+	$rw_ok( 4 === $rw_mails, 'rescue: another visitor can still request a link for the same address' );
+	remove_filter( 'pre_wp_mail', $rw_mail );
+	remove_filter( 'rolegate_rescue_defer_mail', '__return_false' );
+	ob_start();
+	( new Rescue() )->footer_link();
+	$rw_link = ob_get_clean();
+	add_filter( 'rolegate_rescue_show_link', '__return_false' );
+	ob_start();
+	( new Rescue() )->footer_link();
+	$rw_hidden = ob_get_clean();
+	remove_filter( 'rolegate_rescue_show_link', '__return_false' );
+	$rw_ok( false !== strpos( $rw_link, 'rolegate_rescue' ) && '' === $rw_hidden, 'rescue: the login page link shows by default and can be hidden' );
 
 	// Multisite: capabilities WordPress reserves for super admins aren't held by site administrators.
 	if ( is_multisite() ) {

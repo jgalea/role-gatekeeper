@@ -181,7 +181,7 @@ final class Rescue {
 
 	public function footer_link(): void {
 		$action = isset( $_GET['action'] ) ? sanitize_key( wp_unslash( $_GET['action'] ) ) : 'login'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( in_array( $action, array( self::ACTION_REQUEST, self::ACTION_USE ), true ) ) {
+		if ( in_array( $action, array( self::ACTION_REQUEST, self::ACTION_USE ), true ) || ! apply_filters( 'rolegate_rescue_show_link', true ) ) {
 			return;
 		}
 		printf(
