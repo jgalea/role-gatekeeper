@@ -95,6 +95,36 @@ final class Cli_Migrate {
 	}
 
 	/**
+	 * Carries the Disable User Login flag over: every account it disabled is disabled here too.
+	 * The flag Disable User Login stored is left as it is.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--dry-run]
+	 * : Show what would change and write nothing. The default.
+	 *
+	 * [--apply]
+	 * : Apply the changes shown in the preview.
+	 *
+	 * [--format=<format>]
+	 * : table or json.
+	 * ---
+	 * default: table
+	 * options:
+	 *   - table
+	 *   - json
+	 * ---
+	 *
+	 * @subcommand disable-user-login
+	 *
+	 * @param array $args
+	 * @param array $assoc
+	 */
+	public function disable_user_login( $args, $assoc ): void {
+		$this->run( 'disable-user-login', (array) $assoc );
+	}
+
+	/**
 	 * Writes the effective capabilities of every role, every role combination users hold
 	 * and every user with capabilities of their own, to compare after a migration.
 	 *

@@ -15,17 +15,17 @@ final class Disable_Users_Migration {
 	const META   = 'ja_disable_user';
 	const MODULE = 'disabled-users';
 
-	private static function is_active(): bool {
-		if ( in_array( self::PLUGIN, (array) get_option( 'active_plugins', array() ), true ) ) {
+	private static function is_active( string $plugin = self::PLUGIN ): bool {
+		if ( in_array( $plugin, (array) get_option( 'active_plugins', array() ), true ) ) {
 			return true;
 		}
-		return is_multisite() && isset( ( (array) get_site_option( 'active_sitewide_plugins', array() ) )[ self::PLUGIN ] );
+		return is_multisite() && isset( ( (array) get_site_option( 'active_sitewide_plugins', array() ) )[ $plugin ] );
 	}
 
 	/** @return int[] ids of existing users Disable Users has flagged */
-	public static function flagged(): array {
+	public static function flagged( string $meta = self::META ): array {
 		global $wpdb;
-		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT m.user_id FROM {$wpdb->usermeta} m INNER JOIN {$wpdb->users} u ON u.ID = m.user_id WHERE m.meta_key = %s AND m.meta_value = %s ORDER BY m.user_id", self::META, '1' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$ids = $wpdb->get_col( $wpdb->prepare( "SELECT m.user_id FROM {$wpdb->usermeta} m INNER JOIN {$wpdb->users} u ON u.ID = m.user_id WHERE m.meta_key = %s AND m.meta_value = %s ORDER BY m.user_id", $meta, '1' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 		$ids = array_values( array_unique( array_map( 'intval', (array) $ids ) ) );
 		if ( is_multisite() ) {
 			$ids = array_values( array_filter( $ids, 'is_user_member_of_blog' ) );
@@ -34,19 +34,24 @@ final class Disable_Users_Migration {
 	}
 
 	public static function plan( int $actor, array $opts = array() ): array {
+		return self::build( $actor, 'disable-users', 'Disable Users', self::PLUGIN, self::META );
+	}
+
+	/** Shared by every migrator whose source plugin flags accounts with a user meta value of 1. */
+	public static function build( int $actor, string $source, string $name, string $plugin, string $meta ): array {
 		$area    = __( 'Disabled accounts', 'role-gatekeeper' );
 		$plan    = array(
-			'source'   => 'disable-users',
-			'label'    => 'Disable Users',
+			'source'   => $source,
+			'label'    => $name,
 			'detected' => false,
 			'rows'     => array(),
 			'ops'      => Migrator::empty_ops(),
 		);
-		$flagged = self::flagged();
+		$flagged = self::flagged( $meta );
 
-		$plan['detected'] = $flagged || self::is_active();
+		$plan['detected'] = $flagged || self::is_active( $plugin );
 		if ( ! $plan['detected'] ) {
-			$plan['rows'][] = Migrator::row( __( 'Source', 'role-gatekeeper' ), 'Disable Users', 'info', __( 'No Disable Users data found on this site.', 'role-gatekeeper' ) );
+			$plan['rows'][] = Migrator::row( __( 'Source', 'role-gatekeeper' ), $name, 'info', sprintf( /* translators: %s: plugin name */ __( 'No %s data found on this site.', 'role-gatekeeper' ), $name ) );
 			return $plan;
 		}
 
@@ -99,13 +104,13 @@ final class Disable_Users_Migration {
 			$rows[] = Migrator::row( $area, sprintf( _n( '%d account', '%d accounts', count( $already ), 'role-gatekeeper' ), count( $already ) ), 'unchanged', __( 'Already disabled here.', 'role-gatekeeper' ) );
 		}
 		if ( ! $flagged ) {
-			$rows[] = Migrator::row( $area, __( 'Disabled accounts', 'role-gatekeeper' ), 'info', __( 'Disable Users has no disabled accounts on this site.', 'role-gatekeeper' ) );
+			$rows[] = Migrator::row( $area, __( 'Disabled accounts', 'role-gatekeeper' ), 'info', sprintf( /* translators: %s: plugin name */ __( '%s has no disabled accounts on this site.', 'role-gatekeeper' ), $name ) );
 		}
 		if ( ( $todo || $already ) && isset( Plugin::modules()[ self::MODULE ] ) && ! Plugin::is_enabled( self::MODULE ) ) {
 			$ops['modules'][] = self::MODULE;
 			$rows[]           = Migrator::row( __( 'Modules', 'role-gatekeeper' ), Plugin::modules()[ self::MODULE ]->title(), 'add', __( 'Switch on, so the disabled accounts are blocked.', 'role-gatekeeper' ) );
 		}
-		$rows[] = Migrator::row( __( 'Disable Users', 'role-gatekeeper' ), __( 'Its own settings', 'role-gatekeeper' ), 'info', __( 'Left as they are, so you can deactivate either plugin.', 'role-gatekeeper' ) );
+		$rows[] = Migrator::row( $name, __( 'Its own settings', 'role-gatekeeper' ), 'info', __( 'Left as they are, so you can deactivate either plugin.', 'role-gatekeeper' ) );
 
 		$plan['rows'] = $rows;
 		$plan['ops']  = $ops;

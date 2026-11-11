@@ -34,9 +34,10 @@ final class Migrator {
 	/** @return array<string,string> source id => class */
 	public static function sources(): array {
 		return array(
-			'members'       => Members_Migration::class,
-			'ure'           => Ure_Migration::class,
-			'disable-users' => Disable_Users_Migration::class,
+			'members'            => Members_Migration::class,
+			'ure'                => Ure_Migration::class,
+			'disable-users'      => Disable_Users_Migration::class,
+			'disable-user-login' => Disable_User_Login_Migration::class,
 		);
 	}
 
