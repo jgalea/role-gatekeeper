@@ -8,6 +8,7 @@ use Rolegate\Modules\Audit\Audit_Page;
 use Rolegate\Modules\Safety\Caps;
 use Rolegate\Modules\Safety\Enforcer;
 use Rolegate\Modules\Safety\Guard;
+use Rolegate\Modules\Portability\Importer;
 use Rolegate\Modules\Roles\Role_Service;
 use Rolegate\Modules\Safety\Rescue;
 use Rolegate\Modules\Safety\Stripped_Notice;
@@ -183,6 +184,42 @@ try {
 		update_option( Stripped_Notice::OPTION, $rw_orig_stripped, false );
 	}
 	wp_set_current_user( $rw_admin );
+
+	// An import whose section fails leaves the roles as they were.
+	$rw_imp_role = 'rw_t_imp_' . $rw_sfx;
+	$rw_roles[]  = $rw_imp_role;
+	add_filter(
+		'rolegate_portability_sections',
+		$rw_sections = function ( $sections ) {
+			$sections['rwfail'] = array(
+				'label'   => 'RW failing section',
+				'cap'     => Caps::MANAGE,
+				'export'  => function () {
+					return array( 'a' => 1 );
+				},
+				'preview' => function () {
+					return array( 'would change a' );
+				},
+				'import'  => function () {
+					return new \WP_Error( 'rw_section_failed', 'section refused' );
+				},
+			);
+			return $sections;
+		}
+	);
+	wp_set_current_user( $rw_admin );
+	$rw_applied = Importer::apply(
+		array(
+			'roles'    => array( $rw_imp_role => array( 'name' => 'RW import', 'capabilities' => array( 'read' => true ) ) ),
+			'sections' => array( 'rwfail' => array( 'a' => 1 ) ),
+			'source'   => 'test',
+		),
+		$rw_admin,
+		array( 'roles' => array( $rw_imp_role ), 'sections' => array( 'rwfail' ) )
+	);
+	wp_roles()->for_site();
+	$rw_ok( is_wp_error( $rw_applied ) && null === get_role( $rw_imp_role ), 'import: a failing section rolls the roles back and reports one error (' . ( is_wp_error( $rw_applied ) ? $rw_applied->get_error_code() : 'applied' ) . ')' );
+	remove_filter( 'rolegate_portability_sections', $rw_sections );
 
 	// Multisite: capabilities WordPress reserves for super admins aren't held by site administrators.
 	if ( is_multisite() ) {
