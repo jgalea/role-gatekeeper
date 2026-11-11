@@ -4,7 +4,7 @@ Tags: roles, capabilities, user roles, permissions, access control
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -58,7 +58,7 @@ Switching modules on or off and changing the automation settings needs an admini
 
 == Changelog ==
 
-= 1.1.0 (Unreleased) =
+= 1.1.0 =
 * Disabled accounts: disable a user from the user screen or in bulk, keeping the account, posts and byline. Logged in the audit log with revert.
 * Migration from Disable Users: `wp rolegate migrate disable-users` or Import and export > Migrate from another plugin.
 * Migration from Disable User Login: `wp rolegate migrate disable-user-login` or Import and export > Migrate from another plugin.
