@@ -8,10 +8,11 @@ use Rolegate\Modules\Safety\Guard;
 defined( 'ABSPATH' ) || exit;
 
 final class Switcher {
-	const COOKIE   = 'rolegate_test_origin';
-	const START    = 'rolegate_test_start';
-	const STOP     = 'rolegate_test_stop';
-	const DURATION = HOUR_IN_SECONDS;
+	const COOKIE      = 'rolegate_test_origin';
+	const START       = 'rolegate_test_start';
+	const STOP        = 'rolegate_test_stop';
+	const DURATION    = HOUR_IN_SECONDS;
+	const SESSION_KEY = 'rolegate_test_origin';
 
 	public function register(): void {
 		add_action( 'admin_post_' . self::START, array( $this, 'start' ) );
@@ -36,7 +37,7 @@ final class Switcher {
 		if ( $actor <= 0 || $actor === $target ) {
 			return $deny( 'rolegate_test_self', __( 'Pick another user.', 'role-gatekeeper' ) );
 		}
-		if ( self::origin() ) {
+		if ( self::origin() || self::session_actor() ) {
 			return $deny( 'rolegate_test_nested', __( 'Switch back to your own account first.', 'role-gatekeeper' ) );
 		}
 		if ( ! user_can( $actor, Caps::MANAGE_USERS ) || ! user_can( $actor, 'edit_user', $target ) ) {
@@ -96,12 +97,19 @@ final class Switcher {
 		$capture = static function ( $cookie, $expire, $expiration, $user_id, $scheme, $session_token ) use ( &$token ) {
 			$token = (string) $session_token;
 		};
+		$mark    = static function ( $session ) use ( $actor ) {
+			$session[ Switcher::SESSION_KEY ] = $actor;
+			return $session;
+		};
 		add_filter( 'auth_cookie_expiration', $limit, 99 );
+		add_filter( 'attach_session_information', $mark );
 		add_action( 'set_logged_in_cookie', $capture, 10, 6 );
+		wp_destroy_current_session();
 		wp_clear_auth_cookie();
 		wp_set_current_user( $target );
 		wp_set_auth_cookie( $target, false );
 		remove_filter( 'auth_cookie_expiration', $limit, 99 );
+		remove_filter( 'attach_session_information', $mark );
 		remove_action( 'set_logged_in_cookie', $capture, 10 );
 		if ( '' === $token ) {
 			wp_clear_auth_cookie();
@@ -132,6 +140,7 @@ final class Switcher {
 		$actor  = $origin['actor'];
 		$target = get_current_user_id();
 		$user   = get_userdata( $actor );
+		wp_destroy_current_session();
 		if ( ! $user || Accounts::is_disabled( $actor ) ) {
 			wp_clear_auth_cookie();
 			wp_safe_redirect( wp_login_url() );
@@ -178,6 +187,18 @@ final class Switcher {
 			'actor'   => $actor,
 			'expires' => $expires,
 		);
+	}
+
+	/**
+	 * The account that started the current login session as a test session, kept on the server with the session itself,
+	 * so dropping the cookie doesn't hide that a test session is running.
+	 */
+	private static function session_actor(): int {
+		if ( ! is_user_logged_in() ) {
+			return 0;
+		}
+		$session = \WP_Session_Tokens::get_instance( get_current_user_id() )->get( wp_get_session_token() );
+		return is_array( $session ) && ! empty( $session[ self::SESSION_KEY ] ) ? (int) $session[ self::SESSION_KEY ] : 0;
 	}
 
 	private static function sign( int $actor, int $target, int $expires ): string {

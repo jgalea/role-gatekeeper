@@ -3,6 +3,8 @@
  * Run: wp eval-file wp-content/plugins/role-gatekeeper/tests/test-as-user-smoke.php
  */
 
+use Rolegate\Core\Plugin;
+use Rolegate\Modules\Audit\Store;
 use Rolegate\Modules\Disabled_Users\Accounts;
 use Rolegate\Modules\Safety\Caps;
 use Rolegate\Modules\Test_As_User\Switcher;
@@ -91,6 +93,112 @@ try {
 	$rw_ok( null === Switcher::origin(), 'origin: malformed value is rejected' );
 	unset( $_COOKIE[ Switcher::COOKIE ] );
 	wp_set_current_user( 0 );
+
+	// Real requests: a test session is marked on the server, and old sessions die when it starts and ends.
+	$rw_base    = getenv( 'RW_HTTP_BASE' ) ? rtrim( (string) getenv( 'RW_HTTP_BASE' ), '/' ) : 'http://wordpress';
+	$rw_home    = wp_parse_url( home_url( '/' ) );
+	$rw_host    = (string) $rw_home['host'] . ( ! empty( $rw_home['port'] ) ? ':' . $rw_home['port'] : '' );
+	$rw_mods    = get_option( Plugin::OPTION_MODULES, null );
+	$rw_modsarr = is_array( $rw_mods ) ? $rw_mods : array();
+	update_option( Plugin::OPTION_MODULES, array_merge( $rw_modsarr, array( 'test-as-user' => true ) ) );
+	$rw_pw = 'rw-' . wp_generate_password( 16, false );
+	add_role( $rw_role . '_h', 'RW http manager', array( 'read' => true, 'list_users' => true, 'edit_users' => true, Caps::MANAGE_USERS => true ) );
+	$hm1 = $rw_make( 'rw_tau_hm1', $rw_role . '_h' );
+	$hm2 = $rw_make( 'rw_tau_hm2', $rw_role . '_h' );
+	$hs  = $rw_make( 'rw_tau_hs', 'subscriber' );
+	foreach ( array( $hm1, $hm2, $hs ) as $rw_uid ) {
+		wp_set_password( $rw_pw, $rw_uid );
+	}
+	$rw_jar = static function ( array $jar, $response ) {
+		foreach ( (array) wp_remote_retrieve_cookies( $response ) as $c ) {
+			if ( '' === (string) $c->value || ( $c->expires && $c->expires < time() ) ) {
+				unset( $jar[ $c->name ] );
+			} else {
+				$jar[ $c->name ] = $c->value;
+			}
+		}
+		return $jar;
+	};
+	$rw_req = function ( $method, $path, array $jar = array(), array $body = array() ) use ( $rw_base, $rw_host, $rw_jar ) {
+		$cookies = array();
+		foreach ( $jar as $name => $value ) {
+			$cookies[] = new WP_Http_Cookie( array( 'name' => $name, 'value' => $value ) );
+		}
+		$r = wp_remote_request(
+			$rw_base . $path,
+			array(
+				'method'      => $method,
+				'redirection' => 0,
+				'timeout'     => 30,
+				'headers'     => array( 'Host' => $rw_host ),
+				'cookies'     => $cookies,
+				'body'        => $body ? $body : null,
+			)
+		);
+		if ( is_wp_error( $r ) ) {
+			return array( 'code' => 0, 'body' => $r->get_error_message(), 'location' => '', 'jar' => $jar );
+		}
+		return array(
+			'code'     => (int) wp_remote_retrieve_response_code( $r ),
+			'body'     => (string) wp_remote_retrieve_body( $r ),
+			'location' => (string) wp_remote_retrieve_header( $r, 'location' ),
+			'jar'      => $rw_jar( $jar, $r ),
+		);
+	};
+	$rw_signin = function ( $uid ) use ( $rw_req, $rw_pw ) {
+		$r = $rw_req( 'POST', '/wp-login.php', array( 'wordpress_test_cookie' => 'WP Cookie check' ), array( 'log' => get_userdata( $uid )->user_login, 'pwd' => $rw_pw, 'wp-submit' => 'Log In', 'redirect_to' => admin_url() ) );
+		return $r['jar'];
+	};
+	$rw_in = function ( array $jar ) use ( $rw_req ) {
+		$r = $rw_req( 'GET', '/wp-admin/profile.php', $jar );
+		return 200 === $r['code'];
+	};
+	$rw_audit_count = function () {
+		return Store::table_exists() ? (int) Store::query( array( 'type' => 'user.test_started' ), 1, 50 )['total'] : 0;
+	};
+	$rw_path_of = function ( $url ) {
+		return (string) wp_parse_url( $url, PHP_URL_PATH ) . '?' . (string) wp_parse_url( $url, PHP_URL_QUERY );
+	};
+
+	$rw_jar1 = $rw_signin( $hm1 );
+	$rw_ok( $rw_in( $rw_jar1 ), 'http setup: the first manager signs in' );
+	$rw_page = $rw_req( 'GET', '/wp-admin/users.php', $rw_jar1 );
+	$rw_link = preg_match( '#href="([^"]*action=rolegate_test_start&(?:amp;|\#038;)?user=' . $hm2 . '[^"]*)"#', $rw_page['body'], $m ) ? html_entity_decode( $m[1] ) : '';
+	$rw_ok( '' !== $rw_link, 'http setup: users.php offers "Test as this user" for the second manager' );
+	$rw_start = $rw_req( 'GET', $rw_path_of( $rw_link ), $rw_jar1 );
+	$rw_ok( 302 === $rw_start['code'], 'http: starting a test session redirects (' . $rw_start['code'] . ')' );
+	$rw_test_jar = $rw_start['jar'];
+	$rw_ok( ! $rw_in( $rw_jar1 ), 'start: the actor\'s previous session cookie no longer signs in' );
+	$rw_ok( $rw_in( $rw_test_jar ), 'start: the test session signs in' );
+
+	$rw_logged_cookie = '';
+	foreach ( $rw_test_jar as $name => $value ) {
+		if ( 0 === strpos( $name, 'wordpress_logged_in_' ) ) {
+			$rw_logged_cookie = $value;
+		}
+	}
+	wp_set_current_user( $hm2 );
+	$_COOKIE[ LOGGED_IN_COOKIE ] = $rw_logged_cookie;
+	$rw_nonce_hs                 = wp_create_nonce( Switcher::START . $hs );
+	unset( $_COOKIE[ LOGGED_IN_COOKIE ] );
+	wp_set_current_user( 0 );
+	$rw_no_origin = $rw_test_jar;
+	unset( $rw_no_origin[ Switcher::COOKIE ] );
+	$rw_before_audit = $rw_audit_count();
+	$rw_nested       = $rw_req( 'GET', '/wp-admin/admin-post.php?action=' . Switcher::START . '&user=' . $hs . '&_wpnonce=' . $rw_nonce_hs, $rw_no_origin );
+	$rw_ok( 403 === $rw_nested['code'] && false !== strpos( $rw_nested['body'], 'Switch back to your own account first' ), 'nesting: a second test session is refused even with the origin cookie dropped (' . $rw_nested['code'] . ')' );
+	$rw_ok( $rw_audit_count() === $rw_before_audit, 'nesting: no test_started entry is logged for the refused attempt' );
+
+	$rw_page = $rw_req( 'GET', '/wp-admin/profile.php', $rw_test_jar );
+	$rw_stop = preg_match( '#href="([^"]*action=rolegate_test_stop[^"]*)"#', $rw_page['body'], $m ) ? html_entity_decode( $m[1] ) : '';
+	$rw_ok( '' !== $rw_stop, 'http setup: the banner carries the way back' );
+	$rw_back = $rw_req( 'GET', $rw_path_of( $rw_stop ), $rw_test_jar );
+	$rw_ok( 302 === $rw_back['code'] && $rw_in( $rw_back['jar'] ), 'stop: switching back signs the actor in again (' . $rw_back['code'] . ')' );
+	$rw_ok( ! $rw_in( $rw_test_jar ), 'stop: the captured test session cookie no longer signs in' );
+	$rw_replay = $rw_req( 'GET', $rw_path_of( $rw_stop ), $rw_test_jar );
+	$rw_ok( $rw_in( $rw_back['jar'] ) && ! $rw_in( $rw_replay['jar'] ), 'stop: replaying the captured cookies doesn\'t switch back again' );
+	update_option( Plugin::OPTION_MODULES, $rw_modsarr );
+	remove_role( $rw_role . '_h' );
 } finally {
 	unset( $_COOKIE[ Switcher::COOKIE ] );
 	remove_role( $rw_role );
