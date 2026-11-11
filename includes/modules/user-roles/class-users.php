@@ -73,7 +73,7 @@ final class Users {
 		foreach ( array_keys( wp_roles()->role_names ) as $role ) {
 			$groups[] = array(
 				'key'     => $key,
-				'value'   => '"' . $wpdb->esc_like( (string) $role ) . '";b:1',
+				'value'   => '"' . (string) $role . '";b:1',
 				'compare' => 'NOT LIKE',
 			);
 		}

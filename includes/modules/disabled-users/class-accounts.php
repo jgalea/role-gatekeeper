@@ -56,7 +56,7 @@ final class Accounts {
 				'meta_query' => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
 					array(
 						'key'     => $wpdb->get_blog_prefix() . 'capabilities',
-						'value'   => '"' . $wpdb->esc_like( Caps::MANAGE ) . '";b:1',
+						'value'   => '"' . Caps::MANAGE . '";b:1',
 						'compare' => 'LIKE',
 					),
 				),
