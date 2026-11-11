@@ -81,7 +81,7 @@ final class Login_Redirects_Page {
 			foreach ( Login_Redirects_Settings::FIELDS as $field ) {
 				$value = isset( $s['rules'][ $slug ][ $field ] ) ? (string) $s['rules'][ $slug ][ $field ] : '';
 				printf(
-					'<td><input type="text" class="regular-text" name="rw[rules][%1$s][%2$s]" value="%3$s" aria-label="%4$s" /></td>',
+					'<td><input type="text" style="inline-size:100%%;min-inline-size:11em;box-sizing:border-box" name="rw[rules][%1$s][%2$s]" value="%3$s" aria-label="%4$s" /></td>',
 					esc_attr( $slug ),
 					esc_attr( $field ),
 					esc_attr( $value ),
