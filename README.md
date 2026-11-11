@@ -29,12 +29,13 @@ Each module has its own switch under Role Gatekeeper in the admin menu.
 
 The safety module is always on. Nobody can grant a role or capability they don't hold, the administrator role is protected, changes that would lock you out are refused, and a rescue link on the login screen restores access to the Role Gatekeeper screens.
 
-## Migrating from Members or User Role Editor
+## Migrating from Members, User Role Editor or Disable Users
 
 Roles, capabilities, per-user capabilities and multiple roles per user are stored by WordPress itself, so they work here as they are. The migration carries over what those plugins keep of their own:
 
 - Members: capabilities a role denies become deny rules (a deny on any of a user's roles wins, as in Members), per-post content permissions and their messages, block permissions shown to logged-in users, logged-out users or chosen roles, the default restricted-content message, and private-site mode when you confirm it.
 - User Role Editor: the extra roles new users get on registration.
+- Disable Users: every account it disabled is disabled here too. Its own flag is left as it is.
 
 Open Role Gatekeeper > Import and export and use "Migrate from another plugin", or run it with WP-CLI:
 
@@ -42,6 +43,7 @@ Open Role Gatekeeper > Import and export and use "Migrate from another plugin", 
 wp rolegate migrate members            # preview, writes nothing
 wp rolegate migrate members --apply    # apply what the preview shows
 wp rolegate migrate ure --apply
+wp rolegate migrate disable-users --apply
 ```
 
 The preview lists every change and anything that has no counterpart. Applying backs up the roles first, never changes or deletes the other plugin's data, and logs one entry the audit log can revert. Running it again changes nothing.

@@ -132,7 +132,21 @@ $new = wp_insert_user(
 $rw_users[] = (int) $new;
 clean_user_cache( $new );
 $nu = get_userdata( $new );
-$rw_ok( in_array( 'contributor', (array) $nu->roles, true ) && in_array( $rw_src, (array) $nu->roles, true ), 'default: new user gets the default and the extra role' );
+$rw_ok( in_array( 'contributor', (array) $nu->roles, true ) && ! in_array( $rw_src, (array) $nu->roles, true ), 'default: an account created by a logged-in user gets only the default role' );
+$rw_prev = get_current_user_id();
+wp_set_current_user( 0 );
+$new2 = wp_insert_user(
+	array(
+		'user_login' => 'rw_reg2_' . $rw_suffix,
+		'user_email' => 'rw_reg2_' . $rw_suffix . '@example.com',
+		'user_pass'  => wp_generate_password( 24 ),
+	)
+);
+wp_set_current_user( $rw_prev );
+$rw_users[] = (int) $new2;
+clean_user_cache( $new2 );
+$nu2 = get_userdata( $new2 );
+$rw_ok( in_array( 'contributor', (array) $nu2->roles, true ) && in_array( $rw_src, (array) $nu2->roles, true ), 'default: a self-registration gets the default and the extra role' );
 Role_Service::set_default( $rw_admin, $rw_orig_default ? $rw_orig_default : 'subscriber', $rw_orig_extras );
 
 // Reset.

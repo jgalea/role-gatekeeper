@@ -213,6 +213,20 @@ try {
 	// A delegated actor can't save a denial on a role an administrator holds.
 	$res = Denials::save( $ops, $r_junior, array( 'edit_posts' ) );
 	$rw_ok( is_wp_error( $res ) && 'rolegate_holder_above_actor' === $res->get_error_code() && array() === Denials::for_role( $r_junior ), 'delegated actor cannot set denials on a role held by an administrator (' . $rw_code( $res ) . ')' );
+	// More than 500 holders: an administrator past the first page still blocks the change.
+	global $wpdb;
+	$rw_ghosts = array();
+	for ( $i = 0; $i < 500; $i++ ) {
+		$wpdb->insert( $wpdb->users, array( 'user_login' => sprintf( 'a0ghost_%s_%03d', $rw_s, $i ), 'user_pass' => '', 'user_nicename' => sprintf( 'a0ghost-%s-%03d', $rw_s, $i ), 'user_email' => sprintf( 'a0ghost%s%03d@example.com', $rw_s, $i ), 'user_registered' => current_time( 'mysql', true ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$gid = (int) $wpdb->insert_id;
+		update_user_meta( $gid, $wpdb->get_blog_prefix() . 'capabilities', array( $r_junior => true ) );
+		$rw_ghosts[] = $gid;
+	}
+	$res = Denials::save( $ops, $r_junior, array( 'edit_posts' ) );
+	$rw_ok( is_wp_error( $res ) && 'rolegate_holder_above_actor' === $res->get_error_code(), 'holders beyond the first 500 are checked too (' . $rw_code( $res ) . ')' );
+	foreach ( $rw_ghosts as $gid ) {
+		wp_delete_user( $gid );
+	}
 	Enforcer::as_system(
 		function () use ( $admin2, $r_junior ) {
 			( new WP_User( $admin2 ) )->remove_role( $r_junior );

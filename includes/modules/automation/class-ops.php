@@ -3,6 +3,7 @@ namespace Rolegate\Modules\Automation;
 
 use Rolegate\Modules\Safety\Caps;
 use Rolegate\Modules\Safety\Guard;
+use Rolegate\Modules\User_Roles\Users;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -254,7 +255,7 @@ final class Ops {
 		if ( in_array( $role, (array) $user->roles, true ) ) {
 			return new \WP_Error( 'rolegate_already_has_role', __( 'The user already has that role.', 'role-gatekeeper' ) );
 		}
-		foreach ( array( Gate::assign_role( $actor, $role, $target ), Gate::act_on_user( $actor, $target ) ) as $ok ) {
+		foreach ( array( Gate::promote_user( $actor, $target ), Gate::assign_role( $actor, $role, $target ), Gate::act_on_user( $actor, $target ) ) as $ok ) {
 			if ( is_wp_error( $ok ) ) {
 				return $ok;
 			}
@@ -283,13 +284,18 @@ final class Ops {
 		if ( ! in_array( $role, (array) $user->roles, true ) ) {
 			return new \WP_Error( 'rolegate_user_lacks_role', __( 'The user doesn\'t have that role.', 'role-gatekeeper' ) );
 		}
-		$ok = Gate::act_on_user( $actor, $target );
-		if ( is_wp_error( $ok ) ) {
-			return $ok;
+		foreach ( array( Gate::promote_user( $actor, $target ), Gate::act_on_user( $actor, $target ) ) as $ok ) {
+			if ( is_wp_error( $ok ) ) {
+				return $ok;
+			}
 		}
 		$before = array_values( (array) $user->roles );
 		$after  = array_values( array_diff( $before, array( $role ) ) );
-		$ok     = Gate::self_lockout( $actor, $target, $after, self::direct_caps( $user ) );
+		$ok     = Users::check_last_admin( $target, $before, $after );
+		if ( is_wp_error( $ok ) ) {
+			return $ok;
+		}
+		$ok = Gate::self_lockout( $actor, $target, $after, self::direct_caps( $user ) );
 		if ( is_wp_error( $ok ) ) {
 			return $ok;
 		}

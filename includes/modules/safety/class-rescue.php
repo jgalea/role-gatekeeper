@@ -15,6 +15,7 @@ final class Rescue {
 	const FLOOR          = 0.25;
 	const TTL            = 900;
 	const LIMIT          = 3;
+	const ACCOUNT_LIMIT  = 5;
 	const WINDOW         = HOUR_IN_SECONDS;
 
 	public function register(): void {
@@ -36,7 +37,7 @@ final class Rescue {
 	/**
 	 * Counts one hit against $key and reports whether it is still within the limit.
 	 */
-	private static function hit( string $key ): bool {
+	private static function hit( string $key, int $limit = self::LIMIT ): bool {
 		$name  = 'rolegate_rl_' . md5( $key );
 		$state = get_transient( $name );
 		if ( ! is_array( $state ) || empty( $state['start'] ) || $state['start'] + self::WINDOW < time() ) {
@@ -47,7 +48,7 @@ final class Rescue {
 		}
 		++$state['count'];
 		set_transient( $name, $state, self::WINDOW );
-		return $state['count'] <= self::LIMIT;
+		return $state['count'] <= $limit;
 	}
 
 	/**
@@ -66,15 +67,19 @@ final class Rescue {
 	 * the total to a constant floor, so response time doesn't reveal admin addresses.
 	 */
 	private static function request_inner( string $email, string $ip ): bool {
-		$within = self::hit( 'ip|' . $ip );
-		$email  = sanitize_email( $email );
-		$user   = $email ? get_user_by( 'email', $email ) : false;
-		$token  = bin2hex( random_bytes( 32 ) );
-		$hash   = hash( 'sha256', $token );
-		$acct   = self::hit( 'acct|' . ( $user ? $user->ID : 'none|' . hash( 'sha256', strtolower( $email ) ) ) );
+		$within     = self::hit( 'ip|' . $ip );
+		$email      = sanitize_email( $email );
+		$user       = $email ? get_user_by( 'email', $email ) : false;
+		$token      = bin2hex( random_bytes( 32 ) );
+		$hash       = hash( 'sha256', $token );
+		$subject    = $user ? (string) $user->ID : 'none|' . hash( 'sha256', strtolower( $email ) );
+		$acct       = self::hit( 'acct|' . $ip . '|' . $subject );
 		$defer      = (bool) apply_filters( 'rolegate_rescue_defer_mail', ! ( defined( 'WP_CLI' ) && WP_CLI ) );
 		$can_detach = (bool) apply_filters( 'rolegate_rescue_can_detach', function_exists( 'fastcgi_finish_request' ) || function_exists( 'litespeed_finish_request' ) );
-		if ( ! $within || ! $user || ! $acct || ! self::is_eligible( $user ) ) {
+		$eligible   = $within && $user && $acct && self::is_eligible( $user );
+		// Only requests that would send count against the per-account ceiling, so a flood of other requests can't use it up.
+		$ceiling = self::hit( $eligible ? 'acct|' . $user->ID : 'void', self::ACCOUNT_LIMIT );
+		if ( ! $eligible || ! $ceiling ) {
 			if ( $within && $defer && ! $can_detach ) {
 				// Same write as the eligible path, so scheduling cost doesn't reveal which addresses are admins. The handler ignores user 0.
 				wp_schedule_single_event( time(), self::HOOK_DELIVER, array( 0 ) );
@@ -181,7 +186,7 @@ final class Rescue {
 
 	public function footer_link(): void {
 		$action = isset( $_GET['action'] ) ? sanitize_key( wp_unslash( $_GET['action'] ) ) : 'login'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( in_array( $action, array( self::ACTION_REQUEST, self::ACTION_USE ), true ) ) {
+		if ( in_array( $action, array( self::ACTION_REQUEST, self::ACTION_USE ), true ) || ! apply_filters( 'rolegate_rescue_show_link', true ) ) {
 			return;
 		}
 		printf(

@@ -224,7 +224,7 @@ final class Portability_Module extends Module {
 		}
 		echo '<h2>' . esc_html__( 'Migrate from another plugin', 'role-gatekeeper' ) . '</h2>';
 		if ( ! $found ) {
-			echo '<p>' . esc_html__( 'No data from Members or User Role Editor was found on this site.', 'role-gatekeeper' ) . '</p>';
+			echo '<p>' . esc_html__( 'No data from Members, User Role Editor or Disable Users was found on this site.', 'role-gatekeeper' ) . '</p>';
 			return;
 		}
 		echo '<p>' . esc_html__( 'Carries their settings and rules over. Their own data stays as it is, and nothing changes until you confirm on the next screen.', 'role-gatekeeper' ) . '</p><p>';

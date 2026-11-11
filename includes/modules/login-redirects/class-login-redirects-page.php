@@ -66,20 +66,22 @@ final class Login_Redirects_Page {
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
 		echo '<input type="hidden" name="action" value="' . esc_attr( self::ACTION ) . '" />';
 		wp_nonce_field( self::ACTION );
-		echo '<div class="rw-scroll" style="overflow-x:auto"><table class="widefat striped"><thead><tr><th>' . esc_html__( 'Role', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'After login', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'After logout', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'Default landing page', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'Priority', 'role-gatekeeper' ) . '</th></tr></thead><tbody>';
-		$position = 1;
-		$order    = array_flip( (array) $s['priority'] );
+		echo '<div class="rw-scroll" style="overflow-x:auto"><table class="widefat striped"><thead><tr><th>' . esc_html__( 'Role', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'After login', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'After logout', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'Default landing page', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'After registration', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'After first login', 'role-gatekeeper' ) . '</th><th>' . esc_html__( 'Priority', 'role-gatekeeper' ) . '</th></tr></thead><tbody>';
+		$position     = 1;
+		$order        = array_flip( (array) $s['priority'] );
 		$field_labels = array(
-			'login'   => __( 'After login', 'role-gatekeeper' ),
-			'logout'  => __( 'After logout', 'role-gatekeeper' ),
-			'landing' => __( 'Default landing page', 'role-gatekeeper' ),
+			'login'        => __( 'After login', 'role-gatekeeper' ),
+			'logout'       => __( 'After logout', 'role-gatekeeper' ),
+			'landing'      => __( 'Default landing page', 'role-gatekeeper' ),
+			'registration' => __( 'After registration', 'role-gatekeeper' ),
+			'first_login'  => __( 'After first login', 'role-gatekeeper' ),
 		);
 		foreach ( wp_roles()->get_names() as $slug => $name ) {
 			printf( '<tr><td>%s</td>', esc_html( translate_user_role( $name ) ) );
 			foreach ( Login_Redirects_Settings::FIELDS as $field ) {
 				$value = isset( $s['rules'][ $slug ][ $field ] ) ? (string) $s['rules'][ $slug ][ $field ] : '';
 				printf(
-					'<td><input type="text" class="regular-text" name="rw[rules][%1$s][%2$s]" value="%3$s" aria-label="%4$s" /></td>',
+					'<td><input type="text" style="inline-size:100%%;min-inline-size:11em;box-sizing:border-box" name="rw[rules][%1$s][%2$s]" value="%3$s" aria-label="%4$s" /></td>',
 					esc_attr( $slug ),
 					esc_attr( $field ),
 					esc_attr( $value ),

@@ -70,13 +70,17 @@ final class Profile {
 				if ( $role === $primary ) {
 					continue;
 				}
+				$critical = Guard::critical_subset( (array) ( wp_roles()->roles[ $role ]['capabilities'] ?? array() ) );
 				printf(
-					'<label style="display:block;padding:6px 0"><input type="checkbox" name="rolegate_user_roles[]" value="%1$s" %2$s /> %3$s</label>',
+					'<label style="display:block;padding:6px 0"><input type="checkbox" name="rolegate_user_roles[]" value="%1$s" %2$s %4$s /> %3$s%5$s</label>',
 					esc_attr( $role ),
 					checked( in_array( $role, $held, true ), true, false ),
-					esc_html( translate_user_role( $names[ $role ] ?? $role ) )
+					esc_html( translate_user_role( $names[ $role ] ?? $role ) ),
+					$critical ? 'data-rolegate-critical="1"' : '',
+					$critical ? ' <span class="description">' . esc_html__( '(can change the site)', 'role-gatekeeper' ) . '</span>' : ''
 				);
 			}
+			self::confirm_script();
 			if ( $locked ) {
 				echo '<p class="description">' . esc_html(
 					sprintf(
@@ -122,24 +126,33 @@ final class Profile {
 		echo '<h2>' . esc_html__( 'Capabilities granted to this user', 'role-gatekeeper' ) . '</h2>';
 		echo '<input type="hidden" name="rolegate_user_caps_present" value="1" />';
 		echo '<table class="form-table" role="presentation"><tr><th scope="row">' . esc_html__( 'Capabilities', 'role-gatekeeper' ) . '</th><td>';
-		echo '<div style="max-height:280px;overflow:auto;border:1px solid #c3c4c7;padding:8px;columns:3 220px">';
+		echo '<p><label class="screen-reader-text" for="rolegate_user_cap_filter">' . esc_html__( 'Filter capabilities', 'role-gatekeeper' ) . '</label>';
+		echo '<input type="search" class="regular-text" id="rolegate_user_cap_filter" placeholder="' . esc_attr__( 'Filter capabilities', 'role-gatekeeper' ) . '" autocomplete="off" /></p>';
+		echo '<div id="rolegate_user_caps_list" style="max-height:280px;overflow:auto;border:1px solid #c3c4c7;padding:8px;columns:3 220px">';
 		foreach ( array_keys( $all ) as $cap ) {
 			$is_direct = isset( $direct[ $cap ] );
 			$grantable = $is_direct || Guard::can_grant_cap( $actor, $cap );
 			printf(
-				'<label style="display:block;break-inside:avoid;padding:6px 0"><input type="checkbox" name="rolegate_user_caps[]" value="%1$s" %2$s %3$s /> %4$s%5$s</label>',
+				'<label style="display:block;break-inside:avoid;padding:6px 0" data-cap="%6$s"><input type="checkbox" name="rolegate_user_caps[]" value="%1$s" %2$s %3$s /> %4$s%5$s</label>',
 				esc_attr( $cap ),
 				checked( $is_direct, true, false ),
 				disabled( ! $grantable || ( $is_direct && ! Guard::can_grant_cap( $actor, $cap ) ), true, false ),
 				esc_html( $cap ),
-				! empty( $from_roles[ $cap ] ) ? ' <span class="description">' . esc_html__( '(from role)', 'role-gatekeeper' ) . '</span>' : ''
+				( ! empty( $from_roles[ $cap ] ) ? ' <span class="description">' . esc_html__( '(from role)', 'role-gatekeeper' ) . '</span>' : '' ) . ( Guard::is_critical_cap( $cap ) ? ' <span class="description">' . esc_html__( '(critical)', 'role-gatekeeper' ) . '</span>' : '' ),
+				esc_attr( strtolower( $cap ) )
 			);
 		}
 		echo '</div>';
+		echo '<script>document.getElementById("rolegate_user_cap_filter").addEventListener("input",function(e){var q=e.target.value.toLowerCase();document.querySelectorAll("#rolegate_user_caps_list label").forEach(function(l){l.style.display=l.dataset.cap.indexOf(q)<0?"none":"block";});});</script>';
 		echo '<p><label for="rolegate_user_cap_new">' . esc_html__( 'Add capabilities not listed', 'role-gatekeeper' ) . '</label><br />';
 		echo '<input type="text" class="regular-text" id="rolegate_user_cap_new" name="rolegate_user_cap_new" value="" /></p>';
 		echo '<p class="description">' . esc_html__( 'Separate names with spaces or commas. You can only grant capabilities you hold yourself, unless you can manage capabilities.', 'role-gatekeeper' ) . '</p>';
 		echo '</td></tr></table>';
+	}
+
+	private static function confirm_script(): void {
+		$message = __( 'This role can change the site, including users and plugins. Give it to this user?', 'role-gatekeeper' );
+		echo '<script>(function(){var f=document.getElementById("your-profile")||document.getElementById("createuser");if(!f){return;}f.addEventListener("submit",function(e){var hit=f.querySelectorAll("input[data-rolegate-critical]:checked");for(var i=0;i<hit.length;i++){if(!hit[i].defaultChecked&&!window.confirm(' . wp_json_encode( $message ) . ')){e.preventDefault();return;}}});})();</script>'; // phpcs:ignore WordPress.Security.EscapeOutput -- message is JSON-encoded.
 	}
 
 	public function render_new_user( $type ): void {
@@ -156,12 +169,16 @@ final class Profile {
 		echo '<input type="hidden" name="rolegate_user_roles_present" value="1" />';
 		echo '<table class="form-table" role="presentation"><tr><th scope="row">' . esc_html__( 'Additional roles', 'role-gatekeeper' ) . '</th><td>';
 		foreach ( $assignable as $role ) {
+			$critical = Guard::critical_subset( (array) ( wp_roles()->roles[ $role ]['capabilities'] ?? array() ) );
 			printf(
-				'<label style="display:block;padding:6px 0"><input type="checkbox" name="rolegate_user_roles[]" value="%1$s" /> %2$s</label>',
+				'<label style="display:block;padding:6px 0"><input type="checkbox" name="rolegate_user_roles[]" value="%1$s" %3$s /> %2$s%4$s</label>',
 				esc_attr( $role ),
-				esc_html( translate_user_role( $names[ $role ] ?? $role ) )
+				esc_html( translate_user_role( $names[ $role ] ?? $role ) ),
+				$critical ? 'data-rolegate-critical="1"' : '',
+				$critical ? ' <span class="description">' . esc_html__( '(can change the site)', 'role-gatekeeper' ) . '</span>' : ''
 			);
 		}
+		self::confirm_script();
 		echo '</td></tr></table>';
 	}
 

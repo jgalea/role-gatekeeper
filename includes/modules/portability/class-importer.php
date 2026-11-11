@@ -357,8 +357,13 @@ final class Importer {
 		foreach ( $section_ids as $id ) {
 			$result = call_user_func( $all_sections[ $id ]['import'], $payload['sections'][ $id ], $actor );
 			if ( is_wp_error( $result ) ) {
-				$errors[] = $id . ': ' . $result->get_error_message();
-				continue;
+				foreach ( array_reverse( $sections_before, true ) as $done => $state ) {
+					call_user_func( $all_sections[ $done ]['import'], $state, $actor );
+				}
+				if ( $changes ) {
+					Role_Store::write( $before );
+				}
+				return new \WP_Error( 'rolegate_import_failed', __( 'Nothing was imported.', 'role-gatekeeper' ) . ' ' . $id . ': ' . $result->get_error_message() );
 			}
 			$sections_before[ $id ] = $result;
 			$sections_after[ $id ]  = $payload['sections'][ $id ];

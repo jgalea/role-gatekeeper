@@ -52,7 +52,7 @@ final class Audit_Page {
 	}
 
 	public function handle_settings(): void {
-		if ( ! current_user_can( Caps::MANAGE ) || ! current_user_can( Caps::VIEW_AUDIT ) ) {
+		if ( ! current_user_can( Caps::MANAGE ) || ! current_user_can( Caps::VIEW_AUDIT ) || ! Settings::can_change( get_current_user_id() ) ) {
 			wp_die( esc_html__( 'You do not have permission to do that.', 'role-gatekeeper' ), '', array( 'response' => 403 ) );
 		}
 		check_admin_referer( 'rolegate_audit_settings' );
@@ -257,12 +257,12 @@ final class Audit_Page {
 
 	private function render_settings(): void {
 		$settings = Audit_Module::settings();
-		$can_edit = current_user_can( Caps::MANAGE );
+		$can_edit = current_user_can( Caps::MANAGE ) && Settings::can_change( get_current_user_id() );
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '"><input type="hidden" name="action" value="rolegate_audit_settings" />';
 		wp_nonce_field( 'rolegate_audit_settings' );
 		echo '<table class="form-table" role="presentation"><tbody>';
 		echo '<tr><th scope="row"><label for="rw-retention">' . esc_html__( 'Keep entries for (days)', 'role-gatekeeper' ) . '</label></th><td><input id="rw-retention" type="number" min="1" max="3650" name="retention_days" value="' . (int) $settings['retention_days'] . '"' . disabled( ! $can_edit, true, false ) . ' /></td></tr>';
-		echo '<tr><th scope="row">' . esc_html__( 'On uninstall', 'role-gatekeeper' ) . '</th><td><label><input type="checkbox" name="delete_on_uninstall" value="1"' . checked( $settings['delete_on_uninstall'], true, false ) . disabled( ! $can_edit, true, false ) . ' /> ' . esc_html__( 'Delete the audit table when the plugin is deleted', 'role-gatekeeper' ) . '</label></td></tr>';
+		echo '<tr><th scope="row">' . esc_html__( 'On uninstall', 'role-gatekeeper' ) . '</th><td><label><input type="checkbox" name="delete_on_uninstall" value="1"' . checked( $settings['delete_on_uninstall'], true, false ) . disabled( ! $can_edit, true, false ) . ' /> ' . esc_html__( 'Delete the audit log and disabled-account flags when the plugin is deleted', 'role-gatekeeper' ) . '</label></td></tr>';
 		echo '</tbody></table>';
 		if ( $can_edit ) {
 			submit_button( __( 'Save settings', 'role-gatekeeper' ) );
@@ -301,6 +301,9 @@ final class Audit_Page {
 			if ( ! empty( $detail['label'] ) ) {
 				$lines[] = esc_html( $detail['label'] );
 			}
+		}
+		if ( is_array( $detail ) && isset( $detail['disabled_after'] ) ) {
+			$lines[] = $detail['disabled_after'] ? esc_html__( 'Account disabled', 'role-gatekeeper' ) : esc_html__( 'Account enabled', 'role-gatekeeper' );
 		}
 		$groups = array(
 			'caps'     => array(
@@ -347,10 +350,14 @@ final class Audit_Page {
 
 	private static function type_label( string $type ): string {
 		$labels = array(
-			'modules.updated'    => __( 'Modules switched on or off', 'role-gatekeeper' ),
-			'automation.updated' => __( 'Automation settings changed', 'role-gatekeeper' ),
-			'migration.applied'  => __( 'Migrated from another plugin', 'role-gatekeeper' ),
-			'migration.reverted' => __( 'Migration reverted', 'role-gatekeeper' ),
+			'modules.updated'      => __( 'Modules switched on or off', 'role-gatekeeper' ),
+			'automation.updated'   => __( 'Automation settings changed', 'role-gatekeeper' ),
+			'user.disabled'        => __( 'Account disabled or enabled', 'role-gatekeeper' ),
+			'user.disable_skipped' => __( 'Scheduled disabling skipped', 'role-gatekeeper' ),
+			'user.test_started'    => __( 'Started testing as a user', 'role-gatekeeper' ),
+			'user.test_ended'      => __( 'Stopped testing as a user', 'role-gatekeeper' ),
+			'migration.applied'    => __( 'Migrated from another plugin', 'role-gatekeeper' ),
+			'migration.reverted'   => __( 'Migration reverted', 'role-gatekeeper' ),
 		);
 		return isset( $labels[ $type ] ) ? $labels[ $type ] : '';
 	}

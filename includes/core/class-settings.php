@@ -51,12 +51,13 @@ final class Settings {
 		foreach ( Plugin::modules() as $module ) {
 			$locked = ( 'safety' === $module->id() ) || ! $can_edit;
 			printf(
-				'<tr><th scope="row">%1$s</th><td><label><input type="checkbox" name="modules[%2$s]" value="1" %3$s %4$s /> %5$s</label></td></tr>',
+				'<tr><th scope="row">%1$s</th><td><label><input type="checkbox" name="modules[%2$s]" value="1" %3$s %4$s /> %5$s</label>%6$s</td></tr>',
 				esc_html( $module->title() ),
 				esc_attr( $module->id() ),
 				checked( Plugin::is_enabled( $module->id() ) || 'safety' === $module->id(), true, false ),
 				disabled( $locked, true, false ),
-				esc_html( $module->description() )
+				esc_html( $module->description() ),
+				self::warning_html( (string) apply_filters( 'rolegate_module_warning', '', $module->id() ) ) // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in warning_html().
 			);
 		}
 		echo '</tbody></table>';
@@ -64,6 +65,10 @@ final class Settings {
 			submit_button( __( 'Save modules', 'role-gatekeeper' ) );
 		}
 		echo '</form></div>';
+	}
+
+	private static function warning_html( string $text ): string {
+		return '' === $text ? '' : '<p class="description" style="color:#996800">' . esc_html( $text ) . '</p>';
 	}
 
 	/**

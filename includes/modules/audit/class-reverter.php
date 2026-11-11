@@ -1,8 +1,10 @@
 <?php
 namespace Rolegate\Modules\Audit;
 
+use Rolegate\Modules\Disabled_Users\Accounts;
 use Rolegate\Modules\Safety\Caps;
 use Rolegate\Modules\Safety\Guard;
+use Rolegate\Modules\User_Roles\Users;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -11,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
  * change needed. The result fires rolegate_changed with revert_of, which the recorder logs.
  */
 final class Reverter {
-	const TYPES = array( 'role.created', 'role.deleted', 'role.renamed', 'caps.updated', 'user.roles', 'user.caps', 'roles.reset', 'role.default_set', 'migration.applied' );
+	const TYPES = array( 'role.created', 'role.deleted', 'role.renamed', 'caps.updated', 'user.roles', 'user.caps', 'user.disabled', 'roles.reset', 'role.default_set', 'migration.applied' );
 
 	/** Capabilities the actor needs, per type. */
 	public static function required_caps( string $type ): array {
@@ -28,6 +30,8 @@ final class Reverter {
 				return array( Caps::VIEW_AUDIT, Caps::MANAGE_USERS );
 			case 'user.caps':
 				return array( Caps::VIEW_AUDIT, Caps::MANAGE_USERS, Caps::MANAGE_CAPS );
+			case 'user.disabled':
+				return array( Caps::VIEW_AUDIT, Caps::MANAGE_USERS );
 			case 'migration.applied':
 				return array( Caps::VIEW_AUDIT, Caps::IMPORT, Caps::MANAGE_ACCESS );
 		}
@@ -78,6 +82,8 @@ final class Reverter {
 				return self::revert_default_set( $entry_id, $actor, $detail );
 			case 'user.caps':
 				return self::revert_user_caps( $entry_id, $actor, (int) $row->target, $diff );
+			case 'user.disabled':
+				return self::revert_user_disabled( $entry_id, $actor, (int) $row->target, $detail );
 			case 'migration.applied':
 				return self::revert_migration( $entry_id, $actor, (string) $row->target, $detail );
 		}
@@ -217,17 +223,9 @@ final class Reverter {
 		if ( $actor !== $target && ! user_can( $actor, 'promote_user', $target ) ) {
 			return new \WP_Error( 'rolegate_cannot_promote', __( 'You can\'t change the roles of this user.', 'role-gatekeeper' ) );
 		}
-		if ( in_array( 'administrator', $before, true ) && ! in_array( 'administrator', $after, true ) ) {
-			$admins = get_users(
-				array(
-					'role'   => 'administrator',
-					'fields' => 'ID',
-					'number' => 2,
-				)
-			);
-			if ( count( $admins ) < 2 ) {
-				return new \WP_Error( 'rolegate_last_admin', __( 'The last administrator can\'t lose the Administrator role.', 'role-gatekeeper' ) );
-			}
+		$ok = Users::check_last_admin( $target, $before, $after );
+		if ( is_wp_error( $ok ) ) {
+			return $ok;
 		}
 		$ok = self::check_user_result( $actor, $after, self::user_own_caps( $user ) );
 		if ( is_wp_error( $ok ) ) {
@@ -288,6 +286,14 @@ final class Reverter {
 		}
 		self::announce( 'user.caps', $entry_id, $actor, (string) $target, array( 'caps' => $current ), array( 'caps' => $new ) );
 		return true;
+	}
+
+	/** @return true|\WP_Error */
+	private static function revert_user_disabled( int $entry_id, int $actor, int $target, array $detail ) {
+		if ( ! array_key_exists( 'disabled_before', $detail ) ) {
+			return new \WP_Error( 'rolegate_audit_not_revertible', __( 'The previous account status was not recorded.', 'role-gatekeeper' ) );
+		}
+		return Accounts::change( $actor, $target, (bool) $detail['disabled_before'], $entry_id );
 	}
 
 	/** @return true|\WP_Error */

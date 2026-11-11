@@ -197,7 +197,7 @@ final class Role_Service {
 
 	/** @param int $user_id */
 	public static function apply_extra_defaults( $user_id ): void {
-		$extras = self::extra_default_roles();
+		$extras = is_user_logged_in() ? array() : self::extra_default_roles();
 		$user   = $extras ? get_userdata( (int) $user_id ) : false;
 		if ( ! $user ) {
 			return;

@@ -7,6 +7,10 @@ if ( ! defined( 'ROLEGATE_DIR' ) ) {
 	define( 'ROLEGATE_DIR', plugin_dir_path( __FILE__ ) );
 }
 
+$rolegate_audit_opt   = get_option( 'rolegate_audit_settings', array() );
+$rolegate_purge_flags = is_array( $rolegate_audit_opt ) && ! empty( $rolegate_audit_opt['delete_on_uninstall'] );
+unset( $rolegate_audit_opt );
+
 require_once ROLEGATE_DIR . 'includes/modules/audit/uninstall.php';
 
 global $wpdb;
@@ -75,9 +79,13 @@ if ( is_multisite() ) {
 	$rolegate_clean_site();
 }
 
-$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->usermeta} WHERE meta_key = %s", 'rolegate_rescue_token' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->usermeta} WHERE meta_key IN (%s, %s, %s, %s)", 'rolegate_rescue_token', 'rolegate_first_login_pending', 'rolegate_disable_at', 'rolegate_disable_by' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+if ( $rolegate_purge_flags ) {
+	$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->usermeta} WHERE meta_key IN (%s, %s)", 'rolegate_disabled', 'rolegate_disabled_info' ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+}
 if ( function_exists( 'wp_cache_flush_group' ) ) {
 	wp_cache_flush_group( 'user_meta' );
 }
 
 wp_clear_scheduled_hook( 'rolegate_audit_prune' );
+wp_clear_scheduled_hook( 'rolegate_disable_due' );

@@ -104,6 +104,17 @@ try {
 	$rw_store( $ok );
 	$rw_ok( home_url( '/account/' ) === Resolver::filter_login( admin_url(), '', $sub ), 'login: subscriber goes to their page' );
 	$rw_ok( home_url( '/goodbye/' ) === Resolver::filter_logout( 'wp-login.php?loggedout=true', '', $sub ), 'logout: subscriber goes to their page' );
+
+	// Registration and first login.
+	$rw_new = Login_Redirects_Settings::sanitize( array( 'rules' => array( 'subscriber' => array( 'login' => '/account/', 'registration' => '/welcome/', 'first_login' => '/start/' ) ) ) );
+	$rw_ok( is_array( $rw_new ) && home_url( '/welcome/' ) === $rw_new['rules']['subscriber']['registration'] && home_url( '/start/' ) === $rw_new['rules']['subscriber']['first_login'], 'registration and first login URLs are saved' );
+	$rw_store( $rw_new );
+	$rw_fresh = $rw_make( 'rw_lr_fresh', 'subscriber' )->ID;
+	$rw_ok( home_url( '/welcome/' ) === Resolver::filter_registration( 'wp-login.php?checkemail=registered', $rw_fresh ) && 'x' === Resolver::filter_registration( 'x', 0 ), 'registration: the new user goes to the role page, an unknown user is left alone' );
+	$rw_ok( home_url( '/start/' ) === Resolver::filter_login( admin_url(), '', get_userdata( $rw_fresh ) ), 'first login: a newly registered user goes to the first login page' );
+	$rw_ok( home_url( '/account/' ) === Resolver::filter_login( admin_url(), '', get_userdata( $rw_fresh ) ), 'first login: the next login uses the normal login page' );
+	$rw_ok( home_url( '/account/' ) === Resolver::filter_login( admin_url(), '', $sub ), 'first login: an account that already logged in keeps the normal login page' );
+	$rw_store( $ok );
 	$rw_ok( admin_url() === Resolver::filter_login( admin_url(), '', $rw_make( 'rw_lr_author', 'author' ) ), 'login: a role without a rule keeps the WordPress default' );
 	$rw_ok( 'wp-login.php?loggedout=true' === Resolver::filter_logout( 'wp-login.php?loggedout=true', '', $editor ), 'logout: a role without a rule keeps the default' );
 	$err = new WP_Error( 'x', 'x' );
