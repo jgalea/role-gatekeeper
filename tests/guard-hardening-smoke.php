@@ -168,6 +168,7 @@ try {
 	$rw_orig_stripped = get_option( Stripped_Notice::OPTION, null );
 	delete_option( Stripped_Notice::OPTION );
 	wp_set_current_user( 0 );
+	add_filter( 'rolegate_trust_anonymous_user_creation', '__return_false' );
 	$rw_anon = wp_insert_user(
 		array(
 			'user_login' => 'rw_t_anon_' . $rw_sfx,
@@ -176,6 +177,7 @@ try {
 			'role'       => 'administrator',
 		)
 	);
+	remove_filter( 'rolegate_trust_anonymous_user_creation', '__return_false' );
 	$rw_users[] = $rw_anon;
 	$rw_ok( ! in_array( 'administrator', get_userdata( $rw_anon )->roles, true ) && in_array( $rw_anon, array_map( 'intval', (array) get_option( Stripped_Notice::OPTION, array() ) ), true ), 'stripped registration: the account is recorded for the admin notice' );
 	if ( null === $rw_orig_stripped ) {
