@@ -561,6 +561,53 @@ try {
 		echo "NOTE not running under WP-CLI: shell actor check skipped\n";
 	}
 	delete_user_meta( $rw_a, 'ja_disable_user' );
+
+	// The last active administrator can't be disabled or demoted, and disabled administrators don't count as a second one.
+	$rw_all_admins = array_map( 'intval', get_users( array( 'role' => 'administrator', 'fields' => 'ID' ) ) );
+	$rw_parked     = array();
+	foreach ( array_diff( $rw_all_admins, array( $rw_a, $rw_b ) ) as $rw_id ) {
+		if ( ! Accounts::is_disabled( $rw_id ) ) {
+			Accounts::write( $rw_id, true );
+			$rw_parked[] = $rw_id;
+		}
+	}
+	$rw_owner_role = $rw_role . '_own';
+	$rw_roles[]    = $rw_owner_role;
+	\Rolegate\Modules\Safety\Enforcer::as_system(
+		function () use ( $rw_owner_role ) {
+			add_role( $rw_owner_role, 'RW owner', get_role( 'administrator' )->capabilities );
+		}
+	);
+	wp_set_current_user( $rw_a );
+	$rw_owner = $rw_make( 'rw_dis_owner', $rw_owner_role );
+	wp_set_current_user( 0 );
+	Accounts::write( $rw_a, false );
+	Accounts::write( $rw_b, true );
+	$rw_code = function ( $res ) {
+		return is_wp_error( $res ) ? $res->get_error_code() : 'ok';
+	};
+	$rw_ok( 'rolegate_last_admin' === $rw_code( Accounts::check( $rw_owner, $rw_a, true ) ), 'last admin: the only active administrator can\'t be disabled even when another user can manage the plugin (' . $rw_code( Accounts::check( $rw_owner, $rw_a, true ) ) . ')' );
+	$rw_ok( 'rolegate_last_admin' === $rw_code( \Rolegate\Modules\User_Roles\Users::check_last_admin( $rw_a, array( 'administrator' ), array() ) ), 'last admin: removing the role is refused while the other administrator is disabled' );
+	Accounts::write( $rw_b, false );
+	$rw_ok( 'ok' === $rw_code( Accounts::check( $rw_owner, $rw_a, true ) ) && true === \Rolegate\Modules\User_Roles\Users::check_last_admin( $rw_a, array( 'administrator' ), array() ), 'last admin control: both allowed once a second administrator is enabled' );
+
+	// Per-user capability holders are found as managers (LIKE value isn't escaped twice).
+	$rw_percap = $rw_make( 'rw_dis_percap', 'subscriber' );
+	\Rolegate\Modules\Safety\Enforcer::as_system(
+		function () use ( $rw_percap ) {
+			get_userdata( $rw_percap )->add_cap( Caps::MANAGE );
+		}
+	);
+	$rw_ok( in_array( $rw_percap, Accounts::active_managers(), true ), 'per-user rolegate_manage holder is an active manager' );
+	$rw_under = 'rw_dis_u_' . $rw_sfx;
+	$rw_roles[] = $rw_under;
+	add_role( $rw_under, 'RW underscore', array( 'read' => true ) );
+	$rw_uid = $rw_make( 'rw_dis_under', $rw_under );
+	$rw_nr  = new \WP_User_Query( array( 'fields' => 'ID', 'meta_query' => \Rolegate\Modules\User_Roles\Users::no_role_meta_query() ) ); // phpcs:ignore WordPress.DB.SlowDBQuery
+	$rw_ok( ! in_array( $rw_uid, array_map( 'intval', $rw_nr->get_results() ), true ), 'a user whose role slug contains an underscore is not in the No role view' );
+	foreach ( $rw_parked as $rw_id ) {
+		Accounts::write( $rw_id, false );
+	}
 } catch ( \Throwable $e ) {
 	++$rw_fail;
 	echo 'FAIL exception: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine() . "\n";

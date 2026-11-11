@@ -1,6 +1,7 @@
 <?php
 namespace Rolegate\Modules\User_Roles;
 
+use Rolegate\Modules\Disabled_Users\Accounts;
 use Rolegate\Modules\Safety\Guard;
 
 defined( 'ABSPATH' ) || exit;
@@ -151,6 +152,36 @@ final class Users {
 	}
 
 	/**
+	 * Refuses a role change that leaves the site without an enabled administrator.
+	 *
+	 * @param string[] $before
+	 * @param string[] $after
+	 * @return true|\WP_Error
+	 */
+	public static function check_last_admin( int $target, array $before, array $after ) {
+		if ( ! in_array( 'administrator', $before, true ) || in_array( 'administrator', $after, true ) || self::has_other_active_admin( $target ) ) {
+			return true;
+		}
+		return new \WP_Error( 'rolegate_last_admin', __( 'The last active administrator can\'t lose the Administrator role.', 'role-gatekeeper' ) );
+	}
+
+	public static function has_other_active_admin( int $target ): bool {
+		$admins = get_users(
+			array(
+				'role'    => 'administrator',
+				'fields'  => 'ID',
+				'exclude' => array( $target ),
+			)
+		);
+		foreach ( $admins as $id ) {
+			if ( ! Accounts::is_blocked( (int) $id ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * @param string[] $add
 	 * @param string[] $remove
 	 * @return true|\WP_Error
@@ -180,16 +211,11 @@ final class Users {
 				return new \WP_Error( 'rolegate_role_not_allowed', __( 'You can\'t give that role: it carries capabilities you don\'t hold.', 'role-gatekeeper' ) );
 			}
 		}
-		if ( $target > 0 && in_array( 'administrator', $remove, true ) && in_array( 'administrator', self::raw_roles( $target ), true ) ) {
-			$admins = get_users(
-				array(
-					'role'   => 'administrator',
-					'fields' => 'ID',
-					'number' => 2,
-				)
-			);
-			if ( count( $admins ) < 2 ) {
-				return new \WP_Error( 'rolegate_last_admin', __( 'The last administrator can\'t lose the Administrator role.', 'role-gatekeeper' ) );
+		if ( $target > 0 ) {
+			$before = self::raw_roles( $target );
+			$ok     = self::check_last_admin( $target, $before, array_values( array_unique( array_merge( array_diff( $before, $remove ), $add ) ) ) );
+			if ( is_wp_error( $ok ) ) {
+				return $ok;
 			}
 		}
 		return true;

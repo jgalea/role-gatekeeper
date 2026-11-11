@@ -1,6 +1,7 @@
 <?php
 namespace Rolegate\Modules\Disabled_Users;
 
+use Rolegate\Core\Plugin;
 use Rolegate\Modules\Safety\Caps;
 use Rolegate\Modules\Safety\Guard;
 use Rolegate\Modules\User_Roles\Users;
@@ -12,6 +13,10 @@ final class Accounts {
 
 	public static function is_disabled( int $user_id ): bool {
 		return $user_id > 0 && '1' === (string) get_user_meta( $user_id, self::META, true );
+	}
+
+	public static function is_blocked( int $user_id ): bool {
+		return Plugin::is_enabled( 'disabled-users' ) && self::is_disabled( $user_id );
 	}
 
 	public static function meta_id( int $user_id ): int {
@@ -124,6 +129,9 @@ final class Accounts {
 		}
 		if ( $disable && self::is_last_manager( $target ) ) {
 			return new \WP_Error( 'rolegate_last_manager', __( 'This is the last active user who can manage Role Gatekeeper, so the account can\'t be disabled.', 'role-gatekeeper' ) );
+		}
+		if ( $disable && in_array( 'administrator', Users::raw_roles( $target ), true ) && ! Users::has_other_active_admin( $target ) ) {
+			return new \WP_Error( 'rolegate_last_admin', __( 'This is the last active administrator, so the account can\'t be disabled.', 'role-gatekeeper' ) );
 		}
 		return true;
 	}
