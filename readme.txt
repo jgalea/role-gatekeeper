@@ -48,9 +48,9 @@ No. Every feature is in this plugin.
 
 Use the "Locked out of Role Gatekeeper?" link on the login screen. It emails a one-time link to the administrator's address that restores the Role Gatekeeper capabilities. You can also add `define( 'ROLEGATE_DISABLE_SITE_ACCESS', true );` to wp-config.php to switch off private-site and admin-access rules.
 
-= Can I migrate from Members, User Role Editor or Disable Users? =
+= Can I migrate from Members, User Role Editor, Disable Users or Adminimize? =
 
-Yes. Roles, capabilities and per-user capabilities are stored by WordPress itself and work here as they are. Role Gatekeeper > Import and export > "Migrate from another plugin" carries over the rest: from Members, denied capabilities, content and block permissions, the restricted-content message and private-site mode; from User Role Editor, the extra roles for new users; from Disable Users, every disabled account. You see a preview first, the roles are backed up, the other plugin's data stays as it is, and the audit log can revert the migration. With WP-CLI: `wp rolegate migrate members` previews and `--apply` applies; `wp rolegate migrate snapshot` and `verify` confirm every role and user keeps the same capabilities.
+Yes. Roles, capabilities and per-user capabilities are stored by WordPress itself and work here as they are. Role Gatekeeper > Import and export > "Migrate from another plugin" carries over the rest: from Members, denied capabilities, content and block permissions, the restricted-content message and private-site mode; from User Role Editor, the extra roles for new users; from Disable Users, every disabled account; from Adminimize, the menu items, dashboard widgets and toolbar items it hides per role. You see a preview first, the roles are backed up, the other plugin's data stays as it is, and the audit log can revert the migration. With WP-CLI: `wp rolegate migrate members` previews and `--apply` applies; `wp rolegate migrate snapshot` and `verify` confirm every role and user keeps the same capabilities.
 
 = Delegating access =
 
@@ -61,6 +61,7 @@ Switching modules on or off and changing the automation settings needs an admini
 = 1.1.0 (Unreleased) =
 * Disabled accounts: disable a user from the user screen or in bulk, keeping the account, posts and byline. Logged in the audit log with revert.
 * Migration from Disable Users: `wp rolegate migrate disable-users` or Import and export > Migrate from another plugin.
+* Migration from Adminimize: `wp rolegate migrate adminimize` or Import and export > Migrate from another plugin.
 
 = 1.0.0 =
 * First release.

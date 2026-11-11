@@ -4,6 +4,7 @@ namespace Rolegate\Modules\Portability;
 use Rolegate\Core\Plugin;
 use Rolegate\Core\Settings;
 use Rolegate\Modules\Capabilities\Cap_Catalog;
+use Rolegate\Modules\Admin_Ui\Rules;
 use Rolegate\Modules\Content_Access\Access;
 use Rolegate\Modules\Content_Access\Content_Settings;
 use Rolegate\Modules\Deny_Hierarchy\Denials;
@@ -24,7 +25,8 @@ defined( 'ABSPATH' ) || exit;
  * A plan is { source, label, detected, rows: [{area,item,action,detail}], ops }. ops keys:
  * denials (role => full new list), posts (id => {roles?, message?} to add), blocks
  * (id => {before, after} content), content_message, site_access (new settings), extras
- * (extra default roles), modules (ids to switch on), users (ids of accounts to disable).
+ * (extra default roles), modules (ids to switch on), users (ids of accounts to disable),
+ * access (role => full new admin-ui rule).
  */
 final class Migrator {
 	const RECORDS     = 'rolegate_migrations';
@@ -37,6 +39,7 @@ final class Migrator {
 			'members'       => Members_Migration::class,
 			'ure'           => Ure_Migration::class,
 			'disable-users' => Disable_Users_Migration::class,
+			'adminimize'    => Adminimize_Migration::class,
 		);
 	}
 
@@ -90,11 +93,12 @@ final class Migrator {
 			'extras'          => null,
 			'modules'         => array(),
 			'users'           => array(),
+			'access'          => array(),
 		);
 	}
 
 	public static function has_changes( array $ops ): bool {
-		return $ops['denials'] || $ops['posts'] || $ops['blocks'] || null !== $ops['content_message'] || null !== $ops['site_access'] || null !== $ops['extras'] || $ops['modules'] || ! empty( $ops['users'] );
+		return $ops['denials'] || $ops['posts'] || $ops['blocks'] || null !== $ops['content_message'] || null !== $ops['site_access'] || null !== $ops['extras'] || $ops['modules'] || ! empty( $ops['users'] ) || ! empty( $ops['access'] );
 	}
 
 	/**
@@ -152,6 +156,7 @@ final class Migrator {
 			'modules'         => null,
 			'users'           => array(),
 			'user_state'      => array(),
+			'access'          => array(),
 			'post_ids'        => array(),
 			'reverted'        => false,
 		);
@@ -167,6 +172,19 @@ final class Migrator {
 			$record['denials'][ $role ] = array(
 				'before' => $before,
 				'after'  => Denials::for_role( (string) $role ),
+			);
+		}
+
+		foreach ( (array) ( $ops['access'] ?? array() ) as $role => $rule ) {
+			$before = Rules::get( 'role', (string) $role );
+			$ok     = Rules::save( $actor, 'role', (string) $role, $rule );
+			if ( is_wp_error( $ok ) ) {
+				$errors[] = $role . ': ' . $ok->get_error_message();
+				continue;
+			}
+			$record['access'][ $role ] = array(
+				'before' => $before,
+				'after'  => Rules::get( 'role', (string) $role ),
 			);
 		}
 
@@ -281,6 +299,7 @@ final class Migrator {
 				'target'       => $source,
 				'before'       => array(
 					'denials'  => wp_list_pluck( $record['denials'], 'before' ),
+					'access'   => wp_list_pluck( $record['access'], 'before' ),
 					'post_ids' => $record['post_ids'],
 					'settings' => array(
 						'content_message' => $record['content_message'] ? $record['content_message']['before'] : null,
@@ -292,6 +311,7 @@ final class Migrator {
 				),
 				'after'        => array(
 					'denials'  => wp_list_pluck( $record['denials'], 'after' ),
+					'access'   => wp_list_pluck( $record['access'], 'after' ),
 					'post_ids' => $record['post_ids'],
 					'settings' => array(
 						'content_message' => $record['content_message'] ? $record['content_message']['after'] : null,
@@ -319,6 +339,10 @@ final class Migrator {
 		if ( $record['denials'] ) {
 			/* translators: %d: number of roles */
 			$parts[] = sprintf( _n( 'denials on %d role', 'denials on %d roles', count( $record['denials'] ), 'role-gatekeeper' ), count( $record['denials'] ) );
+		}
+		if ( ! empty( $record['access'] ) ) {
+			/* translators: %d: number of roles */
+			$parts[] = sprintf( _n( 'hidden items on %d role', 'hidden items on %d roles', count( $record['access'] ), 'role-gatekeeper' ), count( $record['access'] ) );
 		}
 		if ( $record['post_ids'] ) {
 			/* translators: %d: number of posts */
@@ -452,6 +476,12 @@ final class Migrator {
 				$changed[] = sprintf( __( 'denials on %s', 'role-gatekeeper' ), $role );
 			}
 		}
+		foreach ( (array) ( $record['access'] ?? array() ) as $role => $a ) {
+			if ( Rules::get( 'role', (string) $role ) !== $a['after'] ) {
+				/* translators: %s: role slug */
+				$changed[] = sprintf( __( 'hidden items on %s', 'role-gatekeeper' ), $role );
+			}
+		}
 		foreach ( $record['posts'] as $post_id => $added ) {
 			$now = self::post_rules( (int) $post_id );
 			if ( ( isset( $added['roles'] ) && $now['roles'] !== $added['roles'] ) || ( isset( $added['message'] ) && $now['message'] !== $added['message'] ) ) {
@@ -494,6 +524,12 @@ final class Migrator {
 		$errors = array();
 		foreach ( $record['denials'] as $role => $d ) {
 			$ok = Denials::save( $actor, (string) $role, (array) $d['before'] );
+			if ( is_wp_error( $ok ) ) {
+				$errors[] = $role . ': ' . $ok->get_error_message();
+			}
+		}
+		foreach ( (array) ( $record['access'] ?? array() ) as $role => $a ) {
+			$ok = Rules::save( $actor, 'role', (string) $role, $a['before'] );
 			if ( is_wp_error( $ok ) ) {
 				$errors[] = $role . ': ' . $ok->get_error_message();
 			}

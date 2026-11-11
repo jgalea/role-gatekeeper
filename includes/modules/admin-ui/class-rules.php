@@ -194,7 +194,8 @@ final class Rules {
 	 * @param mixed  $raw    Unsanitized rule.
 	 */
 	public static function save( int $actor_id, string $scope, string $target, $raw ) {
-		if ( ! user_can( $actor_id, Caps::MANAGE_ACCESS ) ) {
+		$shell = $actor_id <= 0 && defined( 'WP_CLI' ) && WP_CLI;
+		if ( ! $shell && ! user_can( $actor_id, Caps::MANAGE_ACCESS ) ) {
 			return new WP_Error( 'rolegate_forbidden', __( 'You do not have permission to change access rules.', 'role-gatekeeper' ) );
 		}
 		if ( 'role' === $scope ) {
@@ -207,7 +208,7 @@ final class Rules {
 				return new WP_Error( 'rolegate_no_role', __( 'That role does not exist.', 'role-gatekeeper' ) );
 			}
 			$role_caps = (array) $role_obj->capabilities;
-			if ( ! is_super_admin( $actor_id ) && Guard::missing( Guard::critical_subset( $role_caps ), Guard::user_caps( $actor_id ) ) ) {
+			if ( ! $shell && ! is_super_admin( $actor_id ) && Guard::missing( Guard::critical_subset( $role_caps ), Guard::user_caps( $actor_id ) ) ) {
 				return new WP_Error( 'rolegate_role_above_actor', __( 'You cannot change rules for a role that holds capabilities you lack.', 'role-gatekeeper' ) );
 			}
 			if ( self::is_manager_role( $role_caps ) && ! Engine::is_empty( self::sanitize( $raw ) ) ) {
