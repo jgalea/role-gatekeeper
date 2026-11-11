@@ -16,6 +16,23 @@ final class Accounts {
 	}
 
 	public static function is_blocked( int $user_id ): bool {
+	public static function count_disabled(): int {
+		$query = new \WP_User_Query(
+			array(
+				'fields'      => 'ID',
+				'number'      => 1,
+				'count_total' => true,
+				'meta_query'  => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+					array(
+						'key'   => self::META,
+						'value' => '1',
+					),
+				),
+			)
+		);
+		return (int) $query->get_total();
+	}
+
 		return Plugin::is_enabled( 'disabled-users' ) && self::is_disabled( $user_id );
 	}
 
