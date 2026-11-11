@@ -253,13 +253,26 @@ try {
 	$rw_ok( is_wp_error( $rw_res ) && 'rolegate_last_manager' === $rw_res->get_error_code() && ! Accounts::is_disabled( $rw_a ), 'the last active manager cannot be disabled by anyone' );
 	$rw_ok( ! Accounts::is_last_manager( $rw_v2 ), 'a non-manager is never the last manager' );
 
+	// Fixture shortcut: the guard resets a disabled current user, so a disabled administrator can only "act" with that reset switched off.
+	$rw_acting_disabled = function ( callable $fn ) {
+		global $wp_filter;
+		$saved = $wp_filter['set_current_user']->callbacks[ PHP_INT_MAX ] ?? array();
+		unset( $wp_filter['set_current_user']->callbacks[ PHP_INT_MAX ] );
+		try {
+			return $fn();
+		} finally {
+			if ( $saved ) {
+				$wp_filter['set_current_user']->callbacks[ PHP_INT_MAX ] = $saved;
+			}
+		}
+	};
 	$rw_render = function ( $target, $actor ) {
 		wp_set_current_user( $actor );
 		ob_start();
 		( new Profile_Field() )->render( get_userdata( $target ) );
 		return (string) ob_get_clean();
 	};
-	$rw_html = $rw_render( $rw_a, $rw_b );
+	$rw_html = $rw_acting_disabled( function () use ( $rw_render, $rw_a, $rw_b ) { return $rw_render( $rw_a, $rw_b ); } );
 	$rw_ok( false !== strpos( $rw_html, 'rolegate_disabled_user' ) && preg_match( '/name="rolegate_disabled_user"[^>]*disabled/', $rw_html ), 'profile: the last manager\'s checkbox is shown locked' );
 	$rw_html = $rw_render( $rw_v2, $rw_a );
 	$rw_ok( false !== strpos( $rw_html, 'name="rolegate_disabled_user"' ) && ! preg_match( '/name="rolegate_disabled_user"[^>]*disabled/', $rw_html ) && false !== strpos( $rw_html, 'rolegate_disabled_nonce' ), 'profile: an ordinary user shows an enabled checkbox and a nonce' );
@@ -350,7 +363,7 @@ try {
 	$rw_ok( 'enable' === ( $rw_q['rolegate_dis_mode'] ?? '' ) && '2' === ( $rw_q['rolegate_dis_done'] ?? '' ) && '1' === ( $rw_q['rolegate_dis_skip'] ?? '' ) && ! Accounts::is_disabled( $rw_v2 ) && ! Accounts::is_disabled( $rw_v3 ), 'bulk enable: two enabled, an already enabled account skipped' );
 	$rw_q = $rw_bulk( $rw_a, 'rolegate_disable', array( $rw_b, $rw_a ) );
 	$rw_ok( '1' === ( $rw_q['rolegate_dis_done'] ?? '' ) && Accounts::is_disabled( $rw_b ), 'bulk disable: the second manager goes' );
-	$rw_q = $rw_bulk( $rw_b, 'rolegate_disable', array( $rw_a ) );
+	$rw_q = $rw_acting_disabled( function () use ( $rw_bulk, $rw_a, $rw_b ) { return $rw_bulk( $rw_b, 'rolegate_disable', array( $rw_a ) ); } );
 	$rw_ok( '0' === ( $rw_q['rolegate_dis_done'] ?? '' ) && '1' === ( $rw_q['rolegate_dis_skip'] ?? '' ) && ! Accounts::is_disabled( $rw_a ), 'bulk disable: the last active manager is skipped' );
 	Accounts::change( $rw_a, $rw_b, false );
 	$rw_q = $rw_bulk( $rw_mgr, 'rolegate_disable', array( $rw_a, $rw_b ) );
@@ -605,6 +618,19 @@ try {
 	$rw_uid = $rw_make( 'rw_dis_under', $rw_under );
 	$rw_nr  = new \WP_User_Query( array( 'fields' => 'ID', 'meta_query' => \Rolegate\Modules\User_Roles\Users::no_role_meta_query() ) ); // phpcs:ignore WordPress.DB.SlowDBQuery
 	$rw_ok( ! in_array( $rw_uid, array_map( 'intval', $rw_nr->get_results() ), true ), 'a user whose role slug contains an underscore is not in the No role view' );
+	// Code that sets the current user or the auth cookie itself, and password resets.
+	Accounts::write( $rw_victim, true );
+	wp_set_current_user( $rw_victim );
+	$rw_ok( 0 === get_current_user_id() && ! current_user_can( 'read' ), 'wp_set_current_user() on a disabled account resolves to nobody' );
+	wp_set_current_user( 0 );
+	$rw_tokens = count( \WP_Session_Tokens::get_instance( $rw_victim )->get_all() );
+	wp_set_auth_cookie( $rw_victim, false );
+	$rw_ok( count( \WP_Session_Tokens::get_instance( $rw_victim )->get_all() ) === $rw_tokens, 'wp_set_auth_cookie() for a disabled account leaves no session behind' );
+	$rw_ok( false === apply_filters( 'allow_password_reset', true, $rw_victim ), 'password reset is not allowed for a disabled account' );
+	Accounts::write( $rw_victim, false );
+	wp_set_current_user( $rw_victim );
+	$rw_ok( get_current_user_id() === $rw_victim && true === apply_filters( 'allow_password_reset', true, $rw_victim ), 'control: an enabled account keeps its current user and password reset' );
+	wp_set_current_user( 0 );
 	foreach ( $rw_parked as $rw_id ) {
 		Accounts::write( $rw_id, false );
 	}
