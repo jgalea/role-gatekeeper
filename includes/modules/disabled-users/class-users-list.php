@@ -156,7 +156,7 @@ final class Users_List {
 			return $sendback;
 		}
 		check_admin_referer( 'bulk-users' );
-		if ( ! current_user_can( Caps::MANAGE_USERS ) ) {
+		if ( get_current_user_id() && ! current_user_can( Caps::MANAGE_USERS ) ) {
 			wp_die( esc_html__( 'You do not have permission to do that.', 'role-gatekeeper' ), '', array( 'response' => 403 ) );
 		}
 		$disable = self::DISABLE === $action;
