@@ -34,6 +34,15 @@ $rw_ok   = function ( $cond, $label ) use ( &$rw_pass, &$rw_fail ) {
 	}
 };
 
+$rw_php_notices = array();
+set_error_handler( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.prevent_path_disclosure_set_error_handler
+	function ( $no, $msg, $file, $line ) use ( &$rw_php_notices ) {
+		$rw_php_notices[] = $msg . ' (' . basename( $file ) . ':' . $line . ')';
+		return true;
+	},
+	E_WARNING | E_NOTICE | E_USER_WARNING | E_USER_NOTICE
+);
+
 if ( is_multisite() ) {
 	add_filter( 'rolegate_multisite_site_admin_access', '__return_true', 20 );
 }
@@ -257,12 +266,14 @@ try {
 	$rw_acting_disabled = function ( callable $fn ) {
 		global $wp_filter;
 		$saved = $wp_filter['set_current_user']->callbacks[ PHP_INT_MAX ] ?? array();
-		unset( $wp_filter['set_current_user']->callbacks[ PHP_INT_MAX ] );
+		foreach ( $saved as $rw_cb ) {
+			remove_action( 'set_current_user', $rw_cb['function'], PHP_INT_MAX );
+		}
 		try {
 			return $fn();
 		} finally {
-			if ( $saved ) {
-				$wp_filter['set_current_user']->callbacks[ PHP_INT_MAX ] = $saved;
+			foreach ( $saved as $rw_cb ) {
+				add_action( 'set_current_user', $rw_cb['function'], PHP_INT_MAX, $rw_cb['accepted_args'] );
 			}
 		}
 	};
@@ -700,6 +711,9 @@ if ( null === $rw_orig_records ) {
 }
 $_POST    = array();
 $_REQUEST = array();
+
+restore_error_handler();
+$rw_ok( array() === $rw_php_notices, 'the run raised no PHP warnings or notices' . ( $rw_php_notices ? ': ' . implode( '; ', array_slice( $rw_php_notices, 0, 3 ) ) : '' ) );
 
 echo sprintf( "\n%d passed, %d failed\n", $rw_pass, $rw_fail );
 exit( $rw_fail ? 1 : 0 );
