@@ -4,7 +4,7 @@ Tags: roles, capabilities, user roles, permissions, access control
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -58,6 +58,9 @@ Yes. Roles, capabilities and per-user capabilities are stored by WordPress itsel
 Switching modules on or off and changing the automation settings needs an administrator who holds every administrator capability. Treat `rolegate_manage_caps` and `rolegate_import` as administrator-level: a holder can hand out any non-critical capability, or create and overwrite roles from a file.
 
 == Changelog ==
+
+= 1.1.1 =
+* Writers who can't manage access rules can save and submit posts again.
 
 = 1.1.0 =
 * Disabled accounts: disable a user from the user screen or in bulk, keeping the account, posts and byline. Logged in the audit log with revert.
