@@ -385,6 +385,23 @@ $_POST = array( '_rolegate_access_nonce' => wp_create_nonce( Post_Editor::NONCE 
 ( new Post_Editor() )->save_meta_box( $p_new, get_post( $p_new ) );
 $_POST = array();
 $rw_ok( ! Access::is_restricted( $p_new ), 'a user without the access capability cannot set rules from the meta box' );
+// Block editor save by a user without the access capability: the meta from the GET goes back in the POST.
+$other_key = 'rw_t_other_' . $sfx;
+register_post_meta( 'post', $other_key, array( 'single' => true, 'type' => 'string', 'show_in_rest' => true, 'auth_callback' => '__return_true' ) );
+wp_set_current_user( $u_author );
+$own = wp_insert_post( array( 'post_title' => 'author draft', 'post_status' => 'draft', 'post_author' => $u_author ) );
+$posts[] = $own;
+$res  = rest_do_request( new WP_REST_Request( 'GET', '/wp/v2/posts/' . $own ) );
+$meta = (array) ( $res->get_data()['meta'] ?? array() );
+$rw_ok( array_key_exists( $other_key, $meta ) && ! array_key_exists( '_rolegate_roles', $meta ) && ! array_key_exists( '_rolegate_message', $meta ), 'REST response to a user without the access capability omits the rules but keeps other meta' );
+$r = new WP_REST_Request( 'POST', '/wp/v2/posts/' . $own );
+$r->set_body_params( array( 'status' => 'pending', 'meta' => array_merge( $meta, array( $other_key => 'saved' ) ) ) );
+$res = rest_do_request( $r );
+$rw_ok( 200 === $res->get_status() && 'pending' === get_post_status( $own ) && 'saved' === get_post_meta( $own, $other_key, true ), 'author can submit for review with another plugin meta value (status ' . $res->get_status() . ')' );
+wp_set_current_user( $admin_id );
+$res = rest_do_request( new WP_REST_Request( 'GET', '/wp/v2/posts/' . $own ) );
+$rw_ok( array_key_exists( '_rolegate_roles', (array) ( $res->get_data()['meta'] ?? array() ) ), 'REST response to a user with the access capability includes the rules' );
+unregister_meta_key( 'post', $other_key, 'post' );
 wp_set_current_user( $admin_id );
 
 $events = array();
